@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>PIKUL - Customer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- AUTH -->
+  <main id="auth" class="auth">
+    <div class="authCard">
+      <div class="brandRow">
+        <div class="logo">P</div>
+        <div>
+          <h1>PIKUL</h1>
+          <p>Pesan pedagang kaki lima, realtime.</p>
+        </div>
+      </div>
+
+      <form id="loginForm" class="form">
+        <label>
+          Email
+          <input id="email" type="email" placeholder="kamu@pikul.id" required />
+        </label>
+        <label>
+          Password
+          <input id="password" type="password" placeholder="••••••" required minlength="4"/>
+        </label>
+
+        <button class="btn primary" type="submit">Masuk</button>
+        <button id="demoBtn" class="btn ghost" type="button">Akun Demo</button>
+
+        <div class="miniInfo">
+          <span>Admin?</span>
+          <a href="../admin/index.html">Buka Dashboard Admin</a>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <!-- APP -->
+  <div id="app" class="app hidden">
+    <header class="topbar">
+      <div class="topLeft">
+        <span class="pill">🛵 PIKUL</span>
+        <span id="gpsStatus" class="pill warn">GPS belum aktif</span>
+      </div>
+      <div class="topRight">
+        <button id="gpsBtn" class="iconBtn" title="Aktifkan GPS">📍</button>
+        <button id="logoutBtn" class="iconBtn" title="Keluar">⎋</button>
+      </div>
+    </header>
+
+    <main class="content">
+      <!-- HOME -->
+      <section id="screenHome" class="screen">
+        <div class="hero">
+          <h2>Halo, <span id="userName">User</span> 👋</h2>
+          <p class="muted">Cari pedagang, lihat menu, lalu pesan.</p>
+
+          <div class="searchRow">
+            <input id="search" placeholder="Cari bakso, kopi, nasi goreng..." />
+            <button id="refreshBtn" class="btn ghost small">Refresh</button>
+          </div>
+        </div>
+
+        <div class="sectionHeader">
+          <h3>Pedagang terdekat</h3>
+          <span id="youCoord" class="pill">-</span>
+        </div>
+
+        <div id="vendorList" class="cards"></div>
+
+        <div class="sectionHeader">
+          <h3>Keranjang</h3>
+          <span id="cartBadge" class="pill">0 item</span>
+        </div>
+
+        <div id="cartBox" class="card"></div>
+      </section>
+
+      <!-- MAP -->
+      <section id="screenMap" class="screen hidden">
+        <div class="card">
+          <div class="sectionHeader">
+            <h3>Peta (Sederhana)</h3>
+            <button id="openMapsBtn" class="btn primary small">Buka Maps</button>
+          </div>
+          <p class="muted" style="margin-top:0">Lokasi kamu + pedagang (simulasi realtime).</p>
+
+          <div class="mapBox">
+            <div class="pin you">Kamu</div>
+            <div id="pins"></div>
+          </div>
+
+          <div class="rowBetween">
+            <div>
+              <div class="muted">Update terakhir</div>
+              <b id="tick">-</b>
+            </div>
+            <button id="recenterBtn" class="btn ghost small">Re-center</button>
+          </div>
+        </div>
+
+        <div class="sectionHeader">
+          <h3>Realtime List</h3>
+          <span class="pill">tap pedagang</span>
+        </div>
+        <div id="realtimeList" class="list"></div>
+      </section>
+
+      <!-- ORDERS -->
+      <section id="screenOrders" class="screen hidden">
+        <div class="hero">
+          <h2>Pesanan</h2>
+          <p class="muted">Tracking & riwayat pesanan kamu.</p>
+        </div>
+        <div id="ordersList" class="list"></div>
+      </section>
+
+      <!-- MESSAGES -->
+      <section id="screenMessages" class="screen hidden">
+        <div class="hero">
+          <h2>Messages</h2>
+          <p class="muted">Chat sederhana konsumen ↔ pedagang.</p>
+        </div>
+
+        <div class="card">
+          <div class="rowBetween">
+            <div>
+              <div class="muted">Chat dengan</div>
+              <b id="chatWith">-</b>
+            </div>
+            <button id="pickChatBtn" class="btn ghost small">Pilih Pedagang</button>
+          </div>
+
+          <div id="chatBox" class="chatBox"></div>
+
+          <div class="chatInput">
+            <input id="chatInput" placeholder="Tulis pesan..." />
+            <button id="sendChatBtn" class="btn primary">Kirim</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- PROFILE -->
+      <section id="screenProfile" class="screen hidden">
+        <div class="hero">
+          <h2>Profil</h2>
+          <p class="muted">Pengaturan akun sederhana.</p>
+        </div>
+
+        <div class="card">
+          <div class="profileRow">
+            <div class="avatar">👤</div>
+            <div>
+              <b id="pName">-</b>
+              <div id="pEmail" class="muted">-</div>
+            </div>
+          </div>
+
+          <hr class="hr"/>
+
+          <div class="rowBetween">
+            <div>
+              <div class="muted">Saldo (dummy)</div>
+              <div class="big"><b id="wallet">Rp 0</b></div>
+            </div>
+            <button id="topupBtn" class="btn ghost small">Top Up</button>
+          </div>
+
+          <div class="rowBetween">
+            <div class="muted">Notifikasi</div>
+            <label class="switch">
+              <input id="notif" type="checkbox" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Nav -->
+    <nav class="bottomNav">
+      <button class="nav active" data-go="Home">🏠<span>Home</span></button>
+      <button class="nav" data-go="Map">🗺️<span>Map</span></button>
+      <button class="nav" data-go="Orders">🧾<span>Orders</span></button>
+      <button class="nav" data-go="Messages">💬<span>Messages</span></button>
+      <button class="nav" data-go="Profile">👤<span>Profile</span></button>
+    </nav>
+  </div>
+
+  <!-- Vendor Modal -->
+  <div id="vendorModal" class="modal hidden">
+    <div class="overlay" data-close="vendorModal"></div>
+    <div class="sheet">
+      <div class="sheetHead">
+        <div>
+          <div class="muted">Pedagang</div>
+          <h3 id="vTitle">-</h3>
+          <div class="muted" id="vMeta">-</div>
+        </div>
+        <button class="iconBtn" data-close="vendorModal">✕</button>
+      </div>
+
+      <div class="sheetBody">
+        <div class="rowBetween">
+          <button id="chatVendorBtn" class="btn ghost small">Chat</button>
+          <button id="checkoutFromVendorBtn" class="btn primary small">Checkout</button>
+        </div>
+
+        <h4 style="margin:12px 0 8px">Menu</h4>
+        <div id="menuList" class="list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Checkout Modal -->
+  <div id="checkoutModal" class="modal hidden">
+    <div class="overlay" data-close="checkoutModal"></div>
+    <div class="sheet">
+      <div class="sheetHead">
+        <div>
+          <div class="muted">Checkout</div>
+          <h3>Konfirmasi Pesanan</h3>
+        </div>
+        <button class="iconBtn" data-close="checkoutModal">✕</button>
+      </div>
+
+      <div class="sheetBody">
+        <div id="checkoutItems" class="list"></div>
+
+        <div class="card" style="margin-top:12px">
+          <div class="rowBetween">
+            <div class="muted">Metode bayar</div>
+            <select id="payMethod">
+              <option value="cash">Cash</option>
+              <option value="ewallet">E-Wallet (dummy)</option>
+              <option value="transfer">Transfer (dummy)</option>
+            </select>
+          </div>
+
+          <div class="rowBetween" style="margin-top:10px">
+            <div class="muted">Total</div>
+            <div class="big"><b id="checkoutTotal">Rp 0</b></div>
+          </div>
+
+          <label style="display:block; margin-top:10px">
+            <span class="muted">Catatan (opsional)</span>
+            <input id="orderNote" placeholder="contoh: jangan pakai sambal"/>
+          </label>
+        </div>
+
+        <button id="placeOrderBtn" class="btn primary" style="width:100%; margin-top:12px">
+          Buat Pesanan
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pick Chat Vendor Modal -->
+  <div id="pickChatModal" class="modal hidden">
+    <div class="overlay" data-close="pickChatModal"></div>
+    <div class="sheet">
+      <div class="sheetHead">
+        <div>
+          <div class="muted">Pilih pedagang</div>
+          <h3>Chat dengan siapa?</h3>
+        </div>
+        <button class="iconBtn" data-close="pickChatModal">✕</button>
+      </div>
+      <div class="sheetBody">
+        <div id="pickChatList" class="list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

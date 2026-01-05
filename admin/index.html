@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>PIKUL - Admin</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <main id="adminAuth" class="auth">
+    <div class="authCard">
+      <div class="brandRow">
+        <div class="logo">A</div>
+        <div>
+          <h1>PIKUL Admin</h1>
+          <p>Dashboard monitoring order & pedagang.</p>
+        </div>
+      </div>
+
+      <form id="adminLoginForm" class="form">
+        <label>
+          Username
+          <input id="adminUser" placeholder="admin" required />
+        </label>
+        <label>
+          Password
+          <input id="adminPass" type="password" placeholder="admin123" required />
+        </label>
+
+        <button class="btn primary" type="submit">Masuk Admin</button>
+        <div class="miniInfo">
+          <span>Customer?</span>
+          <a href="../customer/index.html">Buka App Customer</a>
+        </div>
+
+        <small class="muted">
+          Demo: username <b>admin</b>, password <b>admin123</b>.
+        </small>
+      </form>
+    </div>
+  </main>
+
+  <div id="adminApp" class="app hidden">
+    <aside class="sidebar">
+      <div class="sbBrand">
+        <div class="sbLogo">P</div>
+        <div>
+          <b>PIKUL</b>
+          <div class="muted">Admin Panel</div>
+        </div>
+      </div>
+
+      <nav class="sbNav">
+        <button class="sbItem active" data-tab="Dashboard">📊 Dashboard</button>
+        <button class="sbItem" data-tab="Orders">🧾 Orders</button>
+        <button class="sbItem" data-tab="Vendors">🧑‍🍳 Vendors</button>
+        <button class="sbItem" data-tab="Settings">⚙️ Settings</button>
+      </nav>
+
+      <button id="adminLogoutBtn" class="sbLogout">⎋ Logout</button>
+    </aside>
+
+    <section class="main">
+      <header class="header">
+        <div>
+          <h2 id="pageTitle">Dashboard</h2>
+          <div class="muted" id="pageSub">Ringkasan aktivitas PIKUL.</div>
+        </div>
+        <div class="headerRight">
+          <button id="refreshAdminBtn" class="btn ghost small">Refresh</button>
+        </div>
+      </header>
+
+      <!-- DASHBOARD -->
+      <section id="tabDashboard" class="tab">
+        <div class="kpiGrid">
+          <div class="kpi">
+            <div class="muted">Total Orders</div>
+            <div class="kpiVal" id="kpiOrders">0</div>
+          </div>
+          <div class="kpi">
+            <div class="muted">Revenue (dummy)</div>
+            <div class="kpiVal" id="kpiRevenue">Rp 0</div>
+          </div>
+          <div class="kpi">
+            <div class="muted">Diproses</div>
+            <div class="kpiVal" id="kpiProcess">0</div>
+          </div>
+          <div class="kpi">
+            <div class="muted">Selesai</div>
+            <div class="kpiVal" id="kpiDone">0</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="rowBetween">
+            <h3 style="margin:0">Order Terbaru</h3>
+            <span class="pill">klik untuk detail</span>
+          </div>
+          <div id="latestOrders" class="list" style="margin-top:10px"></div>
+        </div>
+      </section>
+
+      <!-- ORDERS -->
+      <section id="tabOrders" class="tab hidden">
+        <div class="card">
+          <div class="rowBetween">
+            <h3 style="margin:0">Daftar Orders</h3>
+            <select id="statusFilter">
+              <option value="ALL">All</option>
+              <option value="Diproses">Diproses</option>
+              <option value="Dalam perjalanan">Dalam perjalanan</option>
+              <option value="Selesai">Selesai</option>
+            </select>
+          </div>
+
+          <div id="ordersTable" class="table"></div>
+        </div>
+      </section>
+
+      <!-- VENDORS -->
+      <section id="tabVendors" class="tab hidden">
+        <div class="card">
+          <div class="rowBetween">
+            <h3 style="margin:0">Vendors</h3>
+            <button id="addVendorBtn" class="btn primary small">+ Tambah Vendor</button>
+          </div>
+          <div id="vendorAdminList" class="list" style="margin-top:10px"></div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section id="tabSettings" class="tab hidden">
+        <div class="card">
+          <h3 style="margin-top:0">Settings</h3>
+          <p class="muted">Mode demo (tanpa backend). Data tersimpan di localStorage.</p>
+          <button id="resetDataBtn" class="btn ghost">Reset Semua Data (localStorage)</button>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <!-- Order Detail Modal -->
+  <div id="orderModal" class="modal hidden">
+    <div class="overlay" data-close="orderModal"></div>
+    <div class="sheet">
+      <div class="sheetHead">
+        <div>
+          <div class="muted">Order Detail</div>
+          <h3 id="ordTitle">-</h3>
+          <div id="ordMeta" class="muted">-</div>
+        </div>
+        <button class="iconBtn" data-close="orderModal">✕</button>
+      </div>
+      <div class="sheetBody">
+        <div id="ordItems" class="list"></div>
+
+        <div class="card" style="margin-top:12px">
+          <div class="rowBetween">
+            <div class="muted">Status</div>
+            <select id="ordStatus">
+              <option>Diproses</option>
+              <option>Dalam perjalanan</option>
+              <option>Selesai</option>
+            </select>
+          </div>
+          <button id="saveStatusBtn" class="btn primary" style="width:100%; margin-top:10px">
+            Simpan Status
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>
