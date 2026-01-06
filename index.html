@@ -7,6 +7,7 @@
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"
     />
     <title>PIKUL</title>
+    <link rel="icon" type="image/jpeg" href="pikul.jpeg" />
     <link rel="stylesheet" href="styles.css" />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
@@ -20,6 +21,12 @@
         align-items: center;
         gap: 12px;
       }
+      /* Class untuk gambar logo agar rapi */
+      .brand-img {
+        object-fit: cover;
+        box-shadow: 0 4px 12px rgba(255, 122, 0, 0.2);
+      }
+
       @media (min-width: 768px) {
         .desktop-brand {
           display: flex;
@@ -32,23 +39,24 @@
   </head>
   <body>
     <div id="splash">
+      <img
+        src="pikul.jpeg"
+        class="brand-img"
+        style="
+          width: 90px;
+          height: 90px;
+          border-radius: 24px;
+          animation: bounce 1s infinite alternate;
+        "
+      />
       <div
         style="
-          width: 70px;
-          height: 70px;
-          background: #ff7a00;
-          color: #fff;
-          border-radius: 20px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 32px;
-          font-weight: 900;
+          margin-top: 16px;
+          font-weight: 700;
+          font-size: 20px;
+          letter-spacing: 1px;
         "
       >
-        P
-      </div>
-      <div style="margin-top: 16px; font-weight: 700; font-size: 18px">
         PIKUL
       </div>
     </div>
@@ -56,23 +64,13 @@
     <main id="auth" class="auth hidden">
       <div class="authCard">
         <div style="text-align: center; margin-bottom: 20px">
-          <div
-            style="
-              width: 50px;
-              height: 50px;
-              background: #ff7a00;
-              color: #fff;
-              border-radius: 14px;
-              display: inline-flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 24px;
-              font-weight: bold;
-            "
-          >
-            P
-          </div>
+          <img
+            src="pikul.jpeg"
+            class="brand-img"
+            style="width: 70px; height: 70px; border-radius: 18px"
+          />
         </div>
+
         <h2 style="text-align: center; margin: 0 0 8px">Selamat Datang</h2>
         <p class="muted" style="text-align: center; margin-bottom: 24px">
           Masuk untuk mulai jajan.
@@ -98,21 +96,11 @@
     <div id="app" class="app hidden">
       <nav class="bottomNav">
         <div class="desktop-brand">
-          <div
-            style="
-              width: 36px;
-              height: 36px;
-              background: #ff7a00;
-              color: #fff;
-              border-radius: 10px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-weight: bold;
-            "
-          >
-            P
-          </div>
+          <img
+            src="pikul.jpeg"
+            class="brand-img"
+            style="width: 40px; height: 40px; border-radius: 12px"
+          />
           <div style="font-weight: 800; font-size: 20px">PIKUL</div>
         </div>
 
@@ -149,21 +137,11 @@
 
       <header id="mainHeader" class="topbar">
         <div class="rowBetween">
-          <div
-            style="
-              width: 30px;
-              height: 30px;
-              background: #ff7a00;
-              color: #fff;
-              border-radius: 8px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-weight: bold;
-            "
-          >
-            P
-          </div>
+          <img
+            src="pikul.jpeg"
+            class="brand-img"
+            style="width: 32px; height: 32px; border-radius: 8px"
+          />
           <div style="font-weight: 800; font-size: 16px">PIKUL</div>
         </div>
         <div class="rowBetween">
