@@ -1,285 +1,284 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  onSnapshot,
+  doc,
+  updateDoc,
+  orderBy,
+  query,
+  deleteDoc,
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { firebaseConfig } from "../firebase-config.js";
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
 const $ = (q) => document.querySelector(q);
 const $$ = (q) => document.querySelectorAll(q);
-
-const LS = {
-  admin: "pikul_admin",
-  orders: "pikul_orders",
-  vendors: "pikul_vendors",
-  user: "pikul_user"
-};
-
-function loadJSON(key, fallback){
-  try{
-    const raw = localStorage.getItem(key);
-    if(!raw) return fallback;
-    return JSON.parse(raw);
-  }catch{ return fallback; }
+function rupiah(n) {
+  return "Rp " + (n || 0).toLocaleString("id-ID");
 }
-function saveJSON(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
-
-function rupiah(n){ return "Rp " + (n||0).toLocaleString("id-ID"); }
-function uid(p="ID"){ return `${p}-${Math.random().toString(16).slice(2)}-${Date.now().toString(16)}`; }
 
 let state = {
-  admin: null,
   orders: [],
   vendors: [],
-  selectedOrderId: null
+  replies: [], // State baru untuk reply
+  selectedOrderId: null,
 };
 
-/* ---------- AUTH ---------- */
-function showAuth(){ $("#adminAuth").classList.remove("hidden"); $("#adminApp").classList.add("hidden"); }
-function showApp(){ $("#adminAuth").classList.add("hidden"); $("#adminApp").classList.remove("hidden"); }
-
-function initAuth(){
-  const a = loadJSON(LS.admin, null);
-  if(a){
-    state.admin = a;
-    showApp();
-    boot();
-  }else{
-    showAuth();
-  }
-}
-
+// --- AUTH ---
 $("#adminLoginForm").addEventListener("submit", (e) => {
   e.preventDefault();
-  const u = $("#adminUser").value.trim();
-  const p = $("#adminPass").value.trim();
-  if(u !== "admin" || p !== "admin123"){
-    alert("Username/password salah. Demo: admin / admin123");
-    return;
-  }
-  const admin = { id: uid("ADM"), username: "admin" };
-  state.admin = admin;
-  saveJSON(LS.admin, admin);
-  showApp();
-  boot();
-});
-
-$("#adminLogoutBtn").addEventListener("click", () => {
-  if(confirm("Logout admin?")){
-    localStorage.removeItem(LS.admin);
-    state.admin = null;
-    showAuth();
+  if (
+    $("#adminUser").value === "admin" &&
+    $("#adminPass").value === "admin123"
+  ) {
+    $("#adminAuth").classList.add("hidden");
+    $("#adminApp").classList.remove("hidden");
+    boot();
+  } else {
+    alert("Salah. (admin/admin123)");
   }
 });
+$("#adminLogoutBtn").addEventListener("click", () => location.reload());
 
-/* ---------- NAV ---------- */
-const tabs = {
-  Dashboard: $("#tabDashboard"),
-  Orders: $("#tabOrders"),
-  Vendors: $("#tabVendors"),
-  Settings: $("#tabSettings")
-};
+// --- DATA LISTENER ---
+function boot() {
+  // Listen Orders
+  const qOrd = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+  onSnapshot(qOrd, (snap) => {
+    state.orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderDashboard();
+    renderOrdersTable();
+  });
 
-function setActiveTab(name){
-  $$(".sbItem").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
-  Object.entries(tabs).forEach(([k, el]) => el.classList.toggle("hidden", k !== name));
+  // Listen Vendors
+  onSnapshot(collection(db, "vendors"), (snap) => {
+    state.vendors = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderVendors();
+  });
 
-  $("#pageTitle").textContent = name;
-  $("#pageSub").textContent =
-    name === "Dashboard" ? "Ringkasan aktivitas PIKUL." :
-    name === "Orders" ? "Kelola status pesanan." :
-    name === "Vendors" ? "Daftar pedagang yang tampil di customer." :
-    "Pengaturan & reset demo.";
-}
-
-$$(".sbItem").forEach(b => b.addEventListener("click", () => setActiveTab(b.dataset.tab)));
-
-/* ---------- DATA ---------- */
-function loadAll(){
-  state.orders = loadJSON(LS.orders, []);
-  state.vendors = loadJSON(LS.vendors, []);
-}
-
-function saveOrders(){
-  saveJSON(LS.orders, state.orders);
-}
-
-/* ---------- DASHBOARD ---------- */
-function renderDashboard(){
-  const totalOrders = state.orders.length;
-  const revenue = state.orders.reduce((s,o)=>s+(o.total||0),0);
-  const process = state.orders.filter(o=>o.status==="Diproses").length;
-  const done = state.orders.filter(o=>o.status==="Selesai").length;
-
-  $("#kpiOrders").textContent = totalOrders;
-  $("#kpiRevenue").textContent = rupiah(revenue);
-  $("#kpiProcess").textContent = process;
-  $("#kpiDone").textContent = done;
-
-  const latest = state.orders.slice(0,6);
-  const box = $("#latestOrders");
-  if(!latest.length){
-    box.innerHTML = `<div class="muted">Belum ada order.</div>`;
-    return;
-  }
-  box.innerHTML = latest.map(o => `
-    <div class="item" data-ord="${o.id}">
-      <div>
-        <b>${o.vendorName}</b>
-        <div class="muted">${new Date(o.createdAt).toLocaleString("id-ID")} • ${o.userName}</div>
-        <div class="muted">Status: <b>${o.status}</b></div>
-      </div>
-      <div class="price">${rupiah(o.total)}</div>
-    </div>
-  `).join("");
-
-  box.querySelectorAll("[data-ord]").forEach(el => el.addEventListener("click", () => openOrder(el.dataset.ord)));
-}
-
-/* ---------- ORDERS TAB ---------- */
-function renderOrdersTable(){
-  const filter = $("#statusFilter").value;
-  const orders = (filter === "ALL") ? state.orders : state.orders.filter(o => o.status === filter);
-
-  const html = `
-    <table>
-      <thead>
-        <tr>
-          <th>Waktu</th>
-          <th>User</th>
-          <th>Vendor</th>
-          <th>Total</th>
-          <th>Status</th>
-          <th>Metode</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${orders.map(o => `
-          <tr data-ord="${o.id}" style="cursor:pointer">
-            <td>${new Date(o.createdAt).toLocaleString("id-ID")}</td>
-            <td>${o.userName}</td>
-            <td>${o.vendorName}</td>
-            <td>${rupiah(o.total)}</td>
-            <td><b>${o.status}</b></td>
-            <td>${(o.method||"").toUpperCase()}</td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
-  `;
-  $("#ordersTable").innerHTML = html;
-
-  $("#ordersTable").querySelectorAll("[data-ord]").forEach(tr => {
-    tr.addEventListener("click", () => openOrder(tr.dataset.ord));
+  // Listen Auto Replies (BARU)
+  onSnapshot(collection(db, "auto_replies"), (snap) => {
+    state.replies = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderReplies();
   });
 }
 
-$("#statusFilter").addEventListener("change", () => {
-  loadAll();
-  renderOrdersTable();
-});
+// --- DASHBOARD ---
+function renderDashboard() {
+  $("#kpiOrders").textContent = state.orders.length;
+  $("#kpiRevenue").textContent = rupiah(
+    state.orders.reduce((a, b) => a + (b.total || 0), 0)
+  );
 
-/* ---------- ORDER MODAL ---------- */
-function openModal(id){ $("#"+id).classList.remove("hidden"); }
-function closeModal(id){ $("#"+id).classList.add("hidden"); }
-
-document.body.addEventListener("click", (e) => {
-  const c = e.target.getAttribute("data-close");
-  if(c) closeModal(c);
-});
-
-function openOrder(id){
-  state.selectedOrderId = id;
-  const o = state.orders.find(x => x.id === id);
-  if(!o) return;
-
-  $("#ordTitle").textContent = `${o.vendorName} • ${o.id}`;
-  $("#ordMeta").textContent = `${new Date(o.createdAt).toLocaleString("id-ID")} • ${o.userName} • ${rupiah(o.total)}`;
-
-  $("#ordItems").innerHTML = (o.items||[]).map(it => `
+  const latest = state.orders.slice(0, 5);
+  $("#latestOrders").innerHTML = latest
+    .map(
+      (o) => `
     <div class="item">
       <div>
-        <b>${it.name} × ${it.qty}</b>
-        <div class="muted">${rupiah(it.price)} / item</div>
+        <b>${o.vendorName}</b>
+        <div class="muted">${new Date(o.createdAt).toLocaleTimeString()} • ${
+        o.userName
+      }</div>
       </div>
-      <div class="price">${rupiah(it.price * it.qty)}</div>
+      <div>
+        <div class="price">${rupiah(o.total)}</div>
+        <small class="pill">${o.status}</small>
+      </div>
     </div>
-  `).join("");
-
-  $("#ordStatus").value = o.status || "Diproses";
-  openModal("orderModal");
+  `
+    )
+    .join("");
 }
 
-$("#saveStatusBtn").addEventListener("click", () => {
-  const id = state.selectedOrderId;
-  const status = $("#ordStatus").value;
+// --- ORDERS ---
+function renderOrdersTable() {
+  const formatItems = (items) => {
+    if (!items || !items.length) return "-";
+    return items.map((i) => `${i.qty}x ${i.name}`).join(", ");
+  };
 
-  state.orders = state.orders.map(o => o.id === id ? { ...o, status } : o);
-  saveOrders();
-  closeModal("orderModal");
+  $("#ordersTable").innerHTML = `
+    <table style="width:100%; border-collapse: collapse;">
+      <thead>
+        <tr style="background:#f5f5f5; text-align:left;">
+          <th style="padding:10px;">Waktu & User</th>
+          <th style="padding:10px;">Vendor</th>
+          <th style="padding:10px;">Menu Pesanan</th>
+          <th style="padding:10px;">Total</th>
+          <th style="padding:10px;">Status</th>
+          <th style="padding:10px;">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${state.orders
+          .map(
+            (o) => `
+          <tr style="border-bottom:1px solid #eee;">
+            <td style="padding:10px;">
+              <div>${new Date(o.createdAt).toLocaleString()}</div>
+              <small class="muted">${o.userName}</small>
+            </td>
+            <td style="padding:10px;">${o.vendorName}</td>
+            <td style="padding:10px;">
+              <div style="font-size:13px; color:#444; max-width:250px; line-height:1.4;">
+                ${formatItems(o.items)}
+              </div>
+              ${
+                o.note
+                  ? `<div style="font-size:11px; color:orange; margin-top:4px;">Catatan: ${o.note}</div>`
+                  : ""
+              }
+            </td>
+            <td style="padding:10px;"><b>${rupiah(o.total)}</b></td>
+            <td style="padding:10px;"><span class="pill">${o.status}</span></td>
+            <td style="padding:10px;">
+              <div style="display:flex; gap:6px;">
+                <button class="btn small ghost" onclick="openOrd('${
+                  o.id
+                }')">Status</button>
+                <button class="btn small" onclick="deleteOrd('${
+                  o.id
+                }')" style="background:#fff0f0; border:1px solid #ffcccc; color:red;">Hapus</button>
+              </div>
+            </td>
+          </tr>
+        `
+          )
+          .join("")}
+      </tbody>
+    </table>
+  `;
+}
 
-  loadAll();
-  renderDashboard();
-  renderOrdersTable();
+window.openOrd = (id) => {
+  state.selectedOrderId = id;
+  const o = state.orders.find((x) => x.id === id);
+  $("#ordStatus").value = o.status;
+
+  $("#ordItems").innerHTML = `
+    <div style="background:#fafafa; padding:10px; border-radius:8px;">
+      ${o.items
+        .map(
+          (i) => `
+        <div class="rowBetween" style="margin-bottom:6px;">
+          <span>${i.name} <small>x${i.qty}</small></span>
+          <span>${rupiah(i.price * i.qty)}</span>
+        </div>
+      `
+        )
+        .join("")}
+      <hr style="border:none; border-top:1px dashed #ddd; margin:8px 0;">
+      <div class="rowBetween">
+        <b>Total</b>
+        <b>${rupiah(o.total)}</b>
+      </div>
+    </div>
+  `;
+  $("#orderModal").classList.remove("hidden");
+};
+
+window.deleteOrd = async (id) => {
+  if (confirm("Yakin ingin menghapus order ini selamanya?")) {
+    await deleteDoc(doc(db, "orders", id));
+  }
+};
+
+$("#saveStatusBtn").addEventListener("click", async () => {
+  const st = $("#ordStatus").value;
+  await updateDoc(doc(db, "orders", state.selectedOrderId), { status: st });
+  $("#orderModal").classList.add("hidden");
 });
 
-/* ---------- VENDORS TAB ---------- */
-function renderVendors(){
-  const box = $("#vendorAdminList");
-  if(!state.vendors.length){
-    box.innerHTML = `<div class="muted">Belum ada vendor (seed dari customer akan muncul setelah dibuka).</div>`;
+$$("[data-close]").forEach((b) =>
+  b.addEventListener("click", () =>
+    $("#" + b.dataset.close).classList.add("hidden")
+  )
+);
+
+// --- VENDORS ---
+function renderVendors() {
+  $("#vendorAdminList").innerHTML = state.vendors
+    .map(
+      (v) => `
+    <div class="item">
+      <div><b>${v.name}</b> <div class="muted">${v.type}</div></div>
+      <div class="muted">${v.lat.toFixed(4)}</div>
+    </div>
+  `
+    )
+    .join("");
+}
+
+$("#addVendorBtn").addEventListener("click", async () => {
+  const name = prompt("Nama Vendor:");
+  if (name) {
+    await addDoc(collection(db, "vendors"), {
+      name,
+      type: "bakso",
+      ico: "🥘",
+      rating: 4.5,
+      busy: "Sepi",
+      lat: -6.2 + Math.random() * 0.01,
+      lon: 106.81 + Math.random() * 0.01,
+    });
+  }
+});
+
+// --- AUTO REPLIES (FUNGSI BARU) ---
+function renderReplies() {
+  const list = $("#replyList");
+  if (!state.replies.length) {
+    list.innerHTML = `<div class="muted">Belum ada kata-kata balasan. Tambahkan dulu.</div>`;
     return;
   }
-  box.innerHTML = state.vendors.map(v => `
+  list.innerHTML = state.replies
+    .map(
+      (r) => `
     <div class="item">
-      <div>
-        <b>${v.ico} ${v.name}</b>
-        <div class="muted">${v.type.toUpperCase()} • Rating ${v.rating} • ${v.busy}</div>
+      <div style="flex:1">"${r.text}"</div>
+      <div style="display:flex; gap:6px;">
+        <button class="btn small ghost" onclick="editReply('${r.id}', '${r.text}')">Edit</button>
+        <button class="btn small" onclick="deleteReply('${r.id}')" style="color:red; border-color:#ffcccc;">Hapus</button>
       </div>
-      <div class="muted">${v.lat.toFixed(4)}, ${v.lon.toFixed(4)}</div>
     </div>
-  `).join("");
+  `
+    )
+    .join("");
 }
 
-$("#addVendorBtn").addEventListener("click", () => {
-  // tambah vendor dummy cepat
-  const v = {
-    id: uid("V"),
-    name: "Vendor Baru",
-    type: "kopi",
-    ico: "☕",
-    rating: 4.4,
-    busy: "Sedang",
-    lat: -6.2 + (Math.random()-0.5)*0.01,
-    lon: 106.81 + (Math.random()-0.5)*0.01,
-  };
-  state.vendors.unshift(v);
-  saveJSON(LS.vendors, state.vendors);
-  renderVendors();
-  alert("Vendor dummy ditambahkan. (Buka customer → refresh vendor)");
-});
-
-/* ---------- SETTINGS ---------- */
-$("#resetDataBtn").addEventListener("click", () => {
-  if(confirm("Reset semua data localStorage? (orders/vendors/user)")){
-    localStorage.removeItem(LS.orders);
-    localStorage.removeItem(LS.vendors);
-    localStorage.removeItem(LS.user);
-    alert("Berhasil reset. Customer & Admin kembali kosong.");
-    loadAll();
-    renderDashboard();
-    renderOrdersTable();
-    renderVendors();
+$("#addReplyBtn").addEventListener("click", async () => {
+  const txt = prompt("Masukkan kalimat balasan otomatis:");
+  if (txt) {
+    await addDoc(collection(db, "auto_replies"), { text: txt });
   }
 });
 
-$("#refreshAdminBtn").addEventListener("click", () => {
-  loadAll();
-  renderDashboard();
-  renderOrdersTable();
-  renderVendors();
-});
+window.editReply = async (id, oldText) => {
+  const newTxt = prompt("Edit balasan:", oldText);
+  if (newTxt && newTxt !== oldText) {
+    await updateDoc(doc(db, "auto_replies", id), { text: newTxt });
+  }
+};
 
-/* ---------- BOOT ---------- */
-function boot(){
-  loadAll();
-  setActiveTab("Dashboard");
-  renderDashboard();
-  renderOrdersTable();
-  renderVendors();
-}
+window.deleteReply = async (id) => {
+  if (confirm("Hapus balasan ini?")) {
+    await deleteDoc(doc(db, "auto_replies", id));
+  }
+};
 
-initAuth();
+// Tab Switching
+$$(".sbItem").forEach((b) =>
+  b.addEventListener("click", () => {
+    $$(".sbItem").forEach((x) => x.classList.remove("active"));
+    b.classList.add("active");
+    $$(".tab").forEach((t) => t.classList.add("hidden"));
+    $("#tab" + b.dataset.tab).classList.remove("hidden");
+    $("#pageTitle").textContent =
+      b.dataset.tab === "Replies" ? "Auto Reply Settings" : b.dataset.tab;
+  })
+);

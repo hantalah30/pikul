@@ -1,11 +1,29 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  doc,
+  onSnapshot,
+  query,
+  where,
+  orderBy,
+  updateDoc,
+  setDoc,
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { firebaseConfig } from "./firebase-config.js";
+
+// --- INIT FIREBASE ---
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Helper
 const $ = (q) => document.querySelector(q);
 const $$ = (q) => document.querySelectorAll(q);
-
-const LS = {
-  user: "pikul_user",
-  orders: "pikul_orders",
-  vendors: "pikul_vendors"
-};
+function rupiah(n) {
+  return "Rp " + (n || 0).toLocaleString("id-ID");
+}
 
 const screens = {
   Home: $("#screenHome"),
@@ -15,589 +33,584 @@ const screens = {
   Profile: $("#screenProfile"),
 };
 
+const MENU = {
+  bakso: [
+    { id: "m1", name: "Bakso Urat", price: 15000 },
+    { id: "m2", name: "Bakso Telur", price: 17000 },
+    { id: "m3", name: "Es Teh", price: 5000 },
+  ],
+  kopi: [
+    { id: "k1", name: "Kopi Susu", price: 12000 },
+    { id: "k2", name: "Americano", price: 14000 },
+  ],
+  nasi: [
+    { id: "n1", name: "Nasi Goreng", price: 18000 },
+    { id: "n2", name: "Mie Goreng", price: 17000 },
+  ],
+};
+
 let state = {
   user: null,
-  you: { ok:false, lat:null, lon:null },
+  you: { ok: false, lat: null, lon: null },
   vendors: [],
   cart: [],
   orders: [],
+  autoReplies: [], // Menyimpan daftar balasan dari DB
   selectedVendorId: null,
   chatWithVendorId: null,
-  chats: {}
+  unsubOrders: null,
+  unsubChats: null,
 };
 
-const MENU = {
-  bakso: [
-    { id:"m1", name:"Bakso Urat", price:15000 },
-    { id:"m2", name:"Bakso Telur", price:17000 },
-    { id:"m3", name:"Es Teh", price:5000 },
-  ],
-  kopi: [
-    { id:"k1", name:"Kopi Susu", price:12000 },
-    { id:"k2", name:"Americano", price:14000 },
-    { id:"k3", name:"Roti Bakar", price:10000 },
-  ],
-  nasi: [
-    { id:"n1", name:"Nasi Goreng", price:18000 },
-    { id:"n2", name:"Mie Goreng", price:17000 },
-    { id:"n3", name:"Air Mineral", price:4000 },
-  ]
-};
-
-function rupiah(n){ return "Rp " + (n||0).toLocaleString("id-ID"); }
-function uid(p="ID"){ return `${p}-${Math.random().toString(16).slice(2)}-${Date.now().toString(16)}`; }
-
-function loadJSON(key, fallback){
-  try{
-    const raw = localStorage.getItem(key);
-    if(!raw) return fallback;
-    return JSON.parse(raw);
-  }catch{ return fallback; }
+// --- AUTH ---
+function showAuth() {
+  $("#auth").classList.remove("hidden");
+  $("#app").classList.add("hidden");
 }
-function saveJSON(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
-
-function show(el){ el.classList.remove("hidden"); }
-function hide(el){ el.classList.add("hidden"); }
-
-function setActiveNav(name){
-  $$(".nav").forEach(b => b.classList.toggle("active", b.dataset.go === name));
-}
-function go(name){
-  Object.entries(screens).forEach(([k, el]) => el.classList.toggle("hidden", k !== name));
-  setActiveNav(name);
-  if(name === "Map") renderMap();
-  if(name === "Orders") renderOrders();
-  if(name === "Messages") renderChat();
-  if(name === "Profile") renderProfile();
+function showApp() {
+  $("#auth").classList.add("hidden");
+  $("#app").classList.remove("hidden");
 }
 
-/* ---------- AUTH ---------- */
-function showAuth(){ show($("#auth")); hide($("#app")); }
-function showApp(){ hide($("#auth")); show($("#app")); }
+async function initAuth() {
+  const savedEmail = localStorage.getItem("pikul_email");
+  if (savedEmail) {
+    await loginUser(savedEmail);
+  } else {
+    showAuth();
+  }
+}
 
-function initAuth(){
-  const u = loadJSON(LS.user, null);
-  if(u){
-    state.user = u;
+async function loginUser(email) {
+  try {
+    const q = query(collection(db, "users"), where("email", "==", email));
+    const snap = await getDocs(q);
+
+    if (!snap.empty) {
+      const d = snap.docs[0];
+      state.user = { id: d.id, ...d.data() };
+    } else {
+      const name = email.split("@")[0];
+      const newUser = {
+        email,
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        wallet: 0,
+        createdAt: new Date().toISOString(),
+      };
+      const ref = await addDoc(collection(db, "users"), newUser);
+      state.user = { id: ref.id, ...newUser };
+    }
+
+    localStorage.setItem("pikul_email", email);
     showApp();
     bootApp();
-  }else{
-    showAuth();
+  } catch (e) {
+    alert("Gagal login: " + e.message);
+    console.error(e);
   }
 }
 
 $("#loginForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const email = $("#email").value.trim();
-  const pass = $("#password").value.trim();
-  if(!email.includes("@")) return alert("Email tidak valid.");
-  if(pass.length < 4) return alert("Password minimal 4 karakter.");
-  const name = email.split("@")[0].replaceAll(".", " ").slice(0,18);
-  const user = { id: uid("USR"), name: titleCase(name), email, wallet: 0 };
-  state.user = user;
-  saveJSON(LS.user, user);
-  showApp();
-  bootApp();
-});
-
-$("#demoBtn").addEventListener("click", () => {
-  const user = { id: uid("USR"), name: "Ily Demo", email:"demo@pikul.id", wallet: 25000 };
-  state.user = user;
-  saveJSON(LS.user, user);
-  showApp();
-  bootApp();
+  if (!email.includes("@")) return alert("Email valid diperlukan");
+  loginUser(email);
 });
 
 $("#logoutBtn").addEventListener("click", () => {
-  if(confirm("Keluar dari akun?")){
-    localStorage.removeItem(LS.user);
-    stopGPS();
-    state.user = null;
-    showAuth();
+  if (confirm("Keluar?")) {
+    localStorage.removeItem("pikul_email");
+    location.reload();
   }
 });
 
-/* ---------- BOOT ---------- */
-function bootApp(){
+// --- BOOT ---
+async function bootApp() {
   $("#userName").textContent = state.user.name;
-  loadOrders();
-  loadOrSeedVendors();
-  renderHome();
-  go("Home");
-  updateGpsUI();
-}
 
-/* ---------- GPS ---------- */
-let watchId = null;
-
-function updateGpsUI(){
-  const gps = $("#gpsStatus");
-  gps.textContent = state.you.ok ? "GPS aktif" : "GPS belum aktif";
-  gps.classList.toggle("warn", !state.you.ok);
-  $("#youCoord").textContent = state.you.ok
-    ? `${state.you.lat.toFixed(5)}, ${state.you.lon.toFixed(5)}`
-    : "-";
-}
-
-function startGPS(){
-  if(!navigator.geolocation) return alert("Browser tidak mendukung GPS.");
-  watchId = navigator.geolocation.watchPosition(
-    (pos) => {
-      state.you.ok = true;
-      state.you.lat = pos.coords.latitude;
-      state.you.lon = pos.coords.longitude;
-      updateGpsUI();
-      // re-seed near user only if no vendors
-      if(!state.vendors.length) loadOrSeedVendors(true);
+  // Listen Vendors
+  onSnapshot(collection(db, "vendors"), (snap) => {
+    state.vendors = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    if (state.vendors.length === 0) seedVendors();
+    else {
       renderHome();
-      if(!screens.Map.classList.contains("hidden")) renderMap();
+      if (!screens.Map.classList.contains("hidden")) renderMap();
+    }
+  });
+
+  // Listen Orders
+  if (state.unsubOrders) state.unsubOrders();
+  const qOrd = query(
+    collection(db, "orders"),
+    where("userId", "==", state.user.id)
+  );
+  state.unsubOrders = onSnapshot(qOrd, (snap) => {
+    let rawOrders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    state.orders = rawOrders.sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+    renderOrders();
+  });
+
+  // Listen Auto Replies (BARU: Ambil database balasan)
+  onSnapshot(collection(db, "auto_replies"), (snap) => {
+    state.autoReplies = snap.docs.map((d) => d.data().text); // Ambil teksnya saja
+  });
+
+  renderProfile();
+  go("Home");
+  startGPS();
+}
+
+// --- GPS ---
+function startGPS() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.watchPosition(
+    (pos) => {
+      state.you = {
+        ok: true,
+        lat: pos.coords.latitude,
+        lon: pos.coords.longitude,
+      };
+      $("#gpsStatus").textContent = "GPS Aktif";
+      $("#gpsStatus").classList.remove("warn");
+      $("#youCoord").textContent = `${state.you.lat.toFixed(
+        4
+      )}, ${state.you.lon.toFixed(4)}`;
+      renderVendorCards();
+      if (!screens.Map.classList.contains("hidden")) renderMap();
     },
-    () => {
-      state.you.ok = false;
-      updateGpsUI();
-      alert("GPS ditolak/error. Pakai Live Server / HTTPS ya.");
-    },
-    { enableHighAccuracy:true, maximumAge:2000, timeout:8000 }
+    (err) => console.log(err)
   );
 }
-function stopGPS(){
-  if(watchId != null) navigator.geolocation.clearWatch(watchId);
-  watchId = null;
-}
 
-$("#gpsBtn").addEventListener("click", startGPS);
-
-/* ---------- VENDORS ---------- */
-function loadOrSeedVendors(forceNearUser=false){
-  const saved = loadJSON(LS.vendors, []);
-  if(saved.length && !forceNearUser){
-    state.vendors = saved;
-    return;
-  }
-  const baseLat = state.you.lat ?? -6.200000;
-  const baseLon = state.you.lon ?? 106.816666;
-  const rand = (min,max)=>Math.random()*(max-min)+min;
-
-  state.vendors = [
-    { id:"v1", name:"Bakso Mang Ujang", type:"bakso", ico:"🍲", rating:4.7, busy:"Sedang", lat: baseLat+rand(-0.006,0.006), lon: baseLon+rand(-0.006,0.006)},
-    { id:"v2", name:"Kopi Keliling Dinda", type:"kopi", ico:"☕", rating:4.8, busy:"Ramai", lat: baseLat+rand(-0.006,0.006), lon: baseLon+rand(-0.006,0.006)},
-    { id:"v3", name:"Nasi Goreng Pak De", type:"nasi", ico:"🍳", rating:4.6, busy:"Lengang", lat: baseLat+rand(-0.006,0.006), lon: baseLon+rand(-0.006,0.006)},
-    { id:"v4", name:"Es Teh Jumbo Rani", type:"bakso", ico:"🧋", rating:4.5, busy:"Sedang", lat: baseLat+rand(-0.006,0.006), lon: baseLon+rand(-0.006,0.006)},
+// --- VENDORS ---
+async function seedVendors() {
+  const baseLat = -6.2;
+  const baseLon = 106.816666;
+  const dummies = [
+    {
+      name: "Bakso Mang Ujang",
+      type: "bakso",
+      ico: "🍲",
+      rating: 4.7,
+      busy: "Sedang",
+      lat: baseLat - 0.002,
+      lon: baseLon + 0.001,
+    },
+    {
+      name: "Kopi Dinda",
+      type: "kopi",
+      ico: "☕",
+      rating: 4.8,
+      busy: "Ramai",
+      lat: baseLat + 0.003,
+      lon: baseLon - 0.001,
+    },
+    {
+      name: "Nasi Goreng Pak De",
+      type: "nasi",
+      ico: "🍳",
+      rating: 4.6,
+      busy: "Lengang",
+      lat: baseLat + 0.001,
+      lon: baseLon + 0.002,
+    },
   ];
-  saveJSON(LS.vendors, state.vendors);
+  for (let v of dummies) await addDoc(collection(db, "vendors"), v);
 }
 
-function moveVendors(){
-  const step = 0.00025;
-  state.vendors = state.vendors.map(v => ({
-    ...v,
-    lat: v.lat + (Math.random()-0.5)*step,
-    lon: v.lon + (Math.random()-0.5)*step
-  }));
-  saveJSON(LS.vendors, state.vendors);
-  $("#tick").textContent = new Date().toLocaleTimeString("id-ID");
+function distKm(v) {
+  if (!state.you.ok) return null;
+  const R = 6371;
+  const dLat = ((v.lat - state.you.lat) * Math.PI) / 180;
+  const dLon = ((v.lon - state.you.lon) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((state.you.lat * Math.PI) / 180) *
+      Math.cos((v.lat * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+function distText(v) {
+  const d = distKm(v);
+  if (d === null) return "GPS?";
+  return d < 1 ? Math.round(d * 1000) + " m" : d.toFixed(2) + " km";
 }
 
-setInterval(() => {
-  if(!state.vendors.length) return;
-  moveVendors();
-  if(!screens.Home.classList.contains("hidden")) renderVendorCards();
-  if(!screens.Map.classList.contains("hidden")) { renderMap(); renderRealtimeList(); }
-}, 2000);
-
-function distKm(aLat,aLon,bLat,bLon){
-  if(!state.you.ok) return null;
-  const R=6371;
-  const dLat=(bLat-aLat)*Math.PI/180;
-  const dLon=(bLon-aLon)*Math.PI/180;
-  const x=Math.sin(dLat/2)**2 + Math.cos(aLat*Math.PI/180)*Math.cos(bLat*Math.PI/180)*Math.sin(dLon/2)**2;
-  return 2*R*Math.asin(Math.sqrt(x));
-}
-
-function vendorDistanceText(v){
-  const d = distKm(state.you.lat, state.you.lon, v.lat, v.lon);
-  if(d == null) return "GPS belum aktif";
-  if(d < 1) return `${Math.round(d*1000)} m`;
-  return `${d.toFixed(2)} km`;
-}
-
-/* ---------- HOME RENDER ---------- */
-function renderHome(){
+// --- RENDER HOME ---
+function renderHome() {
   renderVendorCards();
   renderCart();
 }
 
-function renderVendorCards(){
-  const q = ($("#search").value || "").toLowerCase().trim();
-  const list = state.vendors
-    .filter(v => !q || v.name.toLowerCase().includes(q) || v.type.includes(q))
-    .map(v => `
-      <div class="vendorCard" data-v="${v.id}">
-        <div class="vIco">${v.ico}</div>
-        <div class="vMeta">
-          <b>${v.name}</b>
-          <div class="muted">Rating ${v.rating} • ${v.busy}</div>
-          <div class="chips">
-            <span class="chip">${v.type.toUpperCase()}</span>
-            <span class="chip">📍 ${vendorDistanceText(v)}</span>
-            <span class="chip">Realtime</span>
-          </div>
-        </div>
-        <div class="price">Lihat</div>
-      </div>
-    `).join("");
+function renderVendorCards() {
+  const q = ($("#search").value || "").toLowerCase();
+  const list = state.vendors.filter((v) => v.name.toLowerCase().includes(q));
 
-  $("#vendorList").innerHTML = list || `<div class="card"><div class="muted">Tidak ada pedagang.</div></div>`;
-  $$("#vendorList .vendorCard").forEach(el => el.addEventListener("click", () => openVendor(el.dataset.v)));
+  $("#vendorList").innerHTML =
+    list
+      .map(
+        (v) => `
+    <div class="vendorCard" data-id="${v.id}">
+      <div class="vIco">${v.ico}</div>
+      <div class="vMeta">
+        <b>${v.name}</b>
+        <div class="muted">⭐ ${v.rating} • ${v.busy}</div>
+        <div class="chips">
+          <span class="chip">${v.type.toUpperCase()}</span>
+          <span class="chip">📍 ${distText(v)}</span>
+        </div>
+      </div>
+      <div class="price">Lihat</div>
+    </div>
+  `
+      )
+      .join("") || `<div class="card muted">Tidak ada pedagang.</div>`;
+
+  $$(".vendorCard").forEach((el) =>
+    el.addEventListener("click", () => openVendor(el.dataset.id))
+  );
 }
 
 $("#search").addEventListener("input", renderVendorCards);
-$("#refreshBtn").addEventListener("click", () => { moveVendors(); renderVendorCards(); });
 
-/* ---------- MODALS ---------- */
-function openModal(id){ $("#"+id).classList.remove("hidden"); }
-function closeModal(id){ $("#"+id).classList.add("hidden"); }
+// --- MODALS ---
+function openModal(id) {
+  $("#" + id).classList.remove("hidden");
+}
+function closeModal(id) {
+  $("#" + id).classList.add("hidden");
+}
+$$("[data-close]").forEach((el) =>
+  el.addEventListener("click", () => closeModal(el.dataset.close))
+);
 
-document.body.addEventListener("click", (e) => {
-  const close = e.target.getAttribute("data-close");
-  if(close) closeModal(close);
-});
-
-function getVendor(id){ return state.vendors.find(v => v.id === id); }
-
-function openVendor(vId){
-  state.selectedVendorId = vId;
-  const v = getVendor(vId);
-  if(!v) return;
+function openVendor(id) {
+  state.selectedVendorId = id;
+  const v = state.vendors.find((x) => x.id === id);
+  if (!v) return;
 
   $("#vTitle").textContent = v.name;
-  $("#vMeta").textContent = `📍 ${vendorDistanceText(v)} • ${v.type.toUpperCase()}`;
-  const menu = MENU[v.type] || [];
+  $("#vMeta").textContent = `📍 ${distText(v)} • ${v.type}`;
 
-  $("#menuList").innerHTML = menu.map(m => `
-    <div class="listItem" data-menu="${m.id}">
-      <div>
-        <b>${m.name}</b>
-        <div class="muted">${rupiah(m.price)}</div>
-      </div>
+  const menu = MENU[v.type] || [];
+  $("#menuList").innerHTML = menu
+    .map(
+      (m) => `
+    <div class="listItem" data-mid="${m.id}">
+      <div><b>${m.name}</b><div class="muted">${rupiah(m.price)}</div></div>
       <div class="price">Tambah</div>
     </div>
-  `).join("");
+  `
+    )
+    .join("");
 
-  $$("#menuList .listItem").forEach(el => el.addEventListener("click", () => addToCart(vId, v.type, el.dataset.menu)));
-
+  $$("#menuList .listItem").forEach((el) =>
+    el.addEventListener("click", () => addToCart(id, v.type, el.dataset.mid))
+  );
   openModal("vendorModal");
 }
 
-function addToCart(vId, type, menuId){
-  const item = (MENU[type]||[]).find(x => x.id === menuId);
-  if(!item) return;
-  const ex = state.cart.find(x => x.vendorId === vId && x.itemId === menuId);
-  if(ex) ex.qty++;
-  else state.cart.push({ vendorId:vId, itemId:menuId, name:item.name, price:item.price, qty:1 });
+function addToCart(vId, type, mId) {
+  const item = MENU[type].find((x) => x.id === mId);
+  const ex = state.cart.find((x) => x.vendorId === vId && x.itemId === mId);
+  if (ex) ex.qty++;
+  else
+    state.cart.push({
+      vendorId: vId,
+      itemId: mId,
+      name: item.name,
+      price: item.price,
+      qty: 1,
+    });
   renderCart();
 }
 
-/* ---------- CART ---------- */
-function renderCart(){
-  const count = state.cart.reduce((a,c)=>a+c.qty,0);
-  $("#cartBadge").textContent = `${count} item`;
+// --- CART ---
+function renderCart() {
+  const count = state.cart.reduce((a, c) => a + c.qty, 0);
+  $("#cartBadge").textContent = count + " item";
 
-  if(!state.cart.length){
-    $("#cartBox").innerHTML = `<div class="muted">Keranjang kosong. Klik pedagang → tambah menu.</div>`;
-    return;
-  }
+  if (!state.cart.length)
+    return ($(
+      "#cartBox"
+    ).innerHTML = `<div class="muted">Keranjang kosong.</div>`);
 
-  const rows = state.cart.map(it => `
-    <div class="rowBetween" style="padding:10px 0; border-bottom:1px dashed var(--line)">
-      <div>
-        <b>${it.name}</b>
-        <div class="muted">${rupiah(it.price)} • ${getVendor(it.vendorId)?.name ?? "-"}</div>
-      </div>
-      <div style="display:flex; gap:6px; align-items:center">
-        <button class="iconBtn" data-dec="${it.vendorId}|${it.itemId}">−</button>
-        <b>${it.qty}</b>
-        <button class="iconBtn" data-inc="${it.vendorId}|${it.itemId}">+</button>
-      </div>
-    </div>
-  `).join("");
-
-  const total = state.cart.reduce((s,it)=>s+it.price*it.qty,0);
-
+  const total = state.cart.reduce((a, c) => a + c.price * c.qty, 0);
   $("#cartBox").innerHTML = `
-    ${rows}
-    <div class="rowBetween" style="margin-top:10px">
-      <div>
-        <div class="muted">Total</div>
-        <div class="big"><b>${rupiah(total)}</b></div>
+    ${state.cart
+      .map(
+        (it, idx) => `
+      <div class="rowBetween" style="border-bottom:1px dashed #eee; padding:5px 0">
+        <div><b>${it.name}</b> <small>x${it.qty}</small></div>
+        <div style="display:flex; gap:5px">
+          <button class="iconBtn" style="width:24px;height:24px" data-dec="${idx}">-</button>
+          <button class="iconBtn" style="width:24px;height:24px" data-inc="${idx}">+</button>
+        </div>
       </div>
+    `
+      )
+      .join("")}
+    <div class="rowBetween" style="margin-top:10px">
+      <b>Total ${rupiah(total)}</b>
       <button id="checkoutBtn" class="btn primary small">Checkout</button>
     </div>
   `;
 
-  $("#cartBox").querySelectorAll("[data-inc]").forEach(b => b.addEventListener("click", () => adjustQty(b.getAttribute("data-inc"), +1)));
-  $("#cartBox").querySelectorAll("[data-dec]").forEach(b => b.addEventListener("click", () => adjustQty(b.getAttribute("data-dec"), -1)));
+  $$("[data-inc]").forEach((b) =>
+    b.addEventListener("click", () => {
+      state.cart[b.dataset.inc].qty++;
+      renderCart();
+    })
+  );
+  $$("[data-dec]").forEach((b) =>
+    b.addEventListener("click", () => {
+      state.cart[b.dataset.dec].qty--;
+      if (state.cart[b.dataset.dec].qty <= 0)
+        state.cart.splice(b.dataset.dec, 1);
+      renderCart();
+    })
+  );
   $("#checkoutBtn").addEventListener("click", openCheckout);
 }
 
-function adjustQty(key, delta){
-  const [vId, itemId] = key.split("|");
-  const idx = state.cart.findIndex(x => x.vendorId===vId && x.itemId===itemId);
-  if(idx < 0) return;
-  state.cart[idx].qty += delta;
-  if(state.cart[idx].qty <= 0) state.cart.splice(idx,1);
-  renderCart();
-}
-
-/* ---------- CHECKOUT ---------- */
-function openCheckout(){
-  if(!state.cart.length) return alert("Keranjang kosong.");
-  $("#checkoutItems").innerHTML = state.cart.map(it => `
-    <div class="listItem">
-      <div>
-        <b>${it.name} × ${it.qty}</b>
-        <div class="muted">${getVendor(it.vendorId)?.name ?? "-"}</div>
-      </div>
-      <div class="price">${rupiah(it.price*it.qty)}</div>
-    </div>
-  `).join("");
-
-  const total = state.cart.reduce((s,it)=>s+it.price*it.qty,0);
+function openCheckout() {
+  if (!state.cart.length) return;
+  const total = state.cart.reduce((a, c) => a + c.price * c.qty, 0);
+  $("#checkoutItems").innerHTML = state.cart
+    .map(
+      (i) =>
+        `<div class="rowBetween"><span>${i.name} x${i.qty}</span> <b>${rupiah(
+          i.price * i.qty
+        )}</b></div>`
+    )
+    .join("");
   $("#checkoutTotal").textContent = rupiah(total);
   openModal("checkoutModal");
 }
 
-$("#placeOrderBtn").addEventListener("click", () => {
-  const method = $("#payMethod").value;
-  const note = ($("#orderNote").value || "").trim();
-  const total = state.cart.reduce((s,it)=>s+it.price*it.qty,0);
+$("#placeOrderBtn").addEventListener("click", async () => {
+  const btn = $("#placeOrderBtn");
+  btn.textContent = "Loading...";
+  btn.disabled = true;
 
-  const firstVendor = getVendor(state.cart[0].vendorId);
-  const order = {
-    id: uid("ORD"),
-    userId: state.user.id,
-    userName: state.user.name,
-    vendorId: firstVendor?.id ?? "-",
-    vendorName: firstVendor?.name ?? "-",
-    items: JSON.parse(JSON.stringify(state.cart)),
-    total,
-    method,
-    note,
-    status: "Diproses",
-    createdAt: new Date().toISOString()
-  };
+  try {
+    const v = state.vendors.find((x) => x.id === state.cart[0].vendorId);
+    const orderData = {
+      userId: state.user.id,
+      userName: state.user.name,
+      vendorId: v?.id || "unknown",
+      vendorName: v?.name || "Unknown",
+      items: state.cart,
+      total: state.cart.reduce((a, c) => a + c.price * c.qty, 0),
+      note: $("#orderNote").value,
+      method: $("#payMethod").value,
+      status: "Diproses",
+      createdAt: new Date().toISOString(),
+    };
 
-  state.orders.unshift(order);
-  saveOrders();
+    await addDoc(collection(db, "orders"), orderData);
 
-  // simulasi status berubah
-  setTimeout(()=>updateOrderStatus(order.id, "Dalam perjalanan"), 3500);
-  setTimeout(()=>updateOrderStatus(order.id, "Selesai"), 8000);
-
-  state.cart = [];
-  $("#orderNote").value = "";
-  closeModal("checkoutModal");
-  renderCart();
-  go("Orders");
+    state.cart = [];
+    $("#orderNote").value = "";
+    closeModal("checkoutModal");
+    closeModal("vendorModal");
+    renderCart();
+    go("Orders");
+    alert("Pesanan masuk ke Database!");
+  } catch (e) {
+    alert("Gagal order: " + e.message);
+  }
+  btn.textContent = "Buat Pesanan";
+  btn.disabled = false;
 });
 
-function updateOrderStatus(orderId, status){
-  // update in memory + localStorage so admin sees it
-  state.orders = state.orders.map(o => o.id===orderId ? {...o, status} : o);
-  saveOrders();
-  if(!screens.Orders.classList.contains("hidden")) renderOrders();
-}
-
-/* ---------- ORDERS STORAGE ---------- */
-function loadOrders(){
-  state.orders = loadJSON(LS.orders, []);
-}
-function saveOrders(){
-  saveJSON(LS.orders, state.orders);
-}
-
-/* ---------- ORDERS UI ---------- */
-function renderOrders(){
-  loadOrders(); // always sync with LS
+// --- ORDERS LIST ---
+function renderOrders() {
   const list = $("#ordersList");
-  if(!state.orders.length){
-    list.innerHTML = `<div class="card"><div class="muted">Belum ada pesanan. Pesan dari Home dulu.</div></div>`;
-    return;
-  }
+  if (!state.orders.length)
+    return (list.innerHTML = `<div class="card muted">Belum ada pesanan.</div>`);
+
   list.innerHTML = state.orders
-    .filter(o => o.userId === state.user.id) // user-specific
-    .map(o => {
-      const t = new Date(o.createdAt).toLocaleString("id-ID");
+    .map((o) => {
+      const items = o.items || [];
+      const itemSummary = items.map((i) => `${i.qty}x ${i.name}`).join(", ");
+
       return `
-        <div class="listItem" data-ord="${o.id}">
-          <div>
-            <b>${o.vendorName}</b>
-            <div class="muted">${t} • ${o.method.toUpperCase()}</div>
-            <div class="muted">Status: <b>${o.status}</b></div>
-          </div>
+      <div class="listItem" style="display:block;">
+        <div class="rowBetween">
+          <b>${o.vendorName}</b>
           <div class="price">${rupiah(o.total)}</div>
         </div>
-      `;
-    }).join("");
-
-  list.querySelectorAll("[data-ord]").forEach(el => {
-    el.addEventListener("click", () => {
-      const id = el.dataset.ord;
-      const o = state.orders.find(x => x.id === id);
-      if(!o) return;
-      const detail = o.items.map(it => `- ${it.name} x${it.qty} (${rupiah(it.price*it.qty)})`).join("\n");
-      alert(`Detail Pesanan\n\nVendor: ${o.vendorName}\nStatus: ${o.status}\nTotal: ${rupiah(o.total)}\n\nItems:\n${detail}`);
-    });
-  });
-}
-
-/* ---------- MESSAGES ---------- */
-function ensureChat(vId){
-  if(!state.chats[vId]) state.chats[vId] = [];
-  return state.chats[vId];
-}
-function renderChat(){
-  const vId = state.chatWithVendorId;
-  $("#chatWith").textContent = vId ? (getVendor(vId)?.name ?? "-") : "-";
-  const box = $("#chatBox");
-  box.innerHTML = "";
-
-  if(!vId){
-    box.innerHTML = `<div class="muted">Pilih pedagang dulu untuk chat.</div>`;
-    return;
-  }
-
-  const msgs = ensureChat(vId);
-  if(!msgs.length) msgs.push({from:"vendor", text:"Halo! Mau pesan apa hari ini?", ts:Date.now()});
-
-  msgs.forEach(m => {
-    const div = document.createElement("div");
-    div.className = "bubble" + (m.from==="me" ? " me" : "");
-    div.textContent = m.text;
-    box.appendChild(div);
-  });
-  box.scrollTop = box.scrollHeight;
-}
-
-$("#pickChatBtn").addEventListener("click", () => {
-  $("#pickChatList").innerHTML = state.vendors.map(v => `
-    <div class="listItem" data-vchat="${v.id}">
-      <div>
-        <b>${v.ico} ${v.name}</b>
-        <div class="muted">Tap untuk chat</div>
+        <div class="muted" style="margin-top:4px; font-size:13px; color:#444;">
+          ${itemSummary || "-"}
+        </div>
+        <div class="rowBetween" style="margin-top:8px;">
+          <div class="muted" style="font-size:12px;">${new Date(
+            o.createdAt
+          ).toLocaleString()}</div>
+          <div class="pill ${o.status === "Selesai" ? "warn" : ""}">${
+        o.status
+      }</div>
+        </div>
       </div>
-      <div class="price">Pilih</div>
-    </div>
-  `).join("");
-  $$("#pickChatList [data-vchat]").forEach(el => {
-    el.addEventListener("click", () => {
-      state.chatWithVendorId = el.dataset.vchat;
-      closeModal("pickChatModal");
-      renderChat();
-    });
-  });
-  openModal("pickChatModal");
-});
+    `;
+    })
+    .join("");
+}
 
-$("#sendChatBtn").addEventListener("click", () => {
-  const vId = state.chatWithVendorId;
-  if(!vId) return alert("Pilih pedagang dulu.");
-  const txt = ($("#chatInput").value || "").trim();
-  if(!txt) return;
-  ensureChat(vId).push({from:"me", text:txt, ts:Date.now()});
-  $("#chatInput").value = "";
-  renderChat();
-  setTimeout(() => {
-    ensureChat(vId).push({from:"vendor", text:"Siap, noted ya ✅", ts:Date.now()});
-    renderChat();
-  }, 900);
-});
-
+// --- CHAT ---
 $("#chatVendorBtn").addEventListener("click", () => {
-  if(!state.selectedVendorId) return;
+  if (!state.selectedVendorId) return;
   state.chatWithVendorId = state.selectedVendorId;
   closeModal("vendorModal");
   go("Messages");
 });
 
-$("#checkoutFromVendorBtn").addEventListener("click", () => {
-  closeModal("vendorModal");
-  openCheckout();
-});
-
-/* ---------- PROFILE ---------- */
-function renderProfile(){
-  $("#pName").textContent = state.user.name;
-  $("#pEmail").textContent = state.user.email;
-  $("#wallet").textContent = rupiah(state.user.wallet || 0);
+function getChatId() {
+  return `${state.user.id}_${state.chatWithVendorId}`;
 }
 
-$("#topupBtn").addEventListener("click", () => {
-  state.user.wallet = (state.user.wallet || 0) + 50000;
-  saveJSON(LS.user, state.user);
-  renderProfile();
-  alert("Top up berhasil (dummy) +Rp 50.000");
+async function renderChat() {
+  const vId = state.chatWithVendorId;
+  const v = state.vendors.find((x) => x.id === vId);
+  $("#chatWith").textContent = v ? v.name : "Pilih Pedagang";
+  $("#chatBox").innerHTML = "";
+
+  if (!vId) return;
+
+  if (state.unsubChats) state.unsubChats();
+
+  const chatId = getChatId();
+  const msgsRef = collection(db, "chats", chatId, "messages");
+  const q = query(msgsRef, orderBy("ts", "asc"));
+
+  state.unsubChats = onSnapshot(q, (snap) => {
+    const html = snap.docs
+      .map((d) => {
+        const m = d.data();
+        return `<div class="bubble ${m.from == state.user.id ? "me" : ""}">${
+          m.text
+        }</div>`;
+      })
+      .join("");
+    $("#chatBox").innerHTML = html;
+    $("#chatBox").scrollTop = $("#chatBox").scrollHeight;
+  });
+}
+
+// KIRIM PESAN + DYNAMIC AUTO REPLY
+$("#sendChatBtn").addEventListener("click", async () => {
+  const txt = $("#chatInput").value.trim();
+  if (!txt || !state.chatWithVendorId) return;
+
+  const chatId = getChatId();
+  const currentVendorId = state.chatWithVendorId;
+
+  // 1. Pesan User
+  await addDoc(collection(db, "chats", chatId, "messages"), {
+    text: txt,
+    from: state.user.id,
+    ts: Date.now(),
+  });
+  $("#chatInput").value = "";
+
+  // 2. Auto Reply Bot
+  setTimeout(async () => {
+    // Ambil jawaban acak dari state.autoReplies yang sudah disync dengan DB
+    let replyText = "Halo kak! (Default)";
+
+    if (state.autoReplies.length > 0) {
+      replyText =
+        state.autoReplies[Math.floor(Math.random() * state.autoReplies.length)];
+    } else {
+      replyText =
+        "Halo, pesan diterima. (Belum ada auto-reply diset oleh admin)";
+    }
+
+    await addDoc(collection(db, "chats", chatId, "messages"), {
+      text: replyText,
+      from: currentVendorId,
+      ts: Date.now(),
+    });
+  }, 1500);
 });
 
-/* ---------- MAP ---------- */
-function renderMap(){
-  // simple projection: vendor pins around center
+$("#pickChatBtn").addEventListener("click", () => {
+  $("#pickChatList").innerHTML = state.vendors
+    .map(
+      (v) => `
+    <div class="listItem" onclick="selectChat('${v.id}')">
+      <b>${v.name}</b> <span class="price">Chat</span>
+    </div>
+  `
+    )
+    .join("");
+  openModal("pickChatModal");
+});
+
+window.selectChat = (vid) => {
+  state.chatWithVendorId = vid;
+  closeModal("pickChatModal");
+  renderChat();
+};
+
+// --- MAP & PROFILE ---
+function renderMap() {
   const pins = $("#pins");
   pins.innerHTML = "";
-
-  const box = document.querySelector(".mapBox");
-  const w = box.clientWidth;
-  const h = box.clientHeight;
-
-  const baseLat = state.you.lat ?? -6.200000;
-  const baseLon = state.you.lon ?? 106.816666;
-
-  state.vendors.forEach(v => {
-    const dx = (v.lon - baseLon) * 8000;
-    const dy = (v.lat - baseLat) * -8000;
-    const x = Math.max(6, Math.min(w - 60, (w/2) + dx));
-    const y = Math.max(10, Math.min(h - 40, (h*0.55) + dy));
-
+  state.vendors.forEach((v) => {
     const el = document.createElement("div");
     el.className = "pin";
-    el.style.left = x + "px";
-    el.style.top = y + "px";
-    el.textContent = `${v.ico} ${v.name.split(" ").slice(0,2).join(" ")}`;
-    el.title = `${v.name} • ${vendorDistanceText(v)}`;
-    el.style.cursor = "pointer";
-    el.addEventListener("click", () => openVendor(v.id));
+    const dx = (v.lon - 106.816666) * 8000;
+    const dy = (v.lat - -6.2) * -8000;
+    el.style.left = 150 + dx + "px";
+    el.style.top = 130 + dy + "px";
+    el.textContent = v.ico;
     pins.appendChild(el);
   });
 
-  renderRealtimeList();
-}
-
-function renderRealtimeList(){
-  $("#realtimeList").innerHTML = state.vendors.map(v => `
-    <div class="listItem" data-v="${v.id}">
-      <div>
-        <b>${v.ico} ${v.name}</b>
-        <div class="muted">📍 ${vendorDistanceText(v)} • (${v.lat.toFixed(5)}, ${v.lon.toFixed(5)})</div>
-      </div>
-      <div class="price">Menu</div>
+  $("#realtimeList").innerHTML = state.vendors
+    .map(
+      (v) => `
+    <div class="listItem">
+      <div><b>${v.name}</b> <small>(${v.lat.toFixed(4)}, ${v.lon.toFixed(
+        4
+      )})</small></div>
     </div>
-  `).join("");
-  $$("#realtimeList [data-v]").forEach(el => el.addEventListener("click", () => openVendor(el.dataset.v)));
+  `
+    )
+    .join("");
 }
 
-$("#openMapsBtn").addEventListener("click", () => {
-  if(!state.you.ok) return alert("GPS belum aktif.");
-  window.open(`https://www.google.com/maps?q=${state.you.lat},${state.you.lon}`, "_blank");
+function renderProfile() {
+  if (state.user) {
+    $("#pName").textContent = state.user.name;
+    $("#pEmail").textContent = state.user.email;
+    $("#wallet").textContent = rupiah(state.user.wallet);
+  }
+}
+
+$("#topupBtn").addEventListener("click", async () => {
+  const newBal = (state.user.wallet || 0) + 50000;
+  await updateDoc(doc(db, "users", state.user.id), { wallet: newBal });
+  state.user.wallet = newBal;
+  renderProfile();
+  alert("Topup berhasil (DB Updated)");
 });
-$("#recenterBtn").addEventListener("click", renderMap);
 
-/* ---------- NAV ---------- */
-$$(".nav").forEach(b => b.addEventListener("click", () => go(b.dataset.go)));
+// --- NAVIGATION ---
+$$(".nav").forEach((b) => b.addEventListener("click", () => go(b.dataset.go)));
+function go(name) {
+  Object.values(screens).forEach((el) => el.classList.add("hidden"));
+  screens[name].classList.remove("hidden");
+  $$(".nav").forEach((b) =>
+    b.classList.toggle("active", b.dataset.go === name)
+  );
 
-/* ---------- UTILS ---------- */
-function titleCase(s){
-  return (s||"").split(" ").filter(Boolean).map(w => w[0]?.toUpperCase() + w.slice(1)).join(" ");
+  if (name === "Map") renderMap();
+  if (name === "Messages") renderChat();
 }
 
-/* ---------- INIT ---------- */
 initAuth();
