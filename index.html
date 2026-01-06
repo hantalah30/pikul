@@ -8,6 +8,7 @@
     />
     <title>PIKUL</title>
     <link rel="icon" type="image/jpeg" href="pikul.jpeg" />
+
     <link rel="stylesheet" href="styles.css" />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
@@ -21,12 +22,10 @@
         align-items: center;
         gap: 12px;
       }
-      /* Class untuk gambar logo agar rapi */
       .brand-img {
         object-fit: cover;
         box-shadow: 0 4px 12px rgba(255, 122, 0, 0.2);
       }
-
       @media (min-width: 768px) {
         .desktop-brand {
           display: flex;
@@ -70,7 +69,6 @@
             style="width: 70px; height: 70px; border-radius: 18px"
           />
         </div>
-
         <h2 style="text-align: center; margin: 0 0 8px">Selamat Datang</h2>
         <p class="muted" style="text-align: center; margin-bottom: 24px">
           Masuk untuk mulai jajan.
@@ -90,6 +88,28 @@
             Masuk
           </button>
         </form>
+
+        <div
+          style="
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px dashed var(--border);
+          "
+        >
+          <a
+            href="admin/index.html"
+            class="btn ghost"
+            style="
+              width: 100%;
+              display: block;
+              text-align: center;
+              text-decoration: none;
+              font-size: 13px;
+            "
+          >
+            🔐 Masuk sebagai Admin
+          </a>
+        </div>
       </div>
     </main>
 
