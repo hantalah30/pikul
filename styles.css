@@ -195,7 +195,7 @@ select {
   padding: 10px 0;
   height: var(--nav-height);
   z-index: 100;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: 17px;
 }
 .nav {
   background: none;
