@@ -2,174 +2,288 @@
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PIKUL - Customer</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"
+    />
+    <title>PIKUL</title>
     <link rel="stylesheet" href="styles.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
-    <main id="auth" class="auth">
+    <div id="splash">
+      <div
+        style="
+          width: 70px;
+          height: 70px;
+          background: #ff7a00;
+          color: #fff;
+          border-radius: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 32px;
+          font-weight: 900;
+        "
+      >
+        P
+      </div>
+      <div style="margin-top: 16px; font-weight: 700; font-size: 18px">
+        PIKUL
+      </div>
+    </div>
+
+    <main id="auth" class="auth hidden">
       <div class="authCard">
-        <div class="brandRow">
-          <div class="logo">P</div>
-          <div>
-            <h1>PIKUL</h1>
-            <p>Pesan pedagang kaki lima, realtime.</p>
+        <div style="text-align: center; margin-bottom: 20px">
+          <div
+            style="
+              width: 50px;
+              height: 50px;
+              background: #ff7a00;
+              color: #fff;
+              border-radius: 14px;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 24px;
+              font-weight: bold;
+            "
+          >
+            P
           </div>
         </div>
-
-        <form id="loginForm" class="form">
-          <label>
-            Email
-            <input
-              id="email"
-              type="email"
-              placeholder="kamu@pikul.id"
-              required
-            />
-          </label>
-          <label>
-            Password
-            <input
-              id="password"
-              type="password"
-              placeholder="••••••"
-              required
-              minlength="4"
-            />
-          </label>
-
-          <button class="btn primary" type="submit">Masuk / Daftar</button>
-
-          <div class="miniInfo">
-            <span>Admin?</span>
-            <a href="admin/index.html">Buka Dashboard Admin</a>
-          </div>
+        <h2 style="text-align: center; margin: 0 0 8px">Selamat Datang</h2>
+        <p class="muted" style="text-align: center; margin-bottom: 24px">
+          Masuk untuk mulai jajan.
+        </p>
+        <form id="loginForm">
+          <input
+            id="email"
+            type="email"
+            placeholder="Email kamu (contoh: user@pikul.id)"
+            required
+          />
+          <button
+            class="btn primary"
+            style="width: 100%; margin-top: 16px"
+            type="submit"
+          >
+            Masuk
+          </button>
         </form>
       </div>
     </main>
 
     <div id="app" class="app hidden">
-      <header class="topbar">
-        <div class="topLeft">
-          <span class="pill">🛵 PIKUL</span>
-          <span id="gpsStatus" class="pill warn">GPS belum aktif</span>
+      <header id="mainHeader" class="topbar">
+        <div class="rowBetween">
+          <div
+            style="
+              width: 30px;
+              height: 30px;
+              background: #ff7a00;
+              color: #fff;
+              border-radius: 8px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: bold;
+            "
+          >
+            P
+          </div>
+          <div style="font-weight: 800; font-size: 16px">PIKUL</div>
         </div>
-        <div class="topRight">
-          <button id="gpsBtn" class="iconBtn" title="Aktifkan GPS">📍</button>
-          <button id="logoutBtn" class="iconBtn" title="Keluar">⎋</button>
+        <div class="rowBetween">
+          <span id="gpsStatus" class="pill warn" style="font-size: 10px"
+            >GPS Off</span
+          >
+          <button
+            id="logoutBtn"
+            class="iconBtn"
+            style="width: 32px; height: 32px"
+          >
+            ⎋
+          </button>
         </div>
       </header>
 
       <main class="content">
-        <section id="screenHome" class="screen">
-          <div class="hero">
-            <h2>Halo, <span id="userName">User</span> 👋</h2>
-            <p class="muted">Cari pedagang, lihat menu, lalu pesan.</p>
-
-            <div class="searchRow">
-              <input
-                id="search"
-                placeholder="Cari bakso, kopi, nasi goreng..."
-              />
-              <button id="refreshBtn" class="btn ghost small">Refresh</button>
-            </div>
-          </div>
-
-          <div class="sectionHeader">
-            <h3>Pedagang (Database)</h3>
-            <span id="youCoord" class="pill">-</span>
-          </div>
-
-          <div id="vendorList" class="cards"></div>
-
-          <div class="sectionHeader">
-            <h3>Keranjang</h3>
-            <span id="cartBadge" class="pill">0 item</span>
-          </div>
-
-          <div id="cartBox" class="card"></div>
-        </section>
-
-        <section id="screenMap" class="screen hidden">
-          <div class="card">
-            <div class="sectionHeader">
-              <h3>Peta</h3>
-              <button id="openMapsBtn" class="btn primary small">
-                Buka Maps
-              </button>
-            </div>
-            <p class="muted" style="margin-top: 0">
-              Lokasi kamu + pedagang (Live DB).
+        <section id="screenHome">
+          <div style="margin-bottom: 20px">
+            <h2 style="margin: 0">
+              Hai,
+              <span id="userName" style="color: var(--orange)">User</span> 👋
+            </h2>
+            <p class="muted" style="margin: 4px 0 0">
+              Lapar? Cari pedagang dekat sini.
             </p>
-
-            <div class="mapBox">
-              <div class="pin you">Kamu</div>
-              <div id="pins"></div>
-            </div>
           </div>
-
-          <div class="sectionHeader">
-            <h3>Realtime List</h3>
-            <span class="pill">tap pedagang</span>
+          <div id="promoList" class="promo-slider"></div>
+          <div
+            style="
+              position: sticky;
+              top: 0;
+              background: var(--bg);
+              z-index: 10;
+              padding: 10px 0 0;
+              margin-bottom: 10px;
+            "
+          >
+            <input
+              id="search"
+              placeholder="🔍 Cari pedagang..."
+              style="
+                margin-bottom: 12px;
+                border: none;
+                box-shadow: var(--shadow);
+              "
+            />
+            <div id="categoryFilters" class="filter-row"></div>
           </div>
-          <div id="realtimeList" class="list"></div>
+          <div id="vendorList"></div>
         </section>
 
-        <section id="screenOrders" class="screen hidden">
-          <div class="hero">
-            <h2>Pesanan</h2>
-            <p class="muted">Tracking & riwayat pesanan kamu.</p>
+        <section id="screenMap" class="hidden">
+          <h2 style="margin: 0 0 16px">Lokasi</h2>
+          <div class="card" style="padding: 0; overflow: hidden">
+            <iframe
+              class="map-frame"
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1982.620336844419!2d106.84311382956638!3d-6.362889945552416!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e69ed6178a2b32f%3A0x20d7938791acfd4a!2sSTT%20Terpadu%20Nurul%20Fikri%20(Kampus%20A%20-%20Sekretariat)!5e0!3m2!1sid!2sid!4v1767678102362!5m2!1sid!2sid"
+              allowfullscreen=""
+              loading="lazy"
+              referrerpolicy="no-referrer-when-downgrade"
+            ></iframe>
           </div>
-          <div id="ordersList" class="list"></div>
+          <h3 style="margin: 20px 0 10px">Pedagang Sekitar</h3>
+          <div id="realtimeList"></div>
         </section>
 
-        <section id="screenMessages" class="screen hidden">
-          <div class="hero">
-            <h2>Messages</h2>
-            <p class="muted">Chat via Database.</p>
+        <section id="screenOrders" class="hidden">
+          <h2 style="margin: 0 0 16px">Pesanan Saya</h2>
+          <div class="segment-control">
+            <button
+              class="segment-btn active"
+              onclick="switchOrderTab('active')"
+            >
+              Dalam Proses
+            </button>
+            <button class="segment-btn" onclick="switchOrderTab('history')">
+              Riwayat
+            </button>
           </div>
+          <div id="ordersList"></div>
+        </section>
 
-          <div class="card">
-            <div class="rowBetween">
-              <div>
-                <div class="muted">Chat dengan</div>
-                <b id="chatWith">-</b>
+        <section id="screenMessages" class="hidden">
+          <h2 style="margin: 0 0 10px; flex-shrink: 0">Chat</h2>
+          <div class="chat-container">
+            <div class="chat-bg-pattern"></div>
+            <div class="chat-header">
+              <div style="display: flex; align-items: center; gap: 10px">
+                <div
+                  style="
+                    width: 36px;
+                    height: 36px;
+                    background: #eee;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 18px;
+                  "
+                >
+                  👤
+                </div>
+                <div>
+                  <b id="chatWith" style="display: block; font-size: 14px"
+                    >Pilih Pedagang</b
+                  >
+                  <span class="muted" style="font-size: 11px; display: block"
+                    >Status: Online</span
+                  >
+                </div>
               </div>
-              <button id="pickChatBtn" class="btn ghost small">
-                Pilih Pedagang
+              <button id="pickChatBtn" class="btn small ghost">Ganti</button>
+            </div>
+            <div id="chatBox"></div>
+            <div id="quickReplies" class="quick-replies hidden"></div>
+            <div class="chat-input-area">
+              <input
+                id="chatInput"
+                placeholder="Tulis pesan..."
+                style="margin: 0; flex: 1"
+              />
+              <button
+                id="sendChatBtn"
+                class="btn primary small"
+                style="
+                  width: 40px;
+                  height: 40px;
+                  border-radius: 12px;
+                  font-size: 16px;
+                "
+              >
+                ➤
               </button>
             </div>
-
-            <div id="chatBox" class="chatBox"></div>
-
-            <div class="chatInput">
-              <input id="chatInput" placeholder="Tulis pesan..." />
-              <button id="sendChatBtn" class="btn primary">Kirim</button>
-            </div>
           </div>
         </section>
 
-        <section id="screenProfile" class="screen hidden">
-          <div class="hero">
-            <h2>Profil</h2>
-            <p class="muted">Data tersimpan di Firebase.</p>
-          </div>
-
+        <section id="screenProfile" class="hidden">
+          <h2 style="margin: 0 0 16px">Akun Saya</h2>
           <div class="card">
-            <div class="profileRow">
-              <div class="avatar">👤</div>
-              <div>
-                <b id="pName">-</b>
-                <div id="pEmail" class="muted">-</div>
+            <div class="rowBetween">
+              <div style="display: flex; gap: 12px; align-items: center">
+                <div
+                  style="
+                    width: 50px;
+                    height: 50px;
+                    background: #eee;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 24px;
+                  "
+                >
+                  👤
+                </div>
+                <div>
+                  <b id="pName" style="display: block">-</b
+                  ><span id="pEmail" class="muted" style="font-size: 12px"
+                    >-</span
+                  >
+                </div>
               </div>
             </div>
-            <hr class="hr" />
+            <hr
+              style="
+                border: none;
+                border-top: 1px solid var(--border);
+                margin: 16px 0;
+              "
+            />
+            <div class="rowBetween" style="margin-bottom: 10px">
+              <span class="muted">Saldo</span
+              ><b class="big" style="color: var(--orange)" id="wallet">Rp 0</b>
+            </div>
+            <button id="topupBtn" class="btn primary" style="width: 100%">
+              Isi Saldo (+50k)
+            </button>
+          </div>
+          <div class="card" style="margin-top: 12px">
             <div class="rowBetween">
-              <div>
-                <div class="muted">Saldo (dummy)</div>
-                <div class="big"><b id="wallet">Rp 0</b></div>
-              </div>
-              <button id="topupBtn" class="btn ghost small">Top Up</button>
+              <span>🌙 Mode Gelap</span
+              ><input
+                type="checkbox"
+                id="themeSwitch"
+                style="width: auto; margin: 0"
+              />
             </div>
           </div>
         </section>
@@ -179,88 +293,86 @@
         <button class="nav active" data-go="Home">🏠<span>Home</span></button>
         <button class="nav" data-go="Map">🗺️<span>Map</span></button>
         <button class="nav" data-go="Orders">🧾<span>Orders</span></button>
-        <button class="nav" data-go="Messages">💬<span>Messages</span></button>
-        <button class="nav" data-go="Profile">👤<span>Profile</span></button>
+        <button class="nav" data-go="Messages">💬<span>Chat</span></button>
+        <button class="nav" data-go="Profile">👤<span>Akun</span></button>
       </nav>
+
+      <button id="fabCart" class="fab-cart hidden" onclick="openGlobalCart()">
+        🛒
+        <div id="cartBadge" class="cart-badge">0</div>
+      </button>
     </div>
 
     <div id="vendorModal" class="modal hidden">
       <div class="overlay" data-close="vendorModal"></div>
       <div class="sheet">
-        <div class="sheetHead">
+        <div class="rowBetween">
           <div>
-            <div class="muted">Pedagang</div>
-            <h3 id="vTitle">-</h3>
-            <div class="muted" id="vMeta">-</div>
+            <h2 id="vTitle" style="margin: 0">-</h2>
+            <small class="muted" id="vMeta">-</small>
           </div>
           <button class="iconBtn" data-close="vendorModal">✕</button>
         </div>
-        <div class="sheetBody">
-          <div class="rowBetween">
-            <button id="chatVendorBtn" class="btn ghost small">Chat</button>
-            <button id="checkoutFromVendorBtn" class="btn primary small">
-              Checkout
-            </button>
-          </div>
-          <h4 style="margin: 12px 0 8px">Menu</h4>
-          <div id="menuList" class="list"></div>
+        <div class="rowBetween" style="margin: 16px 0">
+          <button
+            id="chatVendorBtn"
+            class="btn ghost small"
+            style="flex: 1; background: var(--input-bg)"
+          >
+            💬 Chat Penjual
+          </button>
         </div>
+        <h4 style="margin: 0 0 10px">Daftar Menu</h4>
+        <div id="menuList"></div>
       </div>
     </div>
 
     <div id="checkoutModal" class="modal hidden">
       <div class="overlay" data-close="checkoutModal"></div>
       <div class="sheet">
-        <div class="sheetHead">
-          <div>
-            <div class="muted">Checkout</div>
-            <h3>Konfirmasi Pesanan</h3>
-          </div>
-          <button class="iconBtn" data-close="checkoutModal">✕</button>
-        </div>
-        <div class="sheetBody">
-          <div id="checkoutItems" class="list"></div>
-          <div class="card" style="margin-top: 12px">
-            <div class="rowBetween">
-              <div class="muted">Metode bayar</div>
-              <select id="payMethod">
-                <option value="cash">Cash</option>
-                <option value="ewallet">E-Wallet (dummy)</option>
-              </select>
-            </div>
-            <div class="rowBetween" style="margin-top: 10px">
-              <div class="muted">Total</div>
-              <div class="big"><b id="checkoutTotal">Rp 0</b></div>
-            </div>
-            <label style="display: block; margin-top: 10px">
-              <span class="muted">Catatan</span>
-              <input id="orderNote" placeholder="contoh: jangan pedas" />
-            </label>
-          </div>
+        <div class="rowBetween" style="margin-bottom: 12px">
+          <h3>Keranjang Belanja</h3>
           <button
-            id="placeOrderBtn"
-            class="btn primary"
-            style="width: 100%; margin-top: 12px"
+            class="iconBtn"
+            data-close="checkoutModal"
+            style="width: 32px; height: 32px"
           >
-            Buat Pesanan
+            ✕
           </button>
         </div>
+        <div
+          id="checkoutItems"
+          style="max-height: 300px; overflow-y: auto; margin-bottom: 16px"
+        ></div>
+        <div class="card" style="background: var(--input-bg)">
+          <div class="rowBetween">
+            <span>Total</span><b class="big" id="checkoutTotal">0</b>
+          </div>
+          <input
+            id="orderNote"
+            placeholder="Catatan (pedas, dll)..."
+            style="margin-top: 10px"
+          />
+          <select id="payMethod" style="margin-top: 10px">
+            <option value="cash">💵 Tunai</option>
+            <option value="ewallet">💳 E-Wallet</option>
+          </select>
+        </div>
+        <button
+          id="placeOrderBtn"
+          class="btn primary"
+          style="width: 100%; margin-top: 16px"
+        >
+          Pesan Sekarang
+        </button>
       </div>
     </div>
 
     <div id="pickChatModal" class="modal hidden">
       <div class="overlay" data-close="pickChatModal"></div>
       <div class="sheet">
-        <div class="sheetHead">
-          <div>
-            <div class="muted">Pilih pedagang</div>
-            <h3>Chat dengan siapa?</h3>
-          </div>
-          <button class="iconBtn" data-close="pickChatModal">✕</button>
-        </div>
-        <div class="sheetBody">
-          <div id="pickChatList" class="list"></div>
-        </div>
+        <h3>Pilih Kontak</h3>
+        <div id="pickChatList"></div>
       </div>
     </div>
 
