@@ -2,62 +2,119 @@
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PIKUL - Admin DB</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"
+    />
+    <title>PIKUL - Admin Panel</title>
+    <link rel="icon" type="image/jpeg" href="../pikul.jpeg" />
     <link rel="stylesheet" href="styles.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
     <main id="adminAuth" class="auth">
       <div class="authCard">
-        <div class="brandRow">
-          <div class="logo">A</div>
-          <div>
-            <h1>PIKUL Admin</h1>
-            <p>Database Management</p>
-          </div>
+        <div style="text-align: center; margin-bottom: 24px">
+          <img src="../pikul.jpeg" class="brand-logo-lg" alt="Logo Pikul" />
+          <h2 style="margin: 12px 0 4px">Admin Panel</h2>
+          <p class="muted" style="margin: 0">Kelola database dan pesanan.</p>
         </div>
+
         <form id="adminLoginForm" class="form">
-          <label
-            >Username <input id="adminUser" placeholder="admin" required
-          /></label>
-          <label
-            >Password
+          <div>
+            <label>Username</label>
+            <input id="adminUser" placeholder="admin" required />
+          </div>
+          <div>
+            <label>Password</label>
             <input
               id="adminPass"
               type="password"
-              placeholder="admin123"
+              placeholder="••••••"
               required
-          /></label>
-          <button class="btn primary" type="submit">Masuk</button>
+            />
+          </div>
+          <button class="btn primary" type="submit" style="margin-top: 10px">
+            Masuk
+          </button>
         </form>
+
+        <div
+          style="
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px dashed var(--line);
+            text-align: center;
+          "
+        >
+          <a
+            href="../index.html"
+            class="btn ghost small"
+            style="text-decoration: none; display: inline-block"
+          >
+            📱 Buka Aplikasi Customer
+          </a>
+        </div>
       </div>
     </main>
 
     <div id="adminApp" class="app hidden">
-      <aside class="sidebar">
+      <nav class="sidebar">
         <div class="sbBrand">
-          <div class="sbLogo">P</div>
-          <div>
-            <b>PIKUL</b>
-            <div class="muted">Admin Panel</div>
+          <img src="../pikul.jpeg" class="brand-logo-sm" alt="Logo" />
+          <div class="desktop-only">
+            <b style="font-size: 18px">PIKUL</b>
+            <div class="muted" style="font-size: 12px">Admin DB</div>
           </div>
         </div>
-        <nav class="sbNav">
+
+        <div class="sbNav">
           <button class="sbItem active" data-tab="Dashboard">
-            📊 Dashboard
+            <span class="icon">📊</span> <span class="label">Dashboard</span>
           </button>
-          <button class="sbItem" data-tab="Orders">🧾 Orders</button>
-          <button class="sbItem" data-tab="Vendors">🧑‍🍳 Vendors</button>
-          <button class="sbItem" data-tab="Replies">🤖 Auto Reply</button>
-        </nav>
-        <button id="adminLogoutBtn" class="sbLogout">⎋ Logout</button>
-      </aside>
+          <button class="sbItem" data-tab="Orders">
+            <span class="icon">🧾</span> <span class="label">Orders</span>
+          </button>
+          <button class="sbItem" data-tab="Vendors">
+            <span class="icon">🧑‍🍳</span> <span class="label">Vendors</span>
+          </button>
+          <button class="sbItem" data-tab="Replies">
+            <span class="icon">🤖</span> <span class="label">Bot Reply</span>
+          </button>
+        </div>
+
+        <button id="adminLogoutBtn" class="sbLogout desktop-only">
+          ⎋ Logout
+        </button>
+      </nav>
 
       <section class="main">
-        <header class="header">
+        <header class="mobile-header">
+          <div style="display: flex; align-items: center; gap: 10px">
+            <img src="../pikul.jpeg" class="brand-logo-sm" />
+            <b>Admin Panel</b>
+          </div>
+          <button
+            onclick="location.reload()"
+            class="iconBtn"
+            style="width: 32px; height: 32px"
+          >
+            ⎋
+          </button>
+        </header>
+
+        <header class="header desktop-only">
           <div>
-            <h2 id="pageTitle">Dashboard</h2>
+            <h2 id="pageTitle" style="margin: 0">Dashboard</h2>
             <div class="muted">Realtime Database Monitor</div>
+          </div>
+          <div class="headerRight">
+            <button id="refreshAdminBtn" class="btn ghost small">
+              Refresh Data
+            </button>
           </div>
         </header>
 
@@ -72,49 +129,57 @@
               <div class="kpiVal" id="kpiRevenue">Rp 0</div>
             </div>
           </div>
-          <div class="card" style="margin-top: 15px">
-            <h3>Order Terbaru</h3>
-            <div id="latestOrders" class="list"></div>
+
+          <div class="card" style="margin-top: 20px">
+            <div class="rowBetween">
+              <h3>Order Terbaru</h3>
+              <span class="pill">Live</span>
+            </div>
+            <div id="latestOrders" class="list" style="margin-top: 15px"></div>
           </div>
         </section>
 
         <section id="tabOrders" class="tab hidden">
+          <h2 class="mobile-only" style="margin-bottom: 15px">Kelola Order</h2>
           <div class="card">
-            <h3>Kelola Status Order</h3>
-            <div id="ordersTable" class="table"></div>
+            <div class="table-wrapper">
+              <div id="ordersTable"></div>
+            </div>
           </div>
         </section>
 
         <section id="tabVendors" class="tab hidden">
+          <h2 class="mobile-only" style="margin-bottom: 15px">Pedagang</h2>
           <div class="card">
             <div class="rowBetween">
               <h3>Daftar Vendor</h3>
               <button id="addVendorBtn" class="btn primary small">
-                + Vendor Baru
+                + Baru
               </button>
             </div>
             <div
               id="vendorAdminList"
               class="list"
-              style="margin-top: 10px"
+              style="margin-top: 15px"
             ></div>
           </div>
         </section>
 
         <section id="tabReplies" class="tab hidden">
+          <h2 class="mobile-only" style="margin-bottom: 15px">Auto Reply</h2>
           <div class="card">
             <div class="rowBetween">
               <div>
-                <h3>Daftar Auto Reply</h3>
-                <p class="muted" style="margin: 0">
-                  Bot akan memilih salah satu kata-kata ini secara acak.
+                <h3>Kata-kata Bot</h3>
+                <p class="muted" style="margin: 0; font-size: 12px">
+                  Bot akan membalas chat customer secara acak dengan ini.
                 </p>
               </div>
               <button id="addReplyBtn" class="btn primary small">
-                + Tambah Kata
+                + Tambah
               </button>
             </div>
-            <div id="replyList" class="list" style="margin-top: 15px"></div>
+            <div id="replyList" class="list" style="margin-top: 20px"></div>
           </div>
         </section>
       </section>
@@ -128,15 +193,33 @@
           <button class="iconBtn" data-close="orderModal">✕</button>
         </div>
         <div class="sheetBody">
-          <div id="ordItems" class="list" style="margin-bottom: 15px"></div>
-          <div class="rowBetween">
-            <select id="ordStatus">
-              <option>Diproses</option>
-              <option>Dalam perjalanan</option>
-              <option>Selesai</option>
-            </select>
-            <button id="saveStatusBtn" class="btn primary">Simpan</button>
+          <div
+            id="ordItems"
+            class="list"
+            style="
+              margin-bottom: 15px;
+              background: var(--bg);
+              padding: 10px;
+              border-radius: 12px;
+            "
+          ></div>
+          <div class="card" style="border: 1px solid var(--orange)">
+            <div class="rowBetween">
+              <b>Ubah Status:</b>
+              <select id="ordStatus" style="width: auto">
+                <option>Diproses</option>
+                <option>Dalam perjalanan</option>
+                <option>Selesai</option>
+              </select>
+            </div>
           </div>
+          <button
+            id="saveStatusBtn"
+            class="btn primary"
+            style="width: 100%; margin-top: 15px"
+          >
+            Simpan Perubahan
+          </button>
         </div>
       </div>
     </div>
