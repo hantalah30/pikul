@@ -12,6 +12,23 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
+    <style>
+      /* Desktop Sidebar Enhancements */
+      .desktop-brand {
+        display: none;
+        padding: 20px 20px 40px 20px;
+        align-items: center;
+        gap: 12px;
+      }
+      @media (min-width: 768px) {
+        .desktop-brand {
+          display: flex;
+        }
+        .app {
+          overflow: hidden;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="splash">
@@ -79,6 +96,57 @@
     </main>
 
     <div id="app" class="app hidden">
+      <nav class="bottomNav">
+        <div class="desktop-brand">
+          <div
+            style="
+              width: 36px;
+              height: 36px;
+              background: #ff7a00;
+              color: #fff;
+              border-radius: 10px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: bold;
+            "
+          >
+            P
+          </div>
+          <div style="font-weight: 800; font-size: 20px">PIKUL</div>
+        </div>
+
+        <button class="nav active" data-go="Home">
+          <span style="font-size: 18px; margin-bottom: 2px">🏠</span
+          ><span>Home</span>
+        </button>
+        <button class="nav" data-go="Map">
+          <span style="font-size: 18px; margin-bottom: 2px">🗺️</span
+          ><span>Map</span>
+        </button>
+        <button class="nav" data-go="Orders">
+          <span style="font-size: 18px; margin-bottom: 2px">🧾</span
+          ><span>Orders</span>
+        </button>
+        <button class="nav" data-go="Messages">
+          <span style="font-size: 18px; margin-bottom: 2px">💬</span
+          ><span>Chat</span>
+        </button>
+        <button class="nav" data-go="Profile">
+          <span style="font-size: 18px; margin-bottom: 2px">👤</span
+          ><span>Akun</span>
+        </button>
+
+        <button
+          id="desktopLogout"
+          class="nav"
+          style="margin-top: auto; display: none"
+        >
+          <span style="font-size: 18px; margin-bottom: 2px">⎋</span
+          ><span>Keluar</span>
+        </button>
+      </nav>
+
       <header id="mainHeader" class="topbar">
         <div class="rowBetween">
           <div
@@ -160,7 +228,14 @@
             ></iframe>
           </div>
           <h3 style="margin: 20px 0 10px">Pedagang Sekitar</h3>
-          <div id="realtimeList"></div>
+          <div
+            id="realtimeList"
+            style="
+              display: grid;
+              gap: 10px;
+              grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            "
+          ></div>
         </section>
 
         <section id="screenOrders" class="hidden">
@@ -176,11 +251,17 @@
               Riwayat
             </button>
           </div>
-          <div id="ordersList"></div>
+          <div
+            id="ordersList"
+            style="
+              display: grid;
+              gap: 10px;
+              grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            "
+          ></div>
         </section>
 
         <section id="screenMessages" class="hidden">
-          <h2 style="margin: 0 0 10px; flex-shrink: 0">Chat</h2>
           <div class="chat-container">
             <div class="chat-bg-pattern"></div>
             <div class="chat-header">
@@ -236,66 +317,66 @@
 
         <section id="screenProfile" class="hidden">
           <h2 style="margin: 0 0 16px">Akun Saya</h2>
-          <div class="card">
-            <div class="rowBetween">
-              <div style="display: flex; gap: 12px; align-items: center">
-                <div
-                  style="
-                    width: 50px;
-                    height: 50px;
-                    background: #eee;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 24px;
-                  "
-                >
-                  👤
-                </div>
-                <div>
-                  <b id="pName" style="display: block">-</b
-                  ><span id="pEmail" class="muted" style="font-size: 12px"
-                    >-</span
+          <div
+            style="
+              display: grid;
+              gap: 20px;
+              grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            "
+          >
+            <div class="card">
+              <div class="rowBetween">
+                <div style="display: flex; gap: 12px; align-items: center">
+                  <div
+                    style="
+                      width: 50px;
+                      height: 50px;
+                      background: #eee;
+                      border-radius: 50%;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      font-size: 24px;
+                    "
                   >
+                    👤
+                  </div>
+                  <div>
+                    <b id="pName" style="display: block">-</b>
+                    <span id="pEmail" class="muted" style="font-size: 12px"
+                      >-</span
+                    >
+                  </div>
                 </div>
               </div>
-            </div>
-            <hr
-              style="
-                border: none;
-                border-top: 1px solid var(--border);
-                margin: 16px 0;
-              "
-            />
-            <div class="rowBetween" style="margin-bottom: 10px">
-              <span class="muted">Saldo</span
-              ><b class="big" style="color: var(--orange)" id="wallet">Rp 0</b>
-            </div>
-            <button id="topupBtn" class="btn primary" style="width: 100%">
-              Isi Saldo (+50k)
-            </button>
-          </div>
-          <div class="card" style="margin-top: 12px">
-            <div class="rowBetween">
-              <span>🌙 Mode Gelap</span
-              ><input
-                type="checkbox"
-                id="themeSwitch"
-                style="width: auto; margin: 0"
+              <hr
+                style="
+                  border: none;
+                  border-top: 1px solid var(--border);
+                  margin: 16px 0;
+                "
               />
+              <div class="rowBetween" style="margin-bottom: 10px">
+                <span class="muted">Saldo</span>
+                <b class="big" style="color: var(--orange)" id="wallet">Rp 0</b>
+              </div>
+              <button id="topupBtn" class="btn primary" style="width: 100%">
+                Isi Saldo (+50k)
+              </button>
+            </div>
+            <div class="card">
+              <div class="rowBetween">
+                <span>🌙 Mode Gelap</span>
+                <input
+                  type="checkbox"
+                  id="themeSwitch"
+                  style="width: auto; margin: 0"
+                />
+              </div>
             </div>
           </div>
         </section>
       </main>
-
-      <nav class="bottomNav">
-        <button class="nav active" data-go="Home">🏠<span>Home</span></button>
-        <button class="nav" data-go="Map">🗺️<span>Map</span></button>
-        <button class="nav" data-go="Orders">🧾<span>Orders</span></button>
-        <button class="nav" data-go="Messages">💬<span>Chat</span></button>
-        <button class="nav" data-go="Profile">👤<span>Akun</span></button>
-      </nav>
 
       <button id="fabCart" class="fab-cart hidden" onclick="openGlobalCart()">
         🛒
