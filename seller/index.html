@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"
+    />
+    <title>PIKUL - Mitra Penjual</title>
+    <link rel="icon" type="image/jpeg" href="../pikul.jpeg" />
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
+      rel="stylesheet"
+    />
+
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      crossorigin=""
+    />
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      crossorigin=""
+    ></script>
+
+    <style>
+      /* Tambahan style khusus peta seller */
+      #sellerMap {
+        width: 100%;
+        height: 300px;
+        border-radius: 12px;
+        margin-top: 12px;
+        border: 1px solid var(--border);
+        z-index: 1;
+      }
+      .mode-selector {
+        display: flex;
+        background: #eee;
+        padding: 4px;
+        border-radius: 10px;
+        margin-top: 10px;
+      }
+      .mode-btn {
+        flex: 1;
+        padding: 8px;
+        text-align: center;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        background: transparent;
+        color: var(--muted);
+      }
+      .mode-btn.active {
+        background: white;
+        color: var(--orange);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+    </style>
+  </head>
+  <body>
+    <main id="auth" class="auth">
+      <div class="authCard">
+        <div style="text-align: center; margin-bottom: 20px">
+          <div class="logo">M</div>
+          <h2 style="margin: 10px 0 5px">Mitra PIKUL</h2>
+          <p class="muted" style="margin: 0">Login Penjual</p>
+        </div>
+        <form id="loginForm">
+          <label>Email</label>
+          <input
+            id="email"
+            type="email"
+            placeholder="contoh: bakso@pikul.id"
+            required
+          />
+          <label>Password</label>
+          <input id="password" type="password" placeholder="••••••" required />
+          <button class="btn primary" style="width: 100%; margin-top: 20px">
+            Masuk / Daftar
+          </button>
+        </form>
+      </div>
+    </main>
+
+    <div id="app" class="app hidden">
+      <header class="topbar">
+        <div>
+          <div class="muted" style="font-size: 11px">Halo,</div>
+          <b id="vName" style="font-size: 16px">Nama Pedagang</b>
+        </div>
+        <button id="logoutBtn" class="btn ghost small">Keluar</button>
+      </header>
+
+      <main class="content">
+        <section id="sellerHome">
+          <div id="subAlert" class="card warn hidden">
+            <div class="rowBetween">
+              <div>
+                <b style="color: #b91c1c">Masa Aktif Habis!</b>
+                <div style="font-size: 12px; margin-top: 4px">
+                  Bayar 5rb/bulan untuk jualan.
+                </div>
+              </div>
+              <button id="payBtn" class="btn primary small">Bayar</button>
+            </div>
+          </div>
+
+          <div id="subActive" class="card success hidden">
+            <div class="rowBetween">
+              <div style="color: #047857; font-size: 12px">
+                <b>✅ Akun Aktif</b> <span id="expDate">-</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top: 16px">
+            <div class="rowBetween">
+              <h3 style="margin: 0">Lokasi & Status</h3>
+              <label class="switch">
+                <input id="statusToggle" type="checkbox" disabled />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div
+              style="margin-top: 10px; font-size: 12px"
+              class="muted"
+              id="statusText"
+            >
+              Toko Tutup
+            </div>
+
+            <div id="locationControls" class="hidden">
+              <div class="mode-selector">
+                <button class="mode-btn active" onclick="setLocMode('gps')">
+                  📡 Live GPS
+                </button>
+                <button class="mode-btn" onclick="setLocMode('manual')">
+                  📍 Pilih di Peta
+                </button>
+              </div>
+
+              <div id="sellerMap"></div>
+              <div
+                id="manualHint"
+                class="hidden"
+                style="
+                  font-size: 11px;
+                  color: var(--orange);
+                  margin-top: 8px;
+                  text-align: center;
+                "
+              >
+                Geser pin di peta untuk update lokasi toko.
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 24px">
+            <div class="rowBetween" style="margin-bottom: 12px">
+              <h3 style="margin: 0">Menu Dagangan</h3>
+              <button id="addMenuBtn" class="btn primary small">
+                + Tambah
+              </button>
+            </div>
+            <div id="menuList"></div>
+          </div>
+        </section>
+
+        <section id="sellerChat" class="hidden">
+          <h3 style="margin-top: 0">Chat Pelanggan</h3>
+          <div id="chatList" class="list"></div>
+
+          <div
+            id="chatRoom"
+            class="card hidden"
+            style="
+              height: 450px;
+              display: flex;
+              flex-direction: column;
+              padding: 0;
+              overflow: hidden;
+              border: 1px solid #e5e7eb;
+            "
+          >
+            <div
+              class="rowBetween"
+              style="
+                padding: 12px;
+                background: #f9fafb;
+                border-bottom: 1px solid #e5e7eb;
+              "
+            >
+              <b id="chattingWith">Nama Customer</b>
+              <button onclick="closeChat()" class="btn ghost small">
+                Tutup
+              </button>
+            </div>
+            <div
+              id="msgBox"
+              style="
+                flex: 1;
+                overflow-y: auto;
+                padding: 12px;
+                background: #fff;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+              "
+            ></div>
+            <div
+              style="
+                padding: 10px;
+                border-top: 1px solid #e5e7eb;
+                display: flex;
+                gap: 8px;
+              "
+            >
+              <input
+                id="replyInput"
+                placeholder="Balas pesan..."
+                style="margin: 0; flex: 1"
+              />
+              <button id="sendReplyBtn" class="btn primary small">➤</button>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <nav class="bottomNav">
+        <button class="nav active" onclick="goSeller('Home')">
+          <span style="font-size: 18px">🏠</span><span>Home</span>
+        </button>
+        <button class="nav" onclick="goSeller('Chat')">
+          <span style="font-size: 18px">💬</span><span>Chat</span>
+        </button>
+      </nav>
+    </div>
+
+    <div id="menuModal" class="modal hidden">
+      <div class="overlay" onclick="closeModal()"></div>
+      <div class="sheet">
+        <h3>Tambah Menu</h3>
+        <form id="menuForm">
+          <label>Nama Makanan</label>
+          <input id="mName" placeholder="Contoh: Bakso Urat" required />
+          <label style="margin-top: 10px">Harga (Rp)</label>
+          <input id="mPrice" type="number" placeholder="15000" required />
+          <button class="btn primary" style="width: 100%; margin-top: 20px">
+            Simpan
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <script type="module" src="seller.js"></script>
+  </body>
+</html>

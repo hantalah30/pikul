@@ -224,6 +224,32 @@
       </div>
     </div>
 
+    <div id="editVendorModal" class="modal hidden">
+      <div class="overlay" data-close="editVendorModal"></div>
+      <div class="sheet">
+        <div class="sheetHead">
+          <h3>Edit Vendor</h3>
+          <button class="iconBtn" data-close="editVendorModal">✕</button>
+        </div>
+        <div class="sheetBody">
+          <form id="editVendorForm">
+            <label>Nama Vendor</label>
+            <input id="evName" required />
+
+            <label>Tipe (bakso/kopi/nasi)</label>
+            <input id="evType" required />
+
+            <label>Rating</label>
+            <input id="evRating" type="number" step="0.1" required />
+
+            <button class="btn primary" style="width: 100%; margin-top: 20px">
+              Simpan Perubahan
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="admin.js"></script>
   </body>
 </html>

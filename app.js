@@ -11,6 +11,7 @@ import {
   orderBy,
   updateDoc,
   getDoc,
+  setDoc,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
@@ -31,6 +32,7 @@ const screens = {
   Messages: $("#screenMessages"),
   Profile: $("#screenProfile"),
 };
+// Dummy Fallback Menu
 const MENU = {
   bakso: [
     { id: "m1", name: "Bakso Urat", price: 15000 },
@@ -49,7 +51,7 @@ const MENU = {
 
 let state = {
   user: null,
-  you: { ok: false, lat: null, lon: null },
+  you: { ok: false, lat: -6.2, lon: 106.816666 }, // Default Loc
   vendors: [],
   cart: [],
   orders: [],
@@ -60,6 +62,9 @@ let state = {
   firstLoad: true,
   unsubChats: null,
   activeOrderTab: "active",
+  map: null,
+  markers: {},
+  userMarker: null,
 };
 
 // --- BOOT ---
@@ -67,15 +72,15 @@ async function bootApp() {
   $("#userName").textContent = state.user.name;
   initTheme();
 
+  // Listen Vendors (Realtime)
   onSnapshot(collection(db, "vendors"), (s) => {
     state.vendors = s.docs.map((d) => ({ id: d.id, ...d.data() }));
-    if (!state.vendors.length) seedVendors();
-    else {
-      renderHome();
-      renderMap();
-    }
+    // Update tampilan jika sedang aktif
+    if (!$("#screenHome").classList.contains("hidden")) renderVendors();
+    if (!$("#screenMap").classList.contains("hidden")) updateMapMarkers();
   });
 
+  // Listen Orders (Realtime)
   onSnapshot(
     query(collection(db, "orders"), where("userId", "==", state.user.id)),
     (s) => {
@@ -94,14 +99,16 @@ async function bootApp() {
     }
   );
 
+  // Listen Auto Replies
   onSnapshot(
     collection(db, "auto_replies"),
     (s) => (state.autoReplies = s.docs.map((d) => d.data().text))
   );
+
   renderProfile();
-  window.go("Home");
+  window.go("Home"); // Start at Home
   startGPS();
-  updateFab(); // Cek keranjang awal
+  updateFab();
 }
 
 // --- HOME ---
@@ -124,6 +131,7 @@ function renderHome() {
         `<div class="promo-card" style="background:${p.c}"><div class="promo-bg">%</div><h3>${p.t}</h3><p>${p.d}</p></div>`
     )
     .join("");
+
   const cats = ["Semua", "Bakso", "Kopi", "Nasi"];
   $("#categoryFilters").innerHTML = cats
     .map(
@@ -133,6 +141,7 @@ function renderHome() {
         }" onclick="setCategory('${c}')">${c}</button>`
     )
     .join("");
+
   renderVendors();
 }
 window.setCategory = (c) => {
@@ -148,29 +157,59 @@ function renderVendors() {
       v.name.toLowerCase().includes(q) &&
       (cat === "semua" || v.type.includes(cat))
   );
+
   $("#vendorList").innerHTML =
     list
       .map(
         (v) => `
     <div class="vendorCard" onclick="openVendor('${v.id}')">
       <div class="vIco">${v.ico}</div>
-      <div class="vMeta"><b>${v.name}</b><div class="muted">⭐ ${
-          v.rating ? v.rating.toFixed(1) : "New"
-        } • ${
+      <div class="vMeta">
+        <b>${v.name}</b>
+        <div class="muted">⭐ ${v.rating ? v.rating.toFixed(1) : "New"} • ${
           v.busy
-        }</div><div class="chips"><span class="chip">${v.type.toUpperCase()}</span><span class="chip">📍 ${distText(
+        }</div>
+        <div class="chips"><span class="chip">${v.type.toUpperCase()}</span><span class="chip">📍 ${distText(
           v
-        )}</span></div></div>
+        )}</span></div>
+      </div>
       <b style="color:var(--orange)">Lihat</b>
     </div>
   `
       )
-      .join("") || `<div class="card muted">Tidak ada pedagang.</div>`;
+      .join("") || `<div class="card muted">Tidak ada pedagang aktif.</div>`;
 }
 $("#search").addEventListener("input", renderVendors);
 
-// --- MAP ---
-function renderMap() {
+// --- MAP REALTIME (LEAFLET) ---
+function initMap() {
+  if (state.map) return; // Map sudah init
+  if (!$("#map")) return;
+
+  state.map = L.map("map").setView([state.you.lat, state.you.lon], 15);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OSM",
+  }).addTo(state.map);
+
+  // User Marker
+  const userIcon = L.divIcon({
+    className: "custom-pin",
+    html: '<div style="background:#3b82f6; width:16px; height:16px; border-radius:50%; border:2px solid white; box-shadow:0 0 0 4px rgba(59,130,246,0.3);"></div>',
+    iconSize: [20, 20],
+  });
+  state.userMarker = L.marker([state.you.lat, state.you.lon], {
+    icon: userIcon,
+  })
+    .addTo(state.map)
+    .bindPopup("Lokasi Kamu");
+
+  updateMapMarkers();
+}
+
+function updateMapMarkers() {
+  if (!state.map) return;
+
+  // Render List di bawah peta
   const listEl = $("#realtimeList");
   if (listEl) {
     listEl.innerHTML = state.vendors
@@ -191,152 +230,198 @@ function renderMap() {
       )
       .join("");
   }
+
+  // Update Markers
+  state.vendors.forEach((v) => {
+    if (state.markers[v.id]) {
+      state.markers[v.id].setLatLng([v.lat, v.lon]);
+    } else {
+      const vendorIcon = L.divIcon({
+        className: "vendor-pin",
+        html: `<div style="background:white; padding:4px; border-radius:8px; border:1px solid #ccc; font-size:16px; text-align:center; width:30px;">${v.ico}</div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 30],
+      });
+      const m = L.marker([v.lat, v.lon], { icon: vendorIcon }).addTo(state.map);
+      m.bindPopup(`<b>${v.name}</b><br>${v.type}`);
+      m.on("click", () => openVendor(v.id));
+      state.markers[v.id] = m;
+    }
+  });
 }
 
-// --- CART LOGIC (NEW & IMPROVED) ---
+// --- CART & MENU ---
+window.openVendor = (id) => {
+  state.selectedVendorId = id;
+  const v = state.vendors.find((x) => x.id === id);
+  if (!v) return;
 
-// 1. Add to Cart (From Menu)
-window.addToCart = (vid, type, mid) => {
-  const it = MENU[type].find((x) => x.id === mid);
-  const ex = state.cart.find((x) => x.itemId === mid && x.vendorId === vid);
+  $("#vTitle").textContent = v.name;
+  $("#vMeta").textContent = v.type;
 
-  if (ex) {
-    ex.qty++;
-  } else {
-    // Jika menambah dari vendor berbeda, kita bisa reset atau append. Di sini kita append saja.
-    state.cart.push({ ...it, vendorId: vid, itemId: mid, qty: 1 });
-  }
+  // Prioritize seller menu from DB
+  let menuData = v.menu && v.menu.length > 0 ? v.menu : MENU[v.type] || [];
 
-  updateFab();
-  showToast("Ditambahkan ke keranjang");
+  $("#menuList").innerHTML = menuData
+    .map(
+      (m) => `
+    <div class="listItem">
+      <div style="flex:1"><b>${m.name}</b><div class="muted">${rupiah(
+        m.price
+      )}</div></div>
+      <button class="btn small primary" onclick="addToCart('${id}', '${
+        m.id
+      }', '${m.name}', ${m.price})">+ Tambah</button>
+    </div>
+  `
+    )
+    .join("");
+
+  openModal("vendorModal");
 };
 
-// 2. Update FAB & Badge
+window.addToCart = (vid, mid, mName, mPrice) => {
+  const v = state.vendors.find((x) => x.id === vid);
+
+  // Fallback nama/harga jika undefined
+  if (!mName) {
+    const type = v ? v.type : "bakso";
+    const item = MENU[type].find((x) => x.id === mid);
+    if (item) {
+      mName = item.name;
+      mPrice = item.price;
+    }
+  }
+
+  const ex = state.cart.find((x) => x.itemId === mid && x.vendorId === vid);
+  if (ex) ex.qty++;
+  else
+    state.cart.push({
+      vendorId: vid,
+      vendorName: v ? v.name : "Vendor",
+      itemId: mid,
+      name: mName,
+      price: parseInt(mPrice),
+      qty: 1,
+    });
+
+  updateFab();
+  showToast("Masuk keranjang");
+};
+
 function updateFab() {
-  const totalItems = state.cart.reduce((a, b) => a + b.qty, 0);
-  $("#cartBadge").textContent = totalItems;
-  if (totalItems > 0) $("#fabCart").classList.remove("hidden");
+  const t = state.cart.reduce((a, b) => a + b.qty, 0);
+  $("#cartBadge").textContent = t;
+  if (t > 0) $("#fabCart").classList.remove("hidden");
   else $("#fabCart").classList.add("hidden");
 }
 
-// 3. Open Global Cart (From FAB)
 window.openGlobalCart = () => {
   if (!state.cart.length) return showToast("Keranjang kosong");
   renderCartModal();
   openModal("checkoutModal");
 };
 
-// 4. Render Cart Items with Edit Controls
 function renderCartModal() {
   $("#checkoutItems").innerHTML = state.cart
     .map(
       (i, idx) => `
     <div class="cart-item-row">
-      <div style="flex:1">
-        <div style="font-weight:bold; font-size:14px">${i.name}</div>
-        <div class="muted" style="font-size:12px">${rupiah(i.price)}</div>
-      </div>
+      <div style="flex:1"><div style="font-weight:bold; font-size:14px">${
+        i.name
+      }</div><div class="muted" style="font-size:12px">${rupiah(i.price)} • ${
+        i.vendorName
+      }</div></div>
       <div class="cart-controls">
-        <button class="ctrl-btn" onclick="updateCartQty(${idx}, -1)">-</button>
-        <span class="ctrl-qty">${i.qty}</span>
-        <button class="ctrl-btn add" onclick="updateCartQty(${idx}, 1)">+</button>
+        <button class="ctrl-btn" onclick="updateCartQty(${idx}, -1)">-</button><span class="ctrl-qty">${
+        i.qty
+      }</span><button class="ctrl-btn add" onclick="updateCartQty(${idx}, 1)">+</button>
       </div>
       <button class="iconBtn" style="width:30px; height:30px; margin-left:10px; border-color:#fee; color:red; background:#fff5f5" onclick="deleteCartItem(${idx})">🗑</button>
     </div>
   `
     )
     .join("");
-
-  const total = state.cart.reduce((a, b) => a + b.price * b.qty, 0);
-  $("#checkoutTotal").textContent = rupiah(total);
+  $("#checkoutTotal").textContent = rupiah(
+    state.cart.reduce((a, b) => a + b.price * b.qty, 0)
+  );
 }
 
-// 5. Update Qty (+ / -)
 window.updateCartQty = (idx, change) => {
   const item = state.cart[idx];
   item.qty += change;
   if (item.qty <= 0) {
-    if (confirm("Hapus item ini?")) state.cart.splice(idx, 1);
-    else item.qty = 1; // Revert if cancel
+    if (confirm("Hapus?")) state.cart.splice(idx, 1);
+    else item.qty = 1;
   }
   updateFab();
-  if (state.cart.length === 0) closeModal("checkoutModal");
+  if (!state.cart.length) closeModal("checkoutModal");
   else renderCartModal();
 };
-
-// 6. Delete Item
 window.deleteCartItem = (idx) => {
-  if (confirm("Hapus item ini dari keranjang?")) {
+  if (confirm("Hapus?")) {
     state.cart.splice(idx, 1);
     updateFab();
-    if (state.cart.length === 0) closeModal("checkoutModal");
+    if (!state.cart.length) closeModal("checkoutModal");
     else renderCartModal();
   }
 };
 
-// 7. Place Order
 $("#placeOrderBtn").addEventListener("click", async () => {
   if (!state.cart.length) return;
   const btn = $("#placeOrderBtn");
   btn.disabled = true;
   btn.textContent = "Memproses...";
-
   try {
     const total = state.cart.reduce((a, b) => a + b.price * b.qty, 0);
-    // Ambil vendor dari item pertama (asumsi order per vendor, atau mixed)
-    // Jika mixed vendor, ini akan mengambil vendor item pertama sebagai 'main vendor'
-    const v = state.vendors.find((x) => x.id === state.cart[0].vendorId) || {
-      id: "mixed",
-      name: "Multiple Vendors",
-    };
+    // Asumsi single vendor order dulu untuk simplifikasi
+    const vName = state.cart[0].vendorName;
+    const vId = state.cart[0].vendorId;
 
     await addDoc(collection(db, "orders"), {
       userId: state.user.id,
       userName: state.user.name,
-      vendorId: v.id,
-      vendorName: v.name,
-      items: state.cart, // Simpan semua item
+      vendorId: vId,
+      vendorName: vName,
+      items: state.cart,
       total: total,
       note: $("#orderNote").value,
       status: "Diproses",
       createdAt: new Date().toISOString(),
     });
-
     state.cart = [];
     updateFab();
     closeModal("checkoutModal");
     window.go("Orders");
-    showToast("Pesanan berhasil dibuat!");
+    showToast("Berhasil!");
   } catch (e) {
-    alert("Gagal order: " + e.message);
+    alert(e.message);
   }
   btn.disabled = false;
   btn.textContent = "Pesan Sekarang";
 });
 
-// --- ORDERS & ACTIONS ---
-window.switchOrderTab = (tabName) => {
-  state.activeOrderTab = tabName;
+// --- ORDERS ---
+window.switchOrderTab = (tab) => {
+  state.activeOrderTab = tab;
   $$(".segment-btn").forEach((b) => b.classList.remove("active"));
-  if (tabName === "active") $$(".segment-btn")[0].classList.add("active");
+  if (tab === "active") $$(".segment-btn")[0].classList.add("active");
   else $$(".segment-btn")[1].classList.add("active");
   renderOrders();
 };
-
 function renderOrders() {
   const list = $("#ordersList");
-  const filtered = state.orders.filter((o) => {
-    if (state.activeOrderTab === "active") return o.status !== "Selesai";
-    return o.status === "Selesai";
-  });
-
+  const filtered = state.orders.filter((o) =>
+    state.activeOrderTab === "active"
+      ? o.status !== "Selesai"
+      : o.status === "Selesai"
+  );
   if (!filtered.length) {
     list.innerHTML = `<div class="empty-state"><span class="empty-icon">${
       state.activeOrderTab === "active" ? "🥘" : "🧾"
-    }</span><p>Tidak ada pesanan.</p><button class="btn small primary" onclick="go('Home')">Mulai Jajan</button></div>`;
+    }</span><p>Kosong.</p><button class="btn small primary" onclick="go('Home')">Jajan Yuk</button></div>`;
     return;
   }
-
   list.innerHTML = filtered
     .map((o) => {
       const items = (o.items || [])
@@ -350,9 +435,8 @@ function renderOrders() {
       });
       let statusBadge = "",
         statusIcon = "⏳",
-        statusDesc = "Menunggu konfirmasi...",
+        statusDesc = "Menunggu...",
         actionButtons = "";
-
       if (o.status === "Diproses") {
         statusBadge = "blue";
         statusIcon = "👨‍🍳";
@@ -360,8 +444,8 @@ function renderOrders() {
       } else if (o.status === "Dalam perjalanan") {
         statusBadge = "orange";
         statusIcon = "🛵";
-        statusDesc = "Driver menuju lokasi!";
-        actionButtons = `<button class="btn small ghost" onclick="trackOrder('${o.vendorId}')" style="flex:1; border-color:var(--orange); color:var(--orange);">🗺️ Lacak Driver</button>`;
+        statusDesc = "Driver OTW!";
+        actionButtons = `<button class="btn small ghost" onclick="trackOrder('${o.vendorId}')" style="flex:1; border-color:var(--orange); color:var(--orange);">🗺️ Lacak</button>`;
       } else if (o.status === "Selesai") {
         statusBadge = "green";
         statusIcon = "✅";
@@ -371,75 +455,77 @@ function renderOrders() {
           : `<div class="pill" style="flex:1; text-align:center">Rating: ${o.rating}⭐</div>`;
         actionButtons = `${rateBtn}<button class="btn small ghost" onclick="reorder('${o.id}')" style="flex:1">🔄 Pesan Lagi</button>`;
       }
-
-      return `
-      <div class="order-card">
-        <div class="oc-header"><div><b style="font-size:15px">${
-          o.vendorName
-        }</b><div class="muted" style="font-size:11px">${date}</div></div><span class="badge ${statusBadge}">${
+      return `<div class="order-card"><div class="oc-header"><div><b style="font-size:15px">${
+        o.vendorName
+      }</b><div class="muted" style="font-size:11px">${date}</div></div><span class="badge ${statusBadge}">${
         o.status
-      }</span></div>
-        <div class="oc-body"><div style="font-size:13px; margin-bottom:12px">${items}</div>
-          ${
-            state.activeOrderTab === "active"
-              ? `<div class="step-compact"><div class="step-icon">${statusIcon}</div><div><b style="font-size:13px; display:block">${o.status}</b><span class="muted" style="font-size:11px">${statusDesc}</span></div></div>`
-              : `<div class="rowBetween"><span class="muted" style="font-size:12px">Total Bayar</span><b style="font-size:16px">${rupiah(
-                  o.total
-                )}</b></div>`
-          }
-        </div>
-        ${actionButtons ? `<div class="oc-footer">${actionButtons}</div>` : ""}
-      </div>`;
+      }</span></div><div class="oc-body"><div style="font-size:13px; margin-bottom:12px">${items}</div>${
+        state.activeOrderTab === "active"
+          ? `<div class="step-compact"><div class="step-icon">${statusIcon}</div><div><b style="font-size:13px; display:block">${o.status}</b><span class="muted" style="font-size:11px">${statusDesc}</span></div></div>`
+          : `<div class="rowBetween"><span class="muted" style="font-size:12px">Total Bayar</span><b style="font-size:16px">${rupiah(
+              o.total
+            )}</b></div>`
+      }</div>${
+        actionButtons ? `<div class="oc-footer">${actionButtons}</div>` : ""
+      }</div>`;
     })
     .join("");
 }
-
 window.trackOrder = (vid) => {
   window.go("Map");
-  setTimeout(() => window.openVendor(vid), 500);
-  showToast("Melacak posisi driver...");
+  setTimeout(() => {
+    if (state.markers[vid]) {
+      const ll = state.markers[vid].getLatLng();
+      state.map.setView(ll, 16);
+      state.markers[vid].openPopup();
+    }
+  }, 500);
+  showToast("Melacak posisi...");
 };
-window.reorder = (orderId) => {
-  const old = state.orders.find((x) => x.id === orderId);
+window.reorder = (id) => {
+  const old = state.orders.find((x) => x.id === id);
   if (!old) return;
   state.cart = [];
   old.items.forEach((i) => state.cart.push({ ...i }));
   updateFab();
-  showToast("Menu ditambahkan!");
+  showToast("Masuk keranjang!");
   window.openGlobalCart();
 };
 window.rate = async (oid, vid) => {
-  const s = prompt("Beri bintang (1-5):");
+  const s = prompt("Bintang (1-5):");
   if (!s) return;
   await updateDoc(doc(db, "orders", oid), { rating: parseInt(s) });
   showToast("Terima kasih!");
 };
 
-// --- CHAT ---
+// --- CHAT SYSTEM (METADATA FIX & NO BOT) ---
 $("#chatVendorBtn").addEventListener("click", () => {
   if (state.selectedVendorId) {
     state.chatWithVendorId = state.selectedVendorId;
     closeModal("vendorModal");
     window.go("Messages");
   } else {
-    showToast("Gagal memuat ID Pedagang");
+    showToast("Error: ID Vendor");
   }
 });
 function getChatId() {
   return `${state.user.id}_${state.chatWithVendorId}`;
 }
+
 async function renderChat() {
   const vid = state.chatWithVendorId;
   if (!vid) {
     $("#chatWith").textContent = "Pilih Pedagang";
     $("#chatBox").innerHTML =
-      "<div class='muted' style='text-align:center; padding:20px'>Belum ada chat dipilih.</div>";
+      "<div class='muted' style='text-align:center; padding:20px'>Pilih pedagang dulu.</div>";
     $("#quickReplies").classList.add("hidden");
     return;
   }
+
   const v = state.vendors.find((x) => x.id === vid);
   $("#chatWith").textContent = v ? v.name : "Unknown";
   $("#chatBox").innerHTML = "";
+
   const replies = ["Apakah buka?", "Stok ready?", "Oke makasih", "Bisa pedas?"];
   $("#quickReplies").innerHTML = replies
     .map(
@@ -448,6 +534,7 @@ async function renderChat() {
     )
     .join("");
   $("#quickReplies").classList.remove("hidden");
+
   if (state.unsubChats) state.unsubChats();
   const q = query(
     collection(db, "chats", getChatId(), "messages"),
@@ -458,44 +545,57 @@ async function renderChat() {
       .map((d) => {
         const m = d.data();
         const isMe = m.from === state.user.id;
-        const time = new Date(m.ts).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-        return `<div class="bubble ${isMe ? "me" : ""}">${
-          m.text
-        }<div class="msg-meta">${time} ${isMe ? "✓✓" : ""}</div></div>`;
+        return `<div class="bubble ${isMe ? "me" : "them"}" style="background:${
+          isMe ? "#ff7a00" : "#f3f4f6"
+        }; color:${
+          isMe ? "white" : "black"
+        }; padding:8px 12px; border-radius:12px; margin-bottom:4px; max-width:80%; align-self:${
+          isMe ? "flex-end" : "flex-start"
+        }">${m.text}</div>`;
       })
       .join("");
     $("#chatBox").scrollTop = $("#chatBox").scrollHeight;
   });
 }
+
 window.sendQuick = (t) => {
   $("#chatInput").value = t;
   $("#sendChatBtn").click();
 };
+
 $("#sendChatBtn").addEventListener("click", async () => {
   const t = $("#chatInput").value.trim();
   if (!t || !state.chatWithVendorId) return showToast("Pilih pedagang dulu!");
+
   const cid = getChatId();
   const vid = state.chatWithVendorId;
+
+  // 1. Simpan Pesan Detail
   await addDoc(collection(db, "chats", cid, "messages"), {
     text: t,
     from: state.user.id,
     ts: Date.now(),
   });
+
+  // 2. WAJIB: Simpan Metadata di Dokumen Induk agar muncul di Seller App
+  const v = state.vendors.find((x) => x.id === vid);
+  await setDoc(
+    doc(db, "chats", cid),
+    {
+      userId: state.user.id,
+      userName: state.user.name,
+      vendorId: vid,
+      vendorName: v ? v.name : "Unknown",
+      lastMessage: t,
+      lastUpdate: Date.now(),
+    },
+    { merge: true }
+  );
+
   $("#chatInput").value = "";
-  setTimeout(async () => {
-    const r = state.autoReplies.length
-      ? state.autoReplies[Math.floor(Math.random() * state.autoReplies.length)]
-      : "Halo!";
-    await addDoc(collection(db, "chats", cid, "messages"), {
-      text: r,
-      from: vid,
-      ts: Date.now(),
-    });
-  }, 1500);
+  // Auto-reply BOT DIHAPUS agar manual
 });
+
 $("#pickChatBtn").addEventListener("click", () => {
   $("#pickChatList").innerHTML = state.vendors
     .map(
@@ -525,24 +625,6 @@ function showToast(m) {
   c.appendChild(e);
   setTimeout(() => e.remove(), 3000);
 }
-window.openVendor = (id) => {
-  state.selectedVendorId = id;
-  const v = state.vendors.find((x) => x.id === id);
-  if (!v) return;
-  $("#vTitle").textContent = v.name;
-  $("#vMeta").textContent = v.type;
-  $("#menuList").innerHTML = (MENU[v.type] || [])
-    .map(
-      (m) =>
-        `<div class="listItem" onclick="addToCart('${id}','${v.type}','${
-          m.id
-        }')"><div><b>${m.name}</b><br><small>${rupiah(
-          m.price
-        )}</small></div><b style="color:var(--orange)">+</b></div>`
-    )
-    .join("");
-  openModal("vendorModal");
-};
 function initTheme() {
   const d = localStorage.getItem("pikul_theme") === "dark";
   if (d) document.body.setAttribute("data-theme", "dark");
@@ -602,20 +684,24 @@ $("#logoutBtn").addEventListener("click", () => {
     location.reload();
   }
 });
-if ($("#desktopLogout"))
-  $("#desktopLogout").addEventListener("click", () => {
-    if (confirm("Keluar?")) {
+
+if ($("#mobileProfileLogout")) {
+  $("#mobileProfileLogout").addEventListener("click", () => {
+    if (confirm("Keluar dari akun?")) {
       localStorage.removeItem("pikul_email");
       location.reload();
     }
   });
-if ($("#desktopLogout")) $("#desktopLogout").style.display = "flex";
+}
+
 function startGPS() {
   if (navigator.geolocation)
     navigator.geolocation.watchPosition((p) => {
       state.you = { ok: true, lat: p.coords.latitude, lon: p.coords.longitude };
       $("#gpsStatus").textContent = "GPS ON";
       $("#gpsStatus").className = "pill";
+      if (state.map && state.userMarker)
+        state.userMarker.setLatLng([state.you.lat, state.you.lon]);
     });
 }
 function distText(v) {
@@ -625,24 +711,6 @@ function distText(v) {
       Math.pow(v.lat - state.you.lat, 2) + Math.pow(v.lon - state.you.lon, 2)
     ) * 111;
   return d.toFixed(1) + " km";
-}
-function seedVendors() {
-  [
-    [-0.002, 0.001, "Bakso Ujang", "bakso", "🍲"],
-    [0.003, -0.001, "Kopi Dinda", "kopi", "☕"],
-    [0.001, 0.002, "Nasi Goreng", "nasi", "🍳"],
-  ].forEach(
-    async (d) =>
-      await addDoc(collection(db, "vendors"), {
-        lat: -6.2 + d[0],
-        lon: 106.81 + d[1],
-        name: d[2],
-        type: d[3],
-        ico: d[4],
-        rating: 4.5,
-        busy: "Sepi",
-      })
-  );
 }
 function renderProfile() {
   if (state.user) {
@@ -667,7 +735,7 @@ window.go = (n) => {
     $("#mainHeader").classList.add("hidden");
   else $("#mainHeader").classList.remove("hidden");
   $$(".nav").forEach((b) => b.classList.toggle("active", b.dataset.go === n));
-  if (n === "Map") renderMap();
+  if (n === "Map") initMap();
   if (n === "Messages") renderChat();
 };
 $$(".nav").forEach((b) =>

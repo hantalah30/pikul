@@ -190,7 +190,14 @@ function renderVendors() {
         v.rating ? v.rating.toFixed(1) : 0
       }</div>
       </div>
-      <div class="muted" style="font-size:12px">${v.lat.toFixed(4)}</div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <button class="btn small ghost" onclick="openEditVendor('${
+          v.id
+        }')">Edit</button>
+        <button class="btn small" style="color:red; border:1px solid #fee; background:#fff5f5" onclick="deleteVendor('${
+          v.id
+        }')">Hapus</button>
+      </div>
     </div>
   `
     )
@@ -211,6 +218,52 @@ $("#addVendorBtn").addEventListener("click", async () => {
     });
   }
 });
+
+// LOGIKA EDIT VENDOR
+window.openEditVendor = (id) => {
+  state.selectedVendorId = id;
+  const v = state.vendors.find((x) => x.id === id);
+  if (!v) return;
+
+  $("#evName").value = v.name;
+  $("#evType").value = v.type;
+  $("#evRating").value = v.rating || 0;
+
+  $("#editVendorModal").classList.remove("hidden");
+};
+
+$("#editVendorForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = state.selectedVendorId;
+  await updateDoc(doc(db, "vendors", id), {
+    name: $("#evName").value,
+    type: $("#evType").value,
+    rating: parseFloat($("#evRating").value),
+  });
+  $("#editVendorModal").classList.add("hidden");
+  showToast("Vendor updated!", "success");
+});
+
+window.deleteVendor = async (id) => {
+  if (confirm("Yakin hapus vendor ini selamanya?")) {
+    await deleteDoc(doc(db, "vendors", id));
+    showToast("Vendor dihapus.", "success");
+  }
+};
+
+function showToast(msg, type = "info") {
+  let c = $(".toast-container");
+  if (!c) {
+    c = document.createElement("div");
+    c.className = "toast-container";
+    document.body.appendChild(c);
+  }
+  const el = document.createElement("div");
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${msg}</span>`;
+  c.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
 
 // --- REPLIES ---
 function renderReplies() {

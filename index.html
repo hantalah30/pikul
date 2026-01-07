@@ -14,11 +14,21 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
+
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      crossorigin=""
+    />
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      crossorigin=""
+    ></script>
+
     <style>
-      /* Desktop Sidebar Enhancements */
       .desktop-brand {
         display: none;
-        padding: 20px 20px 40px 20px;
+        padding: 20px;
         align-items: center;
         gap: 12px;
       }
@@ -34,28 +44,33 @@
           overflow: hidden;
         }
       }
+      #map {
+        height: 100%;
+        width: 100%;
+        border-radius: 16px;
+        z-index: 1;
+      }
     </style>
   </head>
   <body>
     <div id="splash">
-      <img
-        src="pikul.jpeg"
-        class="brand-img"
-        style="
-          width: 90px;
-          height: 90px;
-          border-radius: 24px;
-          animation: bounce 1s infinite alternate;
-        "
-      />
       <div
         style="
-          margin-top: 16px;
-          font-weight: 700;
-          font-size: 20px;
-          letter-spacing: 1px;
+          width: 70px;
+          height: 70px;
+          background: #ff7a00;
+          color: #fff;
+          border-radius: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 32px;
+          font-weight: 900;
         "
       >
+        P
+      </div>
+      <div style="margin-top: 16px; font-weight: 700; font-size: 18px">
         PIKUL
       </div>
     </div>
@@ -63,23 +78,29 @@
     <main id="auth" class="auth hidden">
       <div class="authCard">
         <div style="text-align: center; margin-bottom: 20px">
-          <img
-            src="pikul.jpeg"
-            class="brand-img"
-            style="width: 70px; height: 70px; border-radius: 18px"
-          />
+          <div
+            style="
+              width: 50px;
+              height: 50px;
+              background: #ff7a00;
+              color: #fff;
+              border-radius: 14px;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 24px;
+              font-weight: bold;
+            "
+          >
+            P
+          </div>
         </div>
         <h2 style="text-align: center; margin: 0 0 8px">Selamat Datang</h2>
         <p class="muted" style="text-align: center; margin-bottom: 24px">
           Masuk untuk mulai jajan.
         </p>
         <form id="loginForm">
-          <input
-            id="email"
-            type="email"
-            placeholder="Email kamu (contoh: user@pikul.id)"
-            required
-          />
+          <input id="email" type="email" placeholder="Email kamu" required />
           <button
             class="btn primary"
             style="width: 100%; margin-top: 16px"
@@ -88,7 +109,6 @@
             Masuk
           </button>
         </form>
-
         <div
           style="
             margin-top: 20px;
@@ -106,9 +126,8 @@
               text-decoration: none;
               font-size: 13px;
             "
+            >🔐 Masuk sebagai Admin</a
           >
-            🔐 Masuk sebagai Admin
-          </a>
         </div>
       </div>
     </main>
@@ -116,33 +135,37 @@
     <div id="app" class="app hidden">
       <nav class="bottomNav">
         <div class="desktop-brand">
-          <img
-            src="pikul.jpeg"
-            class="brand-img"
-            style="width: 40px; height: 40px; border-radius: 12px"
-          />
+          <div
+            style="
+              width: 36px;
+              height: 36px;
+              background: #ff7a00;
+              color: #fff;
+              border-radius: 10px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: bold;
+            "
+          >
+            P
+          </div>
           <div style="font-weight: 800; font-size: 20px">PIKUL</div>
         </div>
-
         <button class="nav active" data-go="Home">
-          <span style="font-size: 18px; margin-bottom: 2px">🏠</span
-          ><span>Home</span>
+          <span style="font-size: 18px">🏠</span><span>Home</span>
         </button>
         <button class="nav" data-go="Map">
-          <span style="font-size: 18px; margin-bottom: 2px">🗺️</span
-          ><span>Map</span>
+          <span style="font-size: 18px">🗺️</span><span>Map</span>
         </button>
         <button class="nav" data-go="Orders">
-          <span style="font-size: 18px; margin-bottom: 2px">🧾</span
-          ><span>Orders</span>
+          <span style="font-size: 18px">🧾</span><span>Orders</span>
         </button>
         <button class="nav" data-go="Messages">
-          <span style="font-size: 18px; margin-bottom: 2px">💬</span
-          ><span>Chat</span>
+          <span style="font-size: 18px">💬</span><span>Chat</span>
         </button>
         <button class="nav" data-go="Profile">
-          <span style="font-size: 18px; margin-bottom: 2px">👤</span
-          ><span>Akun</span>
+          <span style="font-size: 18px">👤</span><span>Akun</span>
         </button>
 
         <button
@@ -150,18 +173,27 @@
           class="nav"
           style="margin-top: auto; display: none"
         >
-          <span style="font-size: 18px; margin-bottom: 2px">⎋</span
-          ><span>Keluar</span>
+          <span style="font-size: 18px">⎋</span><span>Keluar</span>
         </button>
       </nav>
 
       <header id="mainHeader" class="topbar">
         <div class="rowBetween">
-          <img
-            src="pikul.jpeg"
-            class="brand-img"
-            style="width: 32px; height: 32px; border-radius: 8px"
-          />
+          <div
+            style="
+              width: 30px;
+              height: 30px;
+              background: #ff7a00;
+              color: #fff;
+              border-radius: 8px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: bold;
+            "
+          >
+            P
+          </div>
           <div style="font-weight: 800; font-size: 16px">PIKUL</div>
         </div>
         <div class="rowBetween">
@@ -215,17 +247,14 @@
         </section>
 
         <section id="screenMap" class="hidden">
-          <h2 style="margin: 0 0 16px">Lokasi</h2>
-          <div class="card" style="padding: 0; overflow: hidden">
-            <iframe
-              class="map-frame"
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1982.620336844419!2d106.84311382956638!3d-6.362889945552416!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e69ed6178a2b32f%3A0x20d7938791acfd4a!2sSTT%20Terpadu%20Nurul%20Fikri%20(Kampus%20A%20-%20Sekretariat)!5e0!3m2!1sid!2sid!4v1767678102362!5m2!1sid!2sid"
-              allowfullscreen=""
-              loading="lazy"
-              referrerpolicy="no-referrer-when-downgrade"
-            ></iframe>
+          <h2 style="margin: 0 0 16px">Peta Sekitar</h2>
+          <div
+            class="card"
+            style="padding: 0; overflow: hidden; height: 400px; border: none"
+          >
+            <div id="map"></div>
           </div>
-          <h3 style="margin: 20px 0 10px">Pedagang Sekitar</h3>
+          <h3 style="margin: 20px 0 10px">List Pedagang</h3>
           <div
             id="realtimeList"
             style="
@@ -243,20 +272,12 @@
               class="segment-btn active"
               onclick="switchOrderTab('active')"
             >
-              Dalam Proses
-            </button>
-            <button class="segment-btn" onclick="switchOrderTab('history')">
+              Dalam Proses</button
+            ><button class="segment-btn" onclick="switchOrderTab('history')">
               Riwayat
             </button>
           </div>
-          <div
-            id="ordersList"
-            style="
-              display: grid;
-              gap: 10px;
-              grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            "
-          ></div>
+          <div id="ordersList"></div>
         </section>
 
         <section id="screenMessages" class="hidden">
@@ -281,8 +302,7 @@
                 <div>
                   <b id="chatWith" style="display: block; font-size: 14px"
                     >Pilih Pedagang</b
-                  >
-                  <span class="muted" style="font-size: 11px; display: block"
+                  ><span class="muted" style="font-size: 11px; display: block"
                     >Status: Online</span
                   >
                 </div>
@@ -296,8 +316,7 @@
                 id="chatInput"
                 placeholder="Tulis pesan..."
                 style="margin: 0; flex: 1"
-              />
-              <button
+              /><button
                 id="sendChatBtn"
                 class="btn primary small"
                 style="
@@ -315,64 +334,71 @@
 
         <section id="screenProfile" class="hidden">
           <h2 style="margin: 0 0 16px">Akun Saya</h2>
-          <div
-            style="
-              display: grid;
-              gap: 20px;
-              grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            "
-          >
-            <div class="card">
-              <div class="rowBetween">
-                <div style="display: flex; gap: 12px; align-items: center">
-                  <div
-                    style="
-                      width: 50px;
-                      height: 50px;
-                      background: #eee;
-                      border-radius: 50%;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      font-size: 24px;
-                    "
+          <div class="card">
+            <div class="rowBetween">
+              <div style="display: flex; gap: 12px; align-items: center">
+                <div
+                  style="
+                    width: 50px;
+                    height: 50px;
+                    background: #eee;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 24px;
+                  "
+                >
+                  👤
+                </div>
+                <div>
+                  <b id="pName" style="display: block">-</b
+                  ><span id="pEmail" class="muted" style="font-size: 12px"
+                    >-</span
                   >
-                    👤
-                  </div>
-                  <div>
-                    <b id="pName" style="display: block">-</b>
-                    <span id="pEmail" class="muted" style="font-size: 12px"
-                      >-</span
-                    >
-                  </div>
                 </div>
               </div>
-              <hr
-                style="
-                  border: none;
-                  border-top: 1px solid var(--border);
-                  margin: 16px 0;
-                "
-              />
-              <div class="rowBetween" style="margin-bottom: 10px">
-                <span class="muted">Saldo</span>
-                <b class="big" style="color: var(--orange)" id="wallet">Rp 0</b>
-              </div>
-              <button id="topupBtn" class="btn primary" style="width: 100%">
-                Isi Saldo (+50k)
-              </button>
             </div>
-            <div class="card">
-              <div class="rowBetween">
-                <span>🌙 Mode Gelap</span>
-                <input
-                  type="checkbox"
-                  id="themeSwitch"
-                  style="width: auto; margin: 0"
-                />
-              </div>
+            <hr
+              style="
+                border: none;
+                border-top: 1px solid var(--border);
+                margin: 16px 0;
+              "
+            />
+            <div class="rowBetween" style="margin-bottom: 10px">
+              <span class="muted">Saldo</span
+              ><b class="big" style="color: var(--orange)" id="wallet">Rp 0</b>
+            </div>
+            <button id="topupBtn" class="btn primary" style="width: 100%">
+              Isi Saldo (+50k)
+            </button>
+          </div>
+
+          <div class="card">
+            <div class="rowBetween">
+              <span>🌙 Mode Gelap</span
+              ><input
+                type="checkbox"
+                id="themeSwitch"
+                style="width: auto; margin: 0"
+              />
             </div>
           </div>
+
+          <button
+            id="mobileProfileLogout"
+            class="btn ghost"
+            style="
+              width: 100%;
+              margin-top: 20px;
+              color: #ef4444;
+              border-color: #fecaca;
+              background: #fff5f5;
+            "
+          >
+            Keluar Akun
+          </button>
         </section>
       </main>
 
@@ -405,12 +431,11 @@
         <div id="menuList"></div>
       </div>
     </div>
-
     <div id="checkoutModal" class="modal hidden">
       <div class="overlay" data-close="checkoutModal"></div>
       <div class="sheet">
         <div class="rowBetween" style="margin-bottom: 12px">
-          <h3>Keranjang Belanja</h3>
+          <h3>Keranjang</h3>
           <button
             class="iconBtn"
             data-close="checkoutModal"
@@ -429,10 +454,9 @@
           </div>
           <input
             id="orderNote"
-            placeholder="Catatan (pedas, dll)..."
+            placeholder="Catatan..."
             style="margin-top: 10px"
-          />
-          <select id="payMethod" style="margin-top: 10px">
+          /><select id="payMethod" style="margin-top: 10px">
             <option value="cash">💵 Tunai</option>
             <option value="ewallet">💳 E-Wallet</option>
           </select>
@@ -446,7 +470,6 @@
         </button>
       </div>
     </div>
-
     <div id="pickChatModal" class="modal hidden">
       <div class="overlay" data-close="pickChatModal"></div>
       <div class="sheet">
