@@ -823,22 +823,4 @@ $$(".nav").forEach((b) =>
   b.addEventListener("click", () => window.go(b.dataset.go))
 );
 
-// ... (Bagian atas kode sama) ...
-
-// LOGOUT HANDLER (Tambahkan di bagian bawah)
-function logout() {
-  if (confirm("Keluar dari akun?")) {
-    localStorage.removeItem("pikul_email");
-    location.reload();
-  }
-}
-
-// Bind Logout Buttons
-$("#logoutBtn").addEventListener("click", logout); // Mobile Header Icon
-if ($("#desktopLogout")) $("#desktopLogout").addEventListener("click", logout); // Desktop Sidebar
-if ($("#mobileProfileLogout"))
-  $("#mobileProfileLogout").addEventListener("click", logout); // Mobile Profile
-
-// ... (Sisa kode initAuth, startGPS, dll sama) ...
-
 initAuth();
