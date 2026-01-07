@@ -18,10 +18,12 @@
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
       crossorigin=""
     />
     <script
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
       crossorigin=""
     ></script>
 
@@ -36,6 +38,12 @@
         object-fit: cover;
         box-shadow: 0 4px 12px rgba(255, 122, 0, 0.2);
       }
+      #map {
+        height: 100%;
+        width: 100%;
+        border-radius: 16px;
+        z-index: 1;
+      }
       @media (min-width: 768px) {
         .desktop-brand {
           display: flex;
@@ -44,33 +52,28 @@
           overflow: hidden;
         }
       }
-      #map {
-        height: 100%;
-        width: 100%;
-        border-radius: 16px;
-        z-index: 1;
-      }
     </style>
   </head>
   <body>
     <div id="splash">
+      <img
+        src="pikul.jpeg"
+        class="brand-img"
+        style="
+          width: 90px;
+          height: 90px;
+          border-radius: 24px;
+          animation: bounce 1s infinite alternate;
+        "
+      />
       <div
         style="
-          width: 70px;
-          height: 70px;
-          background: #ff7a00;
-          color: #fff;
-          border-radius: 20px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 32px;
-          font-weight: 900;
+          margin-top: 16px;
+          font-weight: 700;
+          font-size: 20px;
+          letter-spacing: 1px;
         "
       >
-        P
-      </div>
-      <div style="margin-top: 16px; font-weight: 700; font-size: 18px">
         PIKUL
       </div>
     </div>
@@ -78,29 +81,23 @@
     <main id="auth" class="auth hidden">
       <div class="authCard">
         <div style="text-align: center; margin-bottom: 20px">
-          <div
-            style="
-              width: 50px;
-              height: 50px;
-              background: #ff7a00;
-              color: #fff;
-              border-radius: 14px;
-              display: inline-flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 24px;
-              font-weight: bold;
-            "
-          >
-            P
-          </div>
+          <img
+            src="pikul.jpeg"
+            class="brand-img"
+            style="width: 70px; height: 70px; border-radius: 18px"
+          />
         </div>
         <h2 style="text-align: center; margin: 0 0 8px">Selamat Datang</h2>
         <p class="muted" style="text-align: center; margin-bottom: 24px">
           Masuk untuk mulai jajan.
         </p>
         <form id="loginForm">
-          <input id="email" type="email" placeholder="Email kamu" required />
+          <input
+            id="email"
+            type="email"
+            placeholder="Email kamu (contoh: user@pikul.id)"
+            required
+          />
           <button
             class="btn primary"
             style="width: 100%; margin-top: 16px"
@@ -109,6 +106,7 @@
             Masuk
           </button>
         </form>
+
         <div
           style="
             margin-top: 20px;
@@ -117,7 +115,7 @@
           "
         >
           <a
-            href="admin/index.html"
+            href="seller/index.html"
             class="btn ghost"
             style="
               width: 100%;
@@ -126,8 +124,9 @@
               text-decoration: none;
               font-size: 13px;
             "
-            >🔐 Masuk sebagai Admin</a
           >
+            🏪 Masuk sebagai Penjual
+          </a>
         </div>
       </div>
     </main>
@@ -135,21 +134,11 @@
     <div id="app" class="app hidden">
       <nav class="bottomNav">
         <div class="desktop-brand">
-          <div
-            style="
-              width: 36px;
-              height: 36px;
-              background: #ff7a00;
-              color: #fff;
-              border-radius: 10px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-weight: bold;
-            "
-          >
-            P
-          </div>
+          <img
+            src="pikul.jpeg"
+            class="brand-img"
+            style="width: 40px; height: 40px; border-radius: 12px"
+          />
           <div style="font-weight: 800; font-size: 20px">PIKUL</div>
         </div>
         <button class="nav active" data-go="Home">
@@ -167,7 +156,6 @@
         <button class="nav" data-go="Profile">
           <span style="font-size: 18px">👤</span><span>Akun</span>
         </button>
-
         <button
           id="desktopLogout"
           class="nav"
@@ -179,22 +167,14 @@
 
       <header id="mainHeader" class="topbar">
         <div class="rowBetween">
-          <div
-            style="
-              width: 30px;
-              height: 30px;
-              background: #ff7a00;
-              color: #fff;
-              border-radius: 8px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-weight: bold;
-            "
-          >
-            P
+          <div style="display: flex; align-items: center; gap: 8px">
+            <img
+              src="pikul.jpeg"
+              class="brand-img"
+              style="width: 32px; height: 32px; border-radius: 8px"
+            />
+            <div style="font-weight: 800; font-size: 16px">PIKUL</div>
           </div>
-          <div style="font-weight: 800; font-size: 16px">PIKUL</div>
         </div>
         <div class="rowBetween">
           <span id="gpsStatus" class="pill warn" style="font-size: 10px"
@@ -272,12 +252,20 @@
               class="segment-btn active"
               onclick="switchOrderTab('active')"
             >
-              Dalam Proses</button
-            ><button class="segment-btn" onclick="switchOrderTab('history')">
+              Dalam Proses
+            </button>
+            <button class="segment-btn" onclick="switchOrderTab('history')">
               Riwayat
             </button>
           </div>
-          <div id="ordersList"></div>
+          <div
+            id="ordersList"
+            style="
+              display: grid;
+              gap: 10px;
+              grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            "
+          ></div>
         </section>
 
         <section id="screenMessages" class="hidden">
@@ -302,7 +290,8 @@
                 <div>
                   <b id="chatWith" style="display: block; font-size: 14px"
                     >Pilih Pedagang</b
-                  ><span class="muted" style="font-size: 11px; display: block"
+                  >
+                  <span class="muted" style="font-size: 11px; display: block"
                     >Status: Online</span
                   >
                 </div>
@@ -316,7 +305,8 @@
                 id="chatInput"
                 placeholder="Tulis pesan..."
                 style="margin: 0; flex: 1"
-              /><button
+              />
+              <button
                 id="sendChatBtn"
                 class="btn primary small"
                 style="
@@ -375,7 +365,7 @@
             </button>
           </div>
 
-          <div class="card">
+          <div class="card" style="margin-top: 12px">
             <div class="rowBetween">
               <span>🌙 Mode Gelap</span
               ><input
