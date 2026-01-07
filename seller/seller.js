@@ -30,9 +30,11 @@ let state = {
   locMode: "gps",
   activeChatId: null,
   unsubMsg: null,
+  orders: [],
+  editingMenuIndex: null,
 };
 
-// --- AUTH (Sama) ---
+// --- AUTH ---
 async function login(email, password) {
   const q = query(collection(db, "vendors"), where("email", "==", email));
   const snap = await getDocs(q);
@@ -70,12 +72,12 @@ $("#loginForm").addEventListener("submit", (e) => {
   e.preventDefault();
   login($("#email").value, $("#password").value);
 });
-$("#logoutBtn").addEventListener("click", () => {
+window.logout = () => {
   if (confirm("Keluar?")) {
     localStorage.removeItem("pikul_seller");
     location.reload();
   }
-});
+};
 
 // --- INIT ---
 function initApp() {
@@ -83,15 +85,26 @@ function initApp() {
   if (!saved) return $("#auth").classList.remove("hidden");
   state.vendor = JSON.parse(saved);
   $("#auth").classList.add("hidden");
-  $("#app").classList.remove("hidden");
+  $(".app-layout").classList.remove("hidden"); // FIX: .app-layout
+
   onSnapshot(doc(db, "vendors", state.vendor.id), (doc) => {
     if (doc.exists()) {
       state.vendor = { id: doc.id, ...doc.data() };
       renderUI();
     }
   });
+  const qOrd = query(
+    collection(db, "orders"),
+    where("vendorId", "==", state.vendor.id)
+  );
+  onSnapshot(qOrd, (snap) => {
+    state.orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderOrdersList();
+    calculateStats();
+  });
 }
 
+// --- UI RENDER ---
 function renderUI() {
   $("#vName").textContent = state.vendor.name;
   const isExpired = state.vendor.subscriptionExpiry < Date.now();
@@ -102,17 +115,19 @@ function renderUI() {
     $("#statusToggle").checked = false;
     $("#locationControls").classList.add("hidden");
     $("#statusText").textContent = "Bayar dulu";
+    $("#statusText").className = "status-indicator offline";
     stopGPS();
   } else {
     $("#subAlert").classList.add("hidden");
     $("#subActive").classList.remove("hidden");
-    $("#expDate").textContent =
-      "s/d " + new Date(state.vendor.subscriptionExpiry).toLocaleDateString();
+    $("#expDate").textContent = new Date(
+      state.vendor.subscriptionExpiry
+    ).toLocaleDateString();
     $("#statusToggle").disabled = false;
     $("#statusToggle").checked = state.vendor.isLive;
     if (state.vendor.isLive) {
-      $("#statusText").textContent = "Sedang Jualan (Online)";
-      $("#statusText").style.color = "#059669";
+      $("#statusText").textContent = "Toko Buka (Online)";
+      $("#statusText").className = "status-indicator online";
       $("#locationControls").classList.remove("hidden");
       if (!state.map) initMap();
       state.locMode = state.vendor.locationMode || "gps";
@@ -120,7 +135,7 @@ function renderUI() {
       handleLocationLogic();
     } else {
       $("#statusText").textContent = "Toko Tutup (Offline)";
-      $("#statusText").style.color = "#6b6b6b";
+      $("#statusText").className = "status-indicator offline";
       $("#locationControls").classList.add("hidden");
       stopGPS();
     }
@@ -128,231 +143,47 @@ function renderUI() {
   $("#menuList").innerHTML =
     (state.vendor.menu || [])
       .map(
-        (m, idx) =>
-          `<div class="menu-item"><div><b>${m.name}</b><div class="muted">Rp ${m.price}</div></div><button class="btn ghost small" style="color:red; border-color:#fee" onclick="deleteMenu(${idx})">Hapus</button></div>`
+        (m, idx) => `
+    <div class="menu-card">
+      <div><div style="font-weight:700">${
+        m.name
+      }</div><div style="color:var(--text-muted); font-size:13px;">${rupiah(
+          m.price
+        )}</div></div>
+      <div class="menu-actions"><button class="btn-icon-action btn-edit" onclick="openEditMenu(${idx})">✎</button><button class="btn-icon-action btn-del" onclick="deleteMenu(${idx})">🗑</button></div>
+    </div>`
       )
-      .join("") ||
-    `<div class="muted" style="text-align:center">Belum ada menu</div>`;
+      .join("") || `<div class="empty-state-box">Belum ada menu.</div>`;
 }
 
-// --- ORDERS SYSTEM (BARU) ---
-function loadOrders() {
-  // Query orders untuk vendor ini
-  const q = query(
-    collection(db, "orders"),
-    where("vendorId", "==", state.vendor.id)
-  );
-
-  onSnapshot(q, (snap) => {
-    let list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    // Sort manual desc (terbaru diatas)
-    list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    const activeOrders = list.filter((o) => o.status !== "Selesai");
-    const historyOrders = list.filter((o) => o.status === "Selesai");
-
-    renderOrderList("#incomingOrdersList", activeOrders, true);
-    renderOrderList("#historyOrdersList", historyOrders, false);
-  });
-}
-
-function renderOrderList(selector, data, isActive) {
-  const el = $(selector);
-  if (data.length === 0) {
-    el.innerHTML = `<div class="muted" style="text-align:center; padding:10px; font-size:12px;">Tidak ada pesanan.</div>`;
-    return;
-  }
-
-  el.innerHTML = data
-    .map((o) => {
-      const items = (o.items || [])
-        .map((i) => `${i.qty}x ${i.name}`)
-        .join(", ");
-      const time = new Date(o.createdAt).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-      // Logika Tombol Aksi
-      let actionBtn = "";
-      if (isActive) {
-        if (o.status === "Diproses") {
-          actionBtn = `<button class="btn primary small" style="width:100%" onclick="updateStatus('${o.id}', 'Dalam perjalanan')">🍳 Siap & Antar</button>`;
-        } else if (o.status === "Dalam perjalanan") {
-          actionBtn = `<button class="btn small" style="width:100%; background:#dcfce7; color:#166534; border:1px solid #bbf7d0" onclick="updateStatus('${o.id}', 'Selesai')">✅ Selesaikan Order</button>`;
-        }
-      } else {
-        actionBtn = `<div class="pill" style="font-size:11px; background:#eee">Selesai</div>`;
-      }
-
-      return `
-      <div class="order-card">
-        <div class="ord-head">
-          <div><b>${
-            o.userName
-          }</b> <span class="muted" style="font-size:11px">(${time})</span></div>
-          <span class="pill">${o.status}</span>
-        </div>
-        <div class="ord-body">
-          <div style="font-size:13px; line-height:1.4; margin-bottom:8px;">${items}</div>
-          ${
-            o.note
-              ? `<div style="font-size:12px; color:#e11d48; background:#fff1f2; padding:4px 8px; border-radius:6px; display:inline-block; margin-bottom:8px;">📝 Note: ${o.note}</div>`
-              : ""
-          }
-          <div class="rowBetween">
-            <span class="muted" style="font-size:12px">Total</span>
-            <b style="font-size:15px">${rupiah(o.total)}</b>
-          </div>
-        </div>
-        ${actionBtn ? `<div class="ord-foot">${actionBtn}</div>` : ""}
-      </div>
-    `;
-    })
-    .join("");
-}
-
-window.updateStatus = async (orderId, newStatus) => {
-  if (confirm(`Ubah status jadi "${newStatus}"?`)) {
-    await updateDoc(doc(db, "orders", orderId), { status: newStatus });
-  }
-};
-
-// --- MAP & LOCATION ---
-function initMap() {
-  if (state.map) return;
-  state.map = L.map("sellerMap").setView(
-    [state.vendor.lat, state.vendor.lon],
-    15
-  );
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OSM",
-  }).addTo(state.map);
-  const vendorIcon = L.divIcon({
-    className: "vendor-pin",
-    html: `<div style="background:white; padding:4px; border-radius:8px; border:2px solid #ff7a00; font-size:20px; text-align:center; width:40px;">${
-      state.vendor.ico || "🏪"
-    }</div>`,
-    iconSize: [40, 40],
-    iconAnchor: [20, 40],
-  });
-  state.marker = L.marker([state.vendor.lat, state.vendor.lon], {
-    icon: vendorIcon,
-    draggable: false,
-  }).addTo(state.map);
-  state.marker.on("dragend", async function (e) {
-    const { lat, lng } = e.target.getLatLng();
-    await updateDoc(doc(db, "vendors", state.vendor.id), {
-      lat: lat,
-      lon: lng,
-    });
-  });
-}
-window.setLocMode = async (mode) => {
-  state.locMode = mode;
-  updateModeButtons();
-  await updateDoc(doc(db, "vendors", state.vendor.id), { locationMode: mode });
-  handleLocationLogic();
-};
-function updateModeButtons() {
-  $$(".mode-btn").forEach((b) => b.classList.remove("active"));
-  if (state.locMode === "gps") $$(".mode-btn")[0].classList.add("active");
-  else $$(".mode-btn")[1].classList.add("active");
-  if (state.locMode === "manual") $("#manualHint").classList.remove("hidden");
-  else $("#manualHint").classList.add("hidden");
-}
-function handleLocationLogic() {
-  if (!state.map || !state.marker) return;
-  if (state.locMode === "gps") {
-    state.marker.dragging.disable();
-    startGPS();
-  } else {
-    stopGPS();
-    state.marker.dragging.enable();
-  }
-}
-function startGPS() {
-  if (!navigator.geolocation) return alert("HP tidak dukung GPS");
-  if (state.watchId) return;
-  state.watchId = navigator.geolocation.watchPosition(
-    async (pos) => {
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
-      await updateDoc(doc(db, "vendors", state.vendor.id), { lat, lon });
-      if (state.marker) state.marker.setLatLng([lat, lon]);
-      if (state.map) state.map.setView([lat, lon], 16);
-    },
-    (err) => console.log(err),
-    { enableHighAccuracy: true }
-  );
-}
-function stopGPS() {
-  if (state.watchId) navigator.geolocation.clearWatch(state.watchId);
-  state.watchId = null;
-}
-$("#statusToggle").addEventListener("change", async (e) => {
-  await updateDoc(doc(db, "vendors", state.vendor.id), {
-    isLive: e.target.checked,
-  });
-});
-$("#payBtn").addEventListener("click", async () => {
-  if (confirm("Bayar 5rb?")) {
-    await updateDoc(doc(db, "vendors", state.vendor.id), {
-      subscriptionExpiry: Date.now() + 2592000000,
-    });
-    alert("Lunas!");
-  }
-});
-
-// --- MENU ---
-$("#addMenuBtn").addEventListener("click", () =>
-  $("#menuModal").classList.remove("hidden")
-);
-window.closeModal = () => $("#menuModal").classList.add("hidden");
-$("#menuForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const m = {
-    id: "m" + Date.now(),
-    name: $("#mName").value,
-    price: parseInt($("#mPrice").value),
-  };
-  const upd = [...(state.vendor.menu || []), m];
-  await updateDoc(doc(db, "vendors", state.vendor.id), { menu: upd });
-  $("#mName").value = "";
-  $("#mPrice").value = "";
-  closeModal();
-});
-window.deleteMenu = async (idx) => {
-  if (confirm("Hapus?")) {
-    const upd = [...state.vendor.menu];
-    upd.splice(idx, 1);
-    await updateDoc(doc(db, "vendors", state.vendor.id), { menu: upd });
-  }
-};
-
-// --- NAVIGATION (UPDATED) ---
+// --- NAVIGATION ---
 window.goSeller = (screen) => {
-  const navs = document.querySelectorAll(".nav");
-  navs.forEach((n) => n.classList.remove("active"));
+  // Mobile Nav
+  $$(".nav-item").forEach((n) => n.classList.remove("active"));
+  // Desktop Nav
+  $$(".sb-item").forEach((n) => n.classList.remove("active"));
+
   $("#sellerHome").classList.add("hidden");
   $("#sellerChat").classList.add("hidden");
   $("#sellerOrders").classList.add("hidden");
 
   if (screen === "Home") {
-    navs[0].classList.add("active");
+    $$(".nav-item")[0].classList.add("active");
+    $$(".sb-item")[0].classList.add("active");
     $("#sellerHome").classList.remove("hidden");
   } else if (screen === "Orders") {
-    navs[1].classList.add("active");
+    $$(".nav-item")[1].classList.add("active");
+    $$(".sb-item")[1].classList.add("active");
     $("#sellerOrders").classList.remove("hidden");
-    loadOrders(); // Load Order Data
   } else {
-    navs[2].classList.add("active");
+    $$(".nav-item")[2].classList.add("active");
+    $$(".sb-item")[2].classList.add("active");
     $("#sellerChat").classList.remove("hidden");
     loadChatList();
   }
 };
 
-// --- CHAT SYSTEM ---
+// --- CHAT DESKTOP SUPPORT ---
 function loadChatList() {
   const q = query(
     collection(db, "chats"),
@@ -364,28 +195,32 @@ function loadChatList() {
     $("#chatList").innerHTML =
       list
         .map(
-          (c) =>
-            `<div class="chat-item" onclick="openChat('${c.id}', '${
-              c.userName
-            }')" style="background:white; padding:12px; border:1px solid #eee; border-radius:12px; margin-bottom:8px; cursor:pointer;"><div class="rowBetween"><b>${
-              c.userName
-            }</b><span class="muted" style="font-size:10px">${new Date(
-              c.lastUpdate || Date.now()
-            ).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}</span></div><div class="muted" style="font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${
-              c.lastMessage || "Pesan baru"
-            }</div></div>`
+          (c) => `
+      <div class="chat-entry" onclick="openChat('${c.id}', '${c.userName}')">
+        <div><b style="font-size:14px;">${
+          c.userName
+        }</b><div style="font-size:13px; color:#64748b; margin-top:2px;">${
+            c.lastMessage
+          }</div></div>
+        <div style="font-size:11px; color:#94a3b8;">${new Date(
+          c.lastUpdate || Date.now()
+        ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+      </div>`
         )
-        .join("") ||
-      '<div class="muted" style="text-align:center; padding:20px;">Belum ada pesan masuk.</div>';
+        .join("") || '<div class="empty-state-box">Belum ada chat.</div>';
   });
 }
 window.openChat = (chatId, userName) => {
   state.activeChatId = chatId;
-  $("#chatList").classList.add("hidden");
+
+  // Mobile view logic
+  if (window.innerWidth < 1024) $("#chatRoom").classList.remove("hidden");
+
+  // Desktop view logic (hide placeholder)
+  const ph = $("#chatPlaceholder");
+  if (ph) ph.classList.add("hidden");
   $("#chatRoom").classList.remove("hidden");
+
   $("#chattingWith").textContent = userName;
   if (state.unsubMsg) state.unsubMsg();
   const q = query(
@@ -399,11 +234,7 @@ window.openChat = (chatId, userName) => {
         const isMe = m.from === state.vendor.id;
         return `<div style="display:flex; justify-content:${
           isMe ? "flex-end" : "flex-start"
-        }; margin-bottom:6px;"><div class="bubble ${
-          isMe ? "me" : "them"
-        }" style="background:${isMe ? "#ff7a00" : "#f3f4f6"}; color:${
-          isMe ? "white" : "black"
-        }; padding:8px 12px; border-radius:12px; max-width:80%; font-size:13px;">${
+        };"><div class="chat-bubble ${isMe ? "me" : "them"}">${
           m.text
         }</div></div>`;
       })
@@ -414,7 +245,8 @@ window.openChat = (chatId, userName) => {
 window.closeChat = () => {
   state.activeChatId = null;
   $("#chatRoom").classList.add("hidden");
-  $("#chatList").classList.remove("hidden");
+  const ph = $("#chatPlaceholder");
+  if (ph) ph.classList.remove("hidden"); // Show desktop placeholder
   if (state.unsubMsg) state.unsubMsg();
 };
 $("#sendReplyBtn").addEventListener("click", async () => {
@@ -430,6 +262,226 @@ $("#sendReplyBtn").addEventListener("click", async () => {
     lastUpdate: Date.now(),
   });
   $("#replyInput").value = "";
+});
+
+// --- ORDERS, MAP, MENU (Logic Inti Sama, diadaptasi sedikit) ---
+function calculateStats() {
+  const now = new Date();
+  const d = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  ).getTime();
+  const w = new Date(now.setDate(now.getDate() - now.getDay())).setHours(
+    0,
+    0,
+    0,
+    0
+  );
+  const m = new Date(
+    new Date().getFullYear(),
+    new Date().getMonth(),
+    1
+  ).getTime();
+  let today = 0,
+    week = 0,
+    month = 0,
+    total = 0,
+    itemCounts = {};
+  state.orders.forEach((o) => {
+    if (o.status === "Selesai") {
+      const t = new Date(o.createdAt).getTime();
+      const val = o.total || 0;
+      if (t >= d) today += val;
+      if (t >= w) week += val;
+      if (t >= m) month += val;
+      total += val;
+      (o.items || []).forEach(
+        (i) => (itemCounts[i.name] = (itemCounts[i.name] || 0) + i.qty)
+      );
+    }
+  });
+  $("#statToday").textContent = rupiah(today);
+  $("#statWeek").textContent = rupiah(week);
+  $("#statMonth").textContent = rupiah(month);
+  $("#statTotal").textContent = rupiah(total);
+  let bestName = "-",
+    bestQty = 0;
+  for (const [name, qty] of Object.entries(itemCounts)) {
+    if (qty > bestQty) {
+      bestName = name;
+      bestQty = qty;
+    }
+  }
+  $("#bestSellerName").textContent = bestName;
+  $("#bestSellerCount").textContent = `${bestQty} Terjual`;
+}
+function renderOrdersList() {
+  const list = state.orders.sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  );
+  const activeOrders = list.filter((o) => o.status !== "Selesai");
+  const historyOrders = list.filter((o) => o.status === "Selesai");
+  $("#incomingCount").textContent = activeOrders.length;
+  const renderItem = (o, active) => {
+    const items = (o.items || []).map((i) => `${i.qty}x ${i.name}`).join(", ");
+    let stCls =
+      o.status === "Diproses"
+        ? "status-process"
+        : o.status === "Dalam perjalanan"
+        ? "status-deliv"
+        : "status-done";
+    let btn = active
+      ? o.status === "Diproses"
+        ? `<button class="btn primary full" onclick="updStat('${o.id}','Dalam perjalanan')">🍳 Proses & Antar</button>`
+        : `<button class="btn full" style="background:#10b981; color:white;" onclick="updStat('${o.id}','Selesai')">✅ Selesaikan</button>`
+      : "";
+    return `<div class="order-item"><div class="ord-head"><div><b>${
+      o.userName
+    }</b> <span style="color:#94a3b8; font-size:12px;">• ${new Date(
+      o.createdAt
+    ).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}</span></div><span class="ord-status ${stCls}">${
+      o.status
+    }</span></div><div class="ord-body"><p style="margin:0 0 10px 0; font-size:14px; line-height:1.5;">${items}</p>${
+      o.note
+        ? `<div style="background:#fff1f2; color:#be123c; padding:8px; border-radius:8px; font-size:12px; margin-bottom:10px;">📝 ${o.note}</div>`
+        : ""
+    }<div class="rowBetween"><span class="muted">Total</span><b style="font-size:16px;">${rupiah(
+      o.total
+    )}</b></div></div>${btn ? `<div class="ord-foot">${btn}</div>` : ""}</div>`;
+  };
+  $("#incomingOrdersList").innerHTML =
+    activeOrders.map((o) => renderItem(o, true)).join("") ||
+    `<div class="empty-state-box">Tidak ada pesanan aktif.</div>`;
+  $("#historyOrdersList").innerHTML = historyOrders
+    .map((o) => renderItem(o, false))
+    .join("");
+}
+window.updStat = async (oid, st) => {
+  if (confirm("Update status?"))
+    await updateDoc(doc(db, "orders", oid), { status: st });
+};
+$("#addMenuBtn").addEventListener("click", () => {
+  state.editingMenuIndex = null;
+  $("#menuModalTitle").textContent = "Tambah Menu";
+  $("#mName").value = "";
+  $("#mPrice").value = "";
+  $("#menuModal").classList.remove("hidden");
+});
+window.openEditMenu = (idx) => {
+  state.editingMenuIndex = idx;
+  const item = state.vendor.menu[idx];
+  $("#menuModalTitle").textContent = "Edit Menu";
+  $("#mName").value = item.name;
+  $("#mPrice").value = item.price;
+  $("#menuModal").classList.remove("hidden");
+};
+window.closeModal = () => $("#menuModal").classList.add("hidden");
+$("#menuForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = $("#mName").value,
+    price = parseInt($("#mPrice").value);
+  let updMenu = [...(state.vendor.menu || [])];
+  if (state.editingMenuIndex !== null)
+    updMenu[state.editingMenuIndex] = {
+      ...updMenu[state.editingMenuIndex],
+      name,
+      price,
+    };
+  else updMenu.push({ id: "m" + Date.now(), name, price });
+  await updateDoc(doc(db, "vendors", state.vendor.id), { menu: updMenu });
+  closeModal();
+});
+window.deleteMenu = async (idx) => {
+  if (confirm("Hapus?")) {
+    const upd = [...state.vendor.menu];
+    upd.splice(idx, 1);
+    await updateDoc(doc(db, "vendors", state.vendor.id), { menu: upd });
+  }
+};
+function initMap() {
+  if (state.map) return;
+  state.map = L.map("sellerMap").setView(
+    [state.vendor.lat, state.vendor.lon],
+    15
+  );
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OSM",
+  }).addTo(state.map);
+  const icon = L.divIcon({
+    className: "vendor-pin",
+    html: `<div style="background:white; padding:4px; border-radius:8px; border:2px solid #ff7a00; font-size:20px; text-align:center; width:40px;">${
+      state.vendor.ico || "🏪"
+    }</div>`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+  });
+  state.marker = L.marker([state.vendor.lat, state.vendor.lon], {
+    icon: icon,
+    draggable: false,
+  }).addTo(state.map);
+  state.marker.on("dragend", async (e) => {
+    const { lat, lng } = e.target.getLatLng();
+    await updateDoc(doc(db, "vendors", state.vendor.id), {
+      lat: lat,
+      lon: lng,
+    });
+  });
+}
+window.setLocMode = async (mode) => {
+  state.locMode = mode;
+  updateModeButtons();
+  await updateDoc(doc(db, "vendors", state.vendor.id), { locationMode: mode });
+  handleLocationLogic();
+};
+function updateModeButtons() {
+  $$(".mode-tab").forEach((b) => b.classList.remove("active"));
+  if (state.locMode === "gps") $$(".mode-tab")[0].classList.add("active");
+  else $$(".mode-tab")[1].classList.add("active");
+  $("#manualHint").classList.toggle("hidden", state.locMode !== "manual");
+}
+function handleLocationLogic() {
+  if (!state.map || !state.marker) return;
+  if (state.locMode === "gps") {
+    state.marker.dragging.disable();
+    startGPS();
+  } else {
+    stopGPS();
+    state.marker.dragging.enable();
+  }
+}
+function startGPS() {
+  if (!navigator.geolocation) return;
+  if (state.watchId) return;
+  state.watchId = navigator.geolocation.watchPosition(
+    async (pos) => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      await updateDoc(doc(db, "vendors", state.vendor.id), { lat, lon });
+      if (state.marker) state.marker.setLatLng([lat, lon]);
+      if (state.map) state.map.setView([lat, lon], 16);
+    },
+    null,
+    { enableHighAccuracy: true }
+  );
+}
+function stopGPS() {
+  if (state.watchId) navigator.geolocation.clearWatch(state.watchId);
+  state.watchId = null;
+}
+$("#statusToggle").addEventListener("change", async (e) => {
+  await updateDoc(doc(db, "vendors", state.vendor.id), {
+    isLive: e.target.checked,
+  });
+});
+$("#payBtn").addEventListener("click", async () => {
+  if (confirm("Bayar 5rb?"))
+    await updateDoc(doc(db, "vendors", state.vendor.id), {
+      subscriptionExpiry: Date.now() + 2592000000,
+    });
 });
 
 initApp();

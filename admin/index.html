@@ -22,15 +22,14 @@
           <h2 style="margin: 12px 0 4px">Admin Panel</h2>
           <p class="muted" style="margin: 0">Kelola database dan pesanan.</p>
         </div>
-
         <form id="adminLoginForm" class="form">
           <div>
-            <label>Username</label>
-            <input id="adminUser" placeholder="admin" required />
+            <label>Username</label
+            ><input id="adminUser" placeholder="admin" required />
           </div>
           <div>
-            <label>Password</label>
-            <input
+            <label>Password</label
+            ><input
               id="adminPass"
               type="password"
               placeholder="••••••"
@@ -41,7 +40,6 @@
             Masuk
           </button>
         </form>
-
         <div
           style="
             margin-top: 24px;
@@ -54,9 +52,8 @@
             href="../index.html"
             class="btn ghost small"
             style="text-decoration: none; display: inline-block"
+            >📱 Buka Aplikasi Customer</a
           >
-            📱 Buka Aplikasi Customer
-          </a>
         </div>
       </div>
     </main>
@@ -70,7 +67,6 @@
             <div class="muted" style="font-size: 12px">Admin DB</div>
           </div>
         </div>
-
         <div class="sbNav">
           <button class="sbItem active" data-tab="Dashboard">
             <span class="icon">📊</span> <span class="label">Dashboard</span>
@@ -81,40 +77,23 @@
           <button class="sbItem" data-tab="Vendors">
             <span class="icon">🧑‍🍳</span> <span class="label">Vendors</span>
           </button>
+          <button class="sbItem" data-tab="Banners">
+            <span class="icon">📢</span> <span class="label">Promo Banner</span>
+          </button>
           <button class="sbItem" data-tab="Replies">
             <span class="icon">🤖</span> <span class="label">Bot Reply</span>
           </button>
         </div>
-
         <button id="adminLogoutBtn" class="sbLogout desktop-only">
           ⎋ Logout
         </button>
       </nav>
 
       <section class="main">
-        <header class="mobile-header">
-          <div style="display: flex; align-items: center; gap: 10px">
-            <img src="../pikul.jpeg" class="brand-logo-sm" />
-            <b>Admin Panel</b>
-          </div>
-          <button
-            onclick="location.reload()"
-            class="iconBtn"
-            style="width: 32px; height: 32px"
-          >
-            ⎋
-          </button>
-        </header>
-
         <header class="header desktop-only">
           <div>
             <h2 id="pageTitle" style="margin: 0">Dashboard</h2>
             <div class="muted">Realtime Database Monitor</div>
-          </div>
-          <div class="headerRight">
-            <button id="refreshAdminBtn" class="btn ghost small">
-              Refresh Data
-            </button>
           </div>
         </header>
 
@@ -129,27 +108,19 @@
               <div class="kpiVal" id="kpiRevenue">Rp 0</div>
             </div>
           </div>
-
           <div class="card" style="margin-top: 20px">
-            <div class="rowBetween">
-              <h3>Order Terbaru</h3>
-              <span class="pill">Live</span>
-            </div>
+            <h3>Order Terbaru</h3>
             <div id="latestOrders" class="list" style="margin-top: 15px"></div>
           </div>
         </section>
 
         <section id="tabOrders" class="tab hidden">
-          <h2 class="mobile-only" style="margin-bottom: 15px">Kelola Order</h2>
           <div class="card">
-            <div class="table-wrapper">
-              <div id="ordersTable"></div>
-            </div>
+            <div class="table-wrapper"><div id="ordersTable"></div></div>
           </div>
         </section>
 
         <section id="tabVendors" class="tab hidden">
-          <h2 class="mobile-only" style="margin-bottom: 15px">Pedagang</h2>
           <div class="card">
             <div class="rowBetween">
               <h3>Daftar Vendor</h3>
@@ -165,16 +136,36 @@
           </div>
         </section>
 
-        <section id="tabReplies" class="tab hidden">
-          <h2 class="mobile-only" style="margin-bottom: 15px">Auto Reply</h2>
+        <section id="tabBanners" class="tab hidden">
           <div class="card">
             <div class="rowBetween">
               <div>
-                <h3>Kata-kata Bot</h3>
+                <h3>Banner & Iklan</h3>
                 <p class="muted" style="margin: 0; font-size: 12px">
-                  Bot akan membalas chat customer secara acak dengan ini.
+                  Banner akan muncul di Home Customer.
                 </p>
               </div>
+              <button id="addBannerBtn" class="btn primary small">
+                + Buat Iklan
+              </button>
+            </div>
+            <div
+              id="bannerList"
+              class="list"
+              style="
+                margin-top: 20px;
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                gap: 12px;
+              "
+            ></div>
+          </div>
+        </section>
+
+        <section id="tabReplies" class="tab hidden">
+          <div class="card">
+            <div class="rowBetween">
+              <h3>Kata-kata Bot</h3>
               <button id="addReplyBtn" class="btn primary small">
                 + Tambah
               </button>
@@ -193,32 +184,14 @@
           <button class="iconBtn" data-close="orderModal">✕</button>
         </div>
         <div class="sheetBody">
-          <div
-            id="ordItems"
-            class="list"
-            style="
-              margin-bottom: 15px;
-              background: var(--bg);
-              padding: 10px;
-              border-radius: 12px;
-            "
-          ></div>
-          <div class="card" style="border: 1px solid var(--orange)">
-            <div class="rowBetween">
-              <b>Ubah Status:</b>
-              <select id="ordStatus" style="width: auto">
-                <option>Diproses</option>
-                <option>Dalam perjalanan</option>
-                <option>Selesai</option>
-              </select>
-            </div>
-          </div>
-          <button
-            id="saveStatusBtn"
-            class="btn primary"
-            style="width: 100%; margin-top: 15px"
-          >
-            Simpan Perubahan
+          <div id="ordItems" class="list" style="margin-bottom: 15px"></div>
+          <select id="ordStatus" style="width: 100%; margin-bottom: 10px">
+            <option>Diproses</option>
+            <option>Dalam perjalanan</option>
+            <option>Selesai</option>
+          </select>
+          <button id="saveStatusBtn" class="btn primary" style="width: 100%">
+            Simpan
           </button>
         </div>
       </div>
@@ -233,17 +206,197 @@
         </div>
         <div class="sheetBody">
           <form id="editVendorForm">
-            <label>Nama Vendor</label>
-            <input id="evName" required />
-
-            <label>Tipe (bakso/kopi/nasi)</label>
-            <input id="evType" required />
-
-            <label>Rating</label>
-            <input id="evRating" type="number" step="0.1" required />
-
+            <label>Nama Vendor</label><input id="evName" required />
+            <label>Tipe (bakso/kopi/nasi)</label><input id="evType" required />
+            <label>Rating</label
+            ><input id="evRating" type="number" step="0.1" required />
             <button class="btn primary" style="width: 100%; margin-top: 20px">
-              Simpan Perubahan
+              Simpan
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="bannerModal" class="modal hidden">
+      <div class="overlay" data-close="bannerModal"></div>
+      <div class="sheet">
+        <div class="sheetHead">
+          <h3>Buat Promo Banner</h3>
+          <button class="iconBtn" data-close="bannerModal">✕</button>
+        </div>
+
+        <div class="sheetBody">
+          <form id="bannerForm">
+            <div style="margin-bottom: 20px">
+              <label>Preview Tampilan</label>
+              <div id="bannerPreview" class="banner-preview">
+                <div class="preview-content">
+                  <span class="pill-preview" id="prevVendor">Info Promo</span>
+                  <h2 id="prevTitle">Judul Promo</h2>
+                  <p id="prevDesc">Keterangan singkat...</p>
+                </div>
+                <div class="preview-decor"></div>
+              </div>
+            </div>
+
+            <div
+              style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px"
+            >
+              <div>
+                <label>Judul Utama</label>
+                <input
+                  id="bnTitle"
+                  placeholder="Diskon 50%"
+                  required
+                  oninput="updatePreviewText()"
+                />
+              </div>
+              <div>
+                <label>Sub Judul</label>
+                <input
+                  id="bnDesc"
+                  placeholder="Khusus Hari Ini"
+                  required
+                  oninput="updatePreviewText()"
+                />
+              </div>
+            </div>
+
+            <label style="margin-top: 15px">Vendor Promosi (Opsional)</label>
+            <select id="bnVendor" onchange="updatePreviewText()">
+              <option value="">-- Pilih Vendor --</option>
+            </select>
+
+            <label style="margin-top: 20px">Pilih Gaya Background</label>
+
+            <div class="color-tabs">
+              <button
+                type="button"
+                class="tab-btn active"
+                onclick="switchColorTab('template')"
+              >
+                ✨ Template
+              </button>
+              <button
+                type="button"
+                class="tab-btn"
+                onclick="switchColorTab('custom')"
+              >
+                🎨 Custom Warna
+              </button>
+            </div>
+
+            <div id="tabColorTemplate" class="color-panel">
+              <div class="preset-grid">
+                <div
+                  class="preset-item"
+                  style="
+                    background: linear-gradient(
+                      135deg,
+                      #ff9a9e 0%,
+                      #fecfef 100%
+                    );
+                  "
+                  onclick="selectPreset(this)"
+                ></div>
+                <div
+                  class="preset-item"
+                  style="
+                    background: linear-gradient(
+                      135deg,
+                      #a18cd1 0%,
+                      #fbc2eb 100%
+                    );
+                  "
+                  onclick="selectPreset(this)"
+                ></div>
+                <div
+                  class="preset-item"
+                  style="
+                    background: linear-gradient(
+                      135deg,
+                      #f6d365 0%,
+                      #fda085 100%
+                    );
+                  "
+                  onclick="selectPreset(this)"
+                ></div>
+                <div
+                  class="preset-item"
+                  style="
+                    background: linear-gradient(
+                      135deg,
+                      #84fab0 0%,
+                      #8fd3f4 100%
+                    );
+                  "
+                  onclick="selectPreset(this)"
+                ></div>
+                <div
+                  class="preset-item"
+                  style="background: linear-gradient(135deg, #ff7a00, #ff4d00)"
+                  onclick="selectPreset(this)"
+                ></div>
+                <div
+                  class="preset-item"
+                  style="background: linear-gradient(135deg, #11998e, #38ef7d)"
+                  onclick="selectPreset(this)"
+                ></div>
+                <div
+                  class="preset-item"
+                  style="background: linear-gradient(135deg, #2575fc, #6a11cb)"
+                  onclick="selectPreset(this)"
+                ></div>
+                <div
+                  class="preset-item"
+                  style="
+                    background: linear-gradient(
+                      135deg,
+                      #434343 0%,
+                      #000000 100%
+                    );
+                  "
+                  onclick="selectPreset(this)"
+                ></div>
+              </div>
+            </div>
+
+            <div id="tabColorCustom" class="color-panel hidden">
+              <div class="rowBetween">
+                <div>
+                  <label>Warna Kiri</label>
+                  <input
+                    type="color"
+                    id="color1"
+                    value="#ff7a00"
+                    oninput="updateCustomGradient()"
+                  />
+                </div>
+                <div style="font-size: 20px">➝</div>
+                <div>
+                  <label>Warna Kanan</label>
+                  <input
+                    type="color"
+                    id="color2"
+                    value="#ff4d00"
+                    oninput="updateCustomGradient()"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <input
+              type="hidden"
+              id="finalColor"
+              value="linear-gradient(135deg, #ff7a00, #ff4d00)"
+            />
+
+            <button
+              class="btn primary"
+              style="width: 100%; margin-top: 20px; padding: 14px"
+            >
+              🚀 Pasang Iklan Sekarang
             </button>
           </form>
         </div>

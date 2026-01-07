@@ -18,12 +18,10 @@
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
       crossorigin=""
     />
     <script
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
       crossorigin=""
     ></script>
 
@@ -112,6 +110,9 @@
             margin-top: 20px;
             padding-top: 20px;
             border-top: 1px dashed var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
           "
         >
           <a
@@ -124,9 +125,21 @@
               text-decoration: none;
               font-size: 13px;
             "
+            >🏪 Masuk sebagai Penjual</a
           >
-            🏪 Masuk sebagai Penjual
-          </a>
+          <a
+            href="admin/index.html"
+            class="btn ghost"
+            style="
+              width: 100%;
+              display: block;
+              text-align: center;
+              text-decoration: none;
+              font-size: 13px;
+              color: var(--text-muted);
+            "
+            >🔐 Masuk sebagai Admin</a
+          >
         </div>
       </div>
     </main>
@@ -156,6 +169,7 @@
         <button class="nav" data-go="Profile">
           <span style="font-size: 18px">👤</span><span>Akun</span>
         </button>
+
         <button
           id="desktopLogout"
           class="nav"
@@ -201,7 +215,12 @@
               Lapar? Cari pedagang dekat sini.
             </p>
           </div>
-          <div id="promoList" class="promo-slider"></div>
+
+          <div class="promo-container">
+            <div id="promoList" class="promo-slider"></div>
+            <div id="promoDots" class="promo-dots"></div>
+          </div>
+
           <div
             style="
               position: sticky;

@@ -916,3 +916,156 @@ select {
     height: 64px;
   }
 }
+
+/* --- PROMO BANNER ENHANCED --- */
+
+/* ... Style Dasar (Colors, Layout, Buttons, dll sama seperti sebelumnya) ... */
+
+/* --- TAMBAHAN PROMO BANNER --- */
+.promo-container {
+  position: relative;
+  margin-bottom: 20px;
+}
+.promo-slider {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 4px 4px 20px 4px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.promo-slider::-webkit-scrollbar {
+  display: none;
+}
+.promo-card {
+  min-width: 90%;
+  height: 150px;
+  border-radius: 24px;
+  padding: 20px;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  scroll-snap-align: center;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+.promo-card:active {
+  transform: scale(0.97);
+}
+.promo-content {
+  position: relative;
+  z-index: 2;
+}
+.promo-tag {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  display: inline-block;
+  margin-bottom: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.promo-title {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0 0 4px 0;
+  line-height: 1.2;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.promo-desc {
+  font-size: 13px;
+  opacity: 0.9;
+  margin: 0;
+}
+.promo-decor {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  z-index: 1;
+}
+.decor-1 {
+  width: 100px;
+  height: 100px;
+  top: -20px;
+  right: -20px;
+}
+.decor-2 {
+  width: 60px;
+  height: 60px;
+  bottom: 20px;
+  right: 40px;
+}
+.promo-icon-bg {
+  position: absolute;
+  right: -10px;
+  bottom: -15px;
+  font-size: 100px;
+  opacity: 0.15;
+  transform: rotate(-15deg);
+  z-index: 0;
+}
+.promo-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: skewX(-25deg);
+  animation: shimmer 3s infinite;
+  z-index: 3;
+  pointer-events: none;
+}
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+  20% {
+    left: 200%;
+  }
+  100% {
+    left: 200%;
+  }
+}
+.promo-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: -10px;
+  margin-bottom: 16px;
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 50%;
+  transition: all 0.3s;
+}
+.dot.active {
+  width: 18px;
+  background: var(--orange);
+  border-radius: 10px;
+}
+@media (min-width: 768px) {
+  .promo-card {
+    min-width: 350px;
+    height: 180px;
+  }
+}
+/* ... Sisanya sama ... */

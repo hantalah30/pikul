@@ -6,11 +6,11 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"
     />
-    <title>PIKUL - Mitra Penjual</title>
+    <title>PIKUL Mitra Dashboard</title>
     <link rel="icon" type="image/jpeg" href="../pikul.jpeg" />
     <link rel="stylesheet" href="styles.css" />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
     <link
@@ -22,297 +22,293 @@
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       crossorigin=""
     ></script>
-
-    <style>
-      /* Tambahan Style Map Seller */
-      #sellerMap {
-        width: 100%;
-        height: 300px;
-        border-radius: 12px;
-        margin-top: 12px;
-        border: 1px solid var(--border);
-        z-index: 1;
-      }
-      .mode-selector {
-        display: flex;
-        background: #eee;
-        padding: 4px;
-        border-radius: 10px;
-        margin-top: 10px;
-      }
-      .mode-btn {
-        flex: 1;
-        padding: 8px;
-        text-align: center;
-        border-radius: 8px;
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-        border: none;
-        background: transparent;
-        color: var(--muted);
-      }
-      .mode-btn.active {
-        background: white;
-        color: var(--orange);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      }
-
-      /* Order Item Style */
-      .order-card {
-        background: white;
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        margin-bottom: 12px;
-        overflow: hidden;
-      }
-      .ord-head {
-        padding: 12px;
-        background: #f9fafb;
-        border-bottom: 1px dashed var(--border);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-      .ord-body {
-        padding: 12px;
-      }
-      .ord-foot {
-        padding: 12px;
-        border-top: 1px solid var(--border);
-        display: flex;
-        gap: 8px;
-      }
-    </style>
   </head>
   <body>
     <main id="auth" class="auth">
-      <div class="authCard">
-        <div style="text-align: center; margin-bottom: 20px">
-          <div class="logo">M</div>
-          <h2 style="margin: 10px 0 5px">Mitra PIKUL</h2>
-          <p class="muted" style="margin: 0">Login Penjual</p>
+      <div class="auth-container">
+        <div class="auth-header">
+          <div class="logo-box">M</div>
+          <h1>Mitra PIKUL</h1>
+          <p>Dashboard manajemen untuk penjual.</p>
         </div>
-        <form id="loginForm">
-          <label>Email</label>
-          <input
-            id="email"
-            type="email"
-            placeholder="contoh: bakso@pikul.id"
-            required
-          />
-          <label>Password</label>
-          <input id="password" type="password" placeholder="••••••" required />
-          <button class="btn primary" style="width: 100%; margin-top: 20px">
-            Masuk / Daftar
+        <form id="loginForm" class="auth-form">
+          <div class="input-group">
+            <label>Email</label>
+            <input
+              id="email"
+              type="email"
+              placeholder="contoh: bakso@pikul.id"
+              required
+            />
+          </div>
+          <div class="input-group">
+            <label>Password</label>
+            <input
+              id="password"
+              type="password"
+              placeholder="••••••"
+              required
+            />
+          </div>
+          <button class="btn primary full" type="submit">
+            Masuk Dashboard
           </button>
         </form>
-        <div
-          style="
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px dashed var(--border);
-          "
-        >
-          <a
-            href="../index.html"
-            class="btn ghost"
-            style="
-              width: 100%;
-              display: block;
-              text-align: center;
-              text-decoration: none;
-              font-size: 13px;
-            "
-          >
-            📱 Masuk sebagai Customer
-          </a>
+        <div class="auth-footer">
+          <a href="../index.html" class="link-btn">📱 Buka Aplikasi Pembeli</a>
         </div>
       </div>
     </main>
 
-    <div id="app" class="app hidden">
-      <header class="topbar">
-        <div>
-          <div class="muted" style="font-size: 11px">Halo,</div>
-          <b id="vName" style="font-size: 16px">Nama Pedagang</b>
+    <div id="app" class="app-layout hidden">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="logo-box small">M</div>
+          <h3>Mitra PIKUL</h3>
         </div>
-        <button id="logoutBtn" class="btn ghost small">Keluar</button>
-      </header>
+        <nav class="sidebar-nav">
+          <button class="sb-item active" onclick="goSeller('Home')">
+            <span class="icon">🏠</span> Dashboard
+          </button>
+          <button class="sb-item" onclick="goSeller('Orders')">
+            <span class="icon">📦</span> Pesanan
+          </button>
+          <button class="sb-item" onclick="goSeller('Chat')">
+            <span class="icon">💬</span> Chat Pelanggan
+          </button>
+        </nav>
+        <button onclick="logout()" class="sb-logout">⎋ Keluar</button>
+      </aside>
 
-      <main class="content">
-        <section id="sellerHome">
-          <div id="subAlert" class="card warn hidden">
-            <div class="rowBetween">
-              <div>
-                <b style="color: #b91c1c">Masa Aktif Habis!</b>
-                <div style="font-size: 12px; margin-top: 4px">
-                  Bayar 5rb/bulan.
+      <div class="main-wrapper">
+        <header class="topbar">
+          <div class="profile-info">
+            <div class="avatar">🏪</div>
+            <div>
+              <div class="greeting">Selamat Datang,</div>
+              <b id="vName" class="shop-name">Nama Toko</b>
+            </div>
+          </div>
+          <button onclick="logout()" class="icon-btn-outline mobile-only">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
+        </header>
+
+        <main class="content">
+          <section id="sellerHome">
+            <div class="dashboard-card">
+              <div class="dash-header">
+                <h3>📈 Ringkasan Penjualan</h3>
+                <span class="live-badge">LIVE DATA</span>
+              </div>
+
+              <div class="stats-grid">
+                <div class="stat-box">
+                  <span class="stat-label">Hari Ini</span>
+                  <span class="stat-value" id="statToday">Rp 0</span>
+                </div>
+                <div class="stat-box">
+                  <span class="stat-label">Minggu Ini</span>
+                  <span class="stat-value" id="statWeek">Rp 0</span>
+                </div>
+                <div class="stat-box">
+                  <span class="stat-label">Bulan Ini</span>
+                  <span class="stat-value" id="statMonth">Rp 0</span>
+                </div>
+                <div class="stat-box highlight">
+                  <span class="stat-label">Total Omzet</span>
+                  <span class="stat-value main" id="statTotal">Rp 0</span>
                 </div>
               </div>
-              <button id="payBtn" class="btn primary small">Bayar</button>
-            </div>
-          </div>
-          <div id="subActive" class="card success hidden">
-            <div class="rowBetween">
-              <div style="color: #047857; font-size: 12px">
-                <b>✅ Akun Aktif</b> <span id="expDate">-</span>
+
+              <div class="best-seller-box">
+                <div class="bs-icon">🏆</div>
+                <div class="bs-info">
+                  <span class="bs-label">Produk Terlaris</span>
+                  <b id="bestSellerName">-</b>
+                </div>
+                <span class="bs-count" id="bestSellerCount">0 Terjual</span>
               </div>
             </div>
-          </div>
 
-          <div class="card" style="margin-top: 16px">
-            <div class="rowBetween">
-              <h3 style="margin: 0">Lokasi & Status</h3>
-              <label class="switch"
-                ><input id="statusToggle" type="checkbox" disabled /><span
-                  class="slider"
-                ></span
-              ></label>
-            </div>
-            <div
-              style="margin-top: 10px; font-size: 12px"
-              class="muted"
-              id="statusText"
-            >
-              Toko Tutup
-            </div>
-            <div id="locationControls" class="hidden">
-              <div class="mode-selector">
-                <button class="mode-btn active" onclick="setLocMode('gps')">
-                  📡 Live GPS
-                </button>
-                <button class="mode-btn" onclick="setLocMode('manual')">
-                  📍 Pilih di Peta
-                </button>
+            <div class="dashboard-grid-layout">
+              <div class="dash-col">
+                <div id="subAlert" class="alert-card warn hidden">
+                  <div class="alert-icon">⚠️</div>
+                  <div class="alert-content">
+                    <b>Masa Aktif Habis</b>
+                    <p>Bayar Rp 5.000 untuk lanjut jualan.</p>
+                  </div>
+                  <button id="payBtn" class="btn small dark">Bayar</button>
+                </div>
+
+                <div id="subActive" class="alert-card success hidden">
+                  <div class="alert-icon">✅</div>
+                  <div class="alert-content">
+                    <b>Akun Premium Aktif</b>
+                    <p>Berlaku sampai <span id="expDate">-</span></p>
+                  </div>
+                </div>
+
+                <div class="section-card">
+                  <div class="card-header-row">
+                    <div>
+                      <h3>Status Toko</h3>
+                      <div id="statusText" class="status-indicator offline">
+                        Toko Tutup
+                      </div>
+                    </div>
+                    <label class="switch-toggle"
+                      ><input id="statusToggle" type="checkbox" disabled /><span
+                        class="slider"
+                      ></span
+                    ></label>
+                  </div>
+                  <div id="locationControls" class="loc-controls hidden">
+                    <div class="mode-tabs">
+                      <button
+                        class="mode-tab active"
+                        onclick="setLocMode('gps')"
+                      >
+                        📡 Live GPS
+                      </button>
+                      <button class="mode-tab" onclick="setLocMode('manual')">
+                        📍 Peta Manual
+                      </button>
+                    </div>
+                    <div class="map-wrapper">
+                      <div id="sellerMap"></div>
+                      <div id="manualHint" class="map-hint hidden">
+                        Geser pin merah untuk update lokasi
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div id="sellerMap"></div>
-              <div
-                id="manualHint"
-                class="hidden"
-                style="
-                  font-size: 11px;
-                  color: var(--orange);
-                  margin-top: 8px;
-                  text-align: center;
-                "
-              >
-                Geser pin di peta untuk update lokasi.
+
+              <div class="dash-col full-height">
+                <div class="section-header">
+                  <h3>Daftar Menu</h3>
+                  <button id="addMenuBtn" class="btn primary small">
+                    + Menu Baru
+                  </button>
+                </div>
+                <div id="menuList" class="menu-grid"></div>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div style="margin-top: 24px">
-            <div class="rowBetween" style="margin-bottom: 12px">
-              <h3 style="margin: 0">Menu Dagangan</h3>
-              <button id="addMenuBtn" class="btn primary small">
-                + Tambah
-              </button>
+          <section id="sellerOrders" class="hidden">
+            <div class="desktop-row">
+              <div class="col-half">
+                <div class="section-header">
+                  <h3>Pesanan Masuk</h3>
+                  <span class="badge-count" id="incomingCount">0</span>
+                </div>
+                <div
+                  id="incomingOrdersList"
+                  class="order-list empty-state-box"
+                ></div>
+              </div>
+              <div class="col-half">
+                <div class="section-header">
+                  <h3 class="text-muted">Riwayat Pesanan</h3>
+                </div>
+                <div id="historyOrdersList" class="order-list"></div>
+              </div>
             </div>
-            <div id="menuList"></div>
-          </div>
-        </section>
+          </section>
 
-        <section id="sellerOrders" class="hidden">
-          <h3 style="margin-top: 0">Pesanan Masuk</h3>
-          <div
-            id="incomingOrdersList"
-            class="list"
-            style="margin-bottom: 20px"
-          ></div>
-          <h3 style="margin-top: 0; color: #6b6b6b; font-size: 14px">
-            Riwayat Pesanan
-          </h3>
-          <div id="historyOrdersList" class="list"></div>
-        </section>
+          <section id="sellerChat" class="hidden">
+            <div class="chat-layout">
+              <div class="chat-sidebar">
+                <div class="section-header"><h3>Pesan Pelanggan</h3></div>
+                <div id="chatList" class="chat-list"></div>
+              </div>
 
-        <section id="sellerChat" class="hidden">
-          <h3 style="margin-top: 0">Chat Pelanggan</h3>
-          <div id="chatList" class="list"></div>
-          <div
-            id="chatRoom"
-            class="card hidden"
-            style="
-              height: 450px;
-              display: flex;
-              flex-direction: column;
-              padding: 0;
-              overflow: hidden;
-              border: 1px solid #e5e7eb;
-            "
-          >
-            <div
-              class="rowBetween"
-              style="
-                padding: 12px;
-                background: #f9fafb;
-                border-bottom: 1px solid #e5e7eb;
-              "
-            >
-              <b id="chattingWith">Customer</b
-              ><button onclick="closeChat()" class="btn ghost small">
-                Tutup
-              </button>
+              <div id="chatRoom" class="chat-room hidden">
+                <div class="chat-room-header">
+                  <button
+                    onclick="closeChat()"
+                    class="icon-btn-back mobile-only"
+                  >
+                    ←
+                  </button>
+                  <div class="chat-user-info">
+                    <b id="chattingWith">Customer</b><span>Online</span>
+                  </div>
+                </div>
+                <div id="msgBox" class="chat-messages"></div>
+                <div class="chat-input-bar">
+                  <input
+                    id="replyInput"
+                    placeholder="Tulis balasan..."
+                    autocomplete="off"
+                  />
+                  <button id="sendReplyBtn" class="btn-send">➤</button>
+                </div>
+              </div>
+
+              <div id="chatPlaceholder" class="chat-placeholder desktop-only">
+                <div style="font-size: 40px">💬</div>
+                <p>Pilih chat untuk mulai membalas.</p>
+              </div>
             </div>
-            <div
-              id="msgBox"
-              style="
-                flex: 1;
-                overflow-y: auto;
-                padding: 12px;
-                background: #fff;
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-              "
-            ></div>
-            <div
-              style="
-                padding: 10px;
-                border-top: 1px solid #e5e7eb;
-                display: flex;
-                gap: 8px;
-              "
-            >
-              <input
-                id="replyInput"
-                placeholder="Balas pesan..."
-                style="margin: 0; flex: 1"
-              /><button id="sendReplyBtn" class="btn primary small">➤</button>
-            </div>
-          </div>
-        </section>
-      </main>
+          </section>
+        </main>
+      </div>
 
-      <nav class="bottomNav">
-        <button class="nav active" onclick="goSeller('Home')">
-          <span style="font-size: 18px">🏠</span><span>Home</span>
+      <nav class="bottom-nav mobile-only">
+        <button class="nav-item active" onclick="goSeller('Home')">
+          <div class="nav-icon">🏠</div>
+          <span>Home</span>
         </button>
-        <button class="nav" onclick="goSeller('Orders')">
-          <span style="font-size: 18px">📦</span><span>Orders</span>
+        <button class="nav-item" onclick="goSeller('Orders')">
+          <div class="nav-icon">📦</div>
+          <span>Pesanan</span>
         </button>
-        <button class="nav" onclick="goSeller('Chat')">
-          <span style="font-size: 18px">💬</span><span>Chat</span>
+        <button class="nav-item" onclick="goSeller('Chat')">
+          <div class="nav-icon">💬</div>
+          <span>Chat</span>
         </button>
       </nav>
     </div>
 
     <div id="menuModal" class="modal hidden">
-      <div class="overlay" onclick="closeModal()"></div>
-      <div class="sheet">
-        <h3>Tambah Menu</h3>
+      <div class="modal-overlay" onclick="closeModal()"></div>
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <h3 id="menuModalTitle">Tambah Menu</h3>
+          <button class="icon-btn-close" onclick="closeModal()">✕</button>
+        </div>
         <form id="menuForm">
-          <label>Nama Makanan</label
-          ><input id="mName" placeholder="Contoh: Bakso Urat" required /><label
-            style="margin-top: 10px"
-            >Harga (Rp)</label
-          ><input
-            id="mPrice"
-            type="number"
-            placeholder="15000"
-            required
-          /><button class="btn primary" style="width: 100%; margin-top: 20px">
-            Simpan
+          <div class="input-group">
+            <label>Nama Makanan</label
+            ><input
+              id="mName"
+              placeholder="Contoh: Nasi Goreng Spesial"
+              required
+            />
+          </div>
+          <div class="input-group">
+            <label>Harga (Rp)</label
+            ><input id="mPrice" type="number" placeholder="15000" required />
+          </div>
+          <button class="btn primary full" style="margin-top: 20px">
+            Simpan Menu
           </button>
         </form>
       </div>

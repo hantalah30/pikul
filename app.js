@@ -80,6 +80,12 @@ async function bootApp() {
     if (!$("#screenMap").classList.contains("hidden")) updateMapMarkers();
   });
 
+  // LISTEN BANNERS (BARU)
+  onSnapshot(collection(db, "banners"), (s) => {
+    state.banners = s.docs.map((d) => ({ id: d.id, ...d.data() }));
+    if (!$("#screenHome").classList.contains("hidden")) renderHome(); // Re-render home jika banner berubah
+  });
+
   // Listen Orders (Realtime)
   onSnapshot(
     query(collection(db, "orders"), where("userId", "==", state.user.id)),
@@ -112,37 +118,112 @@ async function bootApp() {
 }
 
 // --- HOME ---
+let bannerInterval; // Variabel untuk menyimpan timer auto-scroll
+
+// --- HOME (UPDATED) ---
 function renderHome() {
-  const promos = [
-    {
-      t: "Diskon 50%",
-      d: "Pengguna baru",
-      c: "linear-gradient(135deg, #ff7a00, #ff4d00)",
-    },
-    {
-      t: "Gratis Ongkir",
-      d: "Min 20rb",
-      c: "linear-gradient(135deg, #3b82f6, #2563eb)",
-    },
-  ];
-  $("#promoList").innerHTML = promos
+  // Ambil banner dari DB, fallback ke default jika kosong
+  let promoData =
+    state.banners.length > 0
+      ? state.banners
+      : [
+          {
+            t: "Diskon 50%",
+            d: "Pengguna Baru",
+            c: "linear-gradient(135deg, #ff7a00, #ff4d00)",
+            vid: null,
+          },
+          {
+            t: "Gratis Ongkir",
+            d: "Min Belanja 20rb",
+            c: "linear-gradient(135deg, #3b82f6, #2563eb)",
+            vid: null,
+          },
+          {
+            t: "Cashback 30%",
+            d: "Pake E-Wallet",
+            c: "linear-gradient(135deg, #10b981, #059669)",
+            vid: null,
+          },
+        ];
+
+  // 1. Render Kartu Banner
+  $("#promoList").innerHTML = promoData
     .map(
-      (p) =>
-        `<div class="promo-card" style="background:${p.c}"><div class="promo-bg">%</div><h3>${p.t}</h3><p>${p.d}</p></div>`
+      (p) => `
+    <div class="promo-card" 
+         style="background: ${p.c};" 
+         onclick="${p.vid ? `openVendor('${p.vid}')` : ""}">
+         
+      <div class="promo-decor decor-1"></div>
+      <div class="promo-decor decor-2"></div>
+      <div class="promo-icon-bg">%</div>
+
+      <div class="promo-content">
+        ${
+          p.vName
+            ? `<div class="promo-tag">Promosi: ${p.vName}</div>`
+            : `<div class="promo-tag">Info Promo</div>`
+        }
+        <h3 class="promo-title">${p.t}</h3>
+        <p class="promo-desc">${p.d}</p>
+      </div>
+      
+    </div>
+  `
     )
     .join("");
 
-  const cats = ["Semua", "Bakso", "Kopi", "Nasi"];
-  $("#categoryFilters").innerHTML = cats
+  // 2. Render Dots (Indikator)
+  $("#promoDots").innerHTML = promoData
     .map(
-      (c) =>
-        `<button class="filter-chip ${
-          state.activeCategory === c ? "active" : ""
-        }" onclick="setCategory('${c}')">${c}</button>`
+      (_, i) =>
+        `<div class="dot ${i === 0 ? "active" : ""}" id="dot-${i}"></div>`
     )
     .join("");
 
-  renderVendors();
+  // 3. Setup Auto Scroll
+  setupBannerScroll(promoData.length);
+}
+
+function setupBannerScroll(count) {
+  const slider = $("#promoList");
+
+  // Hentikan timer lama jika ada (saat refresh data)
+  if (bannerInterval) clearInterval(bannerInterval);
+
+  // Listener Scroll Manual (untuk update dots)
+  slider.addEventListener("scroll", () => {
+    const scrollPos = slider.scrollLeft;
+    const cardWidth = slider.offsetWidth; // Lebar container (karena snap, 1 card = 1 view di mobile)
+    const activeIndex = Math.round(scrollPos / (cardWidth * 0.9)); // 0.9 karena width card 90%
+
+    // Update Dots
+    for (let i = 0; i < count; i++) {
+      const dot = $(`#dot-${i}`);
+      if (dot) {
+        if (i === activeIndex) dot.classList.add("active");
+        else dot.classList.remove("active");
+      }
+    }
+  });
+
+  // Auto Scroll Logic
+  let currentIndex = 0;
+  bannerInterval = setInterval(() => {
+    // Cek jika user sedang menyentuh layar (biar ga berantem scrollnya), skip auto scroll
+    if (slider.matches(":hover") || slider.matches(":active")) return;
+
+    currentIndex++;
+    if (currentIndex >= count) currentIndex = 0;
+
+    // Scroll ke posisi card berikutnya
+    const cardWidth = slider.children[0].offsetWidth + 16; // width + gap
+    slider.scrollTo({
+      left: currentIndex * cardWidth,
+      behavior: "smooth",
+    });
+  }, 4000); // Geser setiap 4 detik
 }
 window.setCategory = (c) => {
   state.activeCategory = c;
@@ -741,5 +822,23 @@ window.go = (n) => {
 $$(".nav").forEach((b) =>
   b.addEventListener("click", () => window.go(b.dataset.go))
 );
+
+// ... (Bagian atas kode sama) ...
+
+// LOGOUT HANDLER (Tambahkan di bagian bawah)
+function logout() {
+  if (confirm("Keluar dari akun?")) {
+    localStorage.removeItem("pikul_email");
+    location.reload();
+  }
+}
+
+// Bind Logout Buttons
+$("#logoutBtn").addEventListener("click", logout); // Mobile Header Icon
+if ($("#desktopLogout")) $("#desktopLogout").addEventListener("click", logout); // Desktop Sidebar
+if ($("#mobileProfileLogout"))
+  $("#mobileProfileLogout").addEventListener("click", logout); // Mobile Profile
+
+// ... (Sisa kode initAuth, startGPS, dll sama) ...
 
 initAuth();
