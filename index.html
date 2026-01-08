@@ -6,11 +6,11 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"
     />
-    <title>PIKUL</title>
+    <title>PIKUL - Jajan Aman</title>
     <link rel="icon" type="image/jpeg" href="pikul.jpeg" />
     <link rel="stylesheet" href="styles.css" />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
     <link
@@ -23,16 +23,214 @@
       crossorigin=""
     ></script>
     <style>
-      .desktop-brand {
-        display: none;
-        padding: 20px;
-        align-items: center;
-        gap: 12px;
+      :root {
+        --primary: #ff7a00;
+        --bg: #f8fafc;
+        --border: #e2e8f0;
+        --text: #1e293b;
+        --text-muted: #64748b;
+        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
       }
-      .brand-img {
-        object-fit: cover;
-        box-shadow: 0 4px 12px rgba(255, 122, 0, 0.2);
+      body {
+        margin: 0;
+        font-family: "Plus Jakarta Sans", sans-serif;
+        background: var(--bg);
+        height: 100vh;
+        overflow: hidden;
+        color: var(--text);
       }
+
+      /* --- NAVIGATION SYSTEM --- */
+      .bottomNav {
+        position: fixed;
+        z-index: 1000;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+      }
+
+      /* MOBILE NAV (Floating Island) */
+      @media (max-width: 767px) {
+        .bottomNav {
+          bottom: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 90%;
+          max-width: 400px;
+          height: 70px;
+          border-radius: 24px;
+          display: flex;
+          justify-content: space-around;
+          align-items: center;
+          padding: 0 10px;
+        }
+        .nav {
+          background: transparent;
+          border: none;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          color: #94a3b8;
+          font-family: inherit;
+          font-size: 10px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s;
+          width: 50px;
+          height: 50px;
+          border-radius: 16px;
+          position: relative;
+        }
+        .nav span:first-child {
+          font-size: 22px;
+          margin-bottom: 2px;
+          transition: transform 0.3s;
+          filter: grayscale(1);
+        }
+        .nav span:last-child {
+          opacity: 0;
+          transform: translateY(10px);
+          transition: all 0.3s;
+          position: absolute;
+          bottom: 8px;
+        }
+        .nav.active {
+          color: var(--primary);
+          background: rgba(255, 122, 0, 0.1);
+          transform: translateY(-5px);
+          box-shadow: 0 5px 15px rgba(255, 122, 0, 0.15);
+        }
+        .nav.active span:first-child {
+          transform: translateY(-8px) scale(1.1);
+          filter: grayscale(0);
+        }
+        .nav.active span:last-child {
+          opacity: 1;
+          transform: translateY(14px);
+          font-size: 9px;
+        }
+        .desktop-brand {
+          display: none;
+        }
+      }
+
+      /* DESKTOP NAV (Sidebar) */
+      @media (min-width: 768px) {
+        .bottomNav {
+          top: 0;
+          left: 0;
+          bottom: 0;
+          width: 260px;
+          height: 100vh;
+          border-radius: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          padding: 32px 20px;
+          background: #ffffff;
+          border-right: 1px solid var(--border);
+          box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02);
+        }
+        .desktop-brand {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          gap: 16px;
+          margin-bottom: 48px;
+          padding-left: 12px;
+          width: 100%;
+        }
+        .desktop-brand img {
+          width: 40px !important;
+          height: 40px !important;
+          border-radius: 10px;
+          box-shadow: 0 4px 10px rgba(255, 122, 0, 0.2);
+        }
+        .desktop-brand div {
+          font-size: 20px;
+          color: #1e293b;
+          letter-spacing: -0.5px;
+          font-weight: 800;
+        }
+        .nav {
+          background: transparent;
+          border: none;
+          width: 100%;
+          height: 52px;
+          border-radius: 12px;
+          margin-bottom: 8px;
+          cursor: pointer;
+          color: #64748b;
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          justify-content: flex-start;
+          padding-left: 16px;
+          position: relative;
+          transition: all 0.2s;
+          font-family: inherit;
+          font-weight: 600;
+          font-size: 15px;
+        }
+        .nav span:first-child {
+          font-size: 20px;
+          margin-right: 16px;
+          width: 24px;
+          text-align: center;
+        }
+        .nav:hover {
+          background: #f8fafc;
+          color: var(--primary);
+          transform: translateX(5px);
+        }
+        .nav.active {
+          background: #fff7ed;
+          color: var(--primary);
+        }
+        .nav.active::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 50%;
+          transform: translateY(-50%);
+          height: 60%;
+          width: 4px;
+          background: var(--primary);
+          border-radius: 0 4px 4px 0;
+        }
+        #app {
+          padding-left: 260px;
+          box-sizing: border-box;
+        }
+        .topbar {
+          left: 260px;
+          width: calc(100% - 260px);
+          padding: 16px 32px;
+          background: rgba(255, 255, 255, 0.8);
+          backdrop-filter: blur(12px);
+        }
+        .topbar .rowBetween > div:first-child {
+          opacity: 0;
+          pointer-events: none;
+        }
+        .content {
+          padding: 32px 40px;
+          max-width: 1280px;
+          margin: 0 auto;
+          width: 100%;
+        }
+        #map-container {
+          height: 600px !important;
+          border-radius: 24px;
+          border: 1px solid var(--border);
+        }
+      }
+
+      /* --- MAP STYLES --- */
       #map-container {
         position: relative;
         height: 60vh;
@@ -59,7 +257,6 @@
         overflow-x: auto;
         padding-bottom: 4px;
         scrollbar-width: none;
-        -webkit-overflow-scrolling: touch;
       }
       .map-chip {
         background: white;
@@ -74,9 +271,9 @@
         transition: 0.2s;
       }
       .map-chip.active {
-        background: var(--orange);
+        background: var(--primary);
         color: white;
-        border-color: var(--orange);
+        border-color: var(--primary);
       }
       .map-vendor-card {
         position: absolute;
@@ -89,7 +286,7 @@
         z-index: 400;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
         transform: translateY(150%);
-        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        transition: transform 0.3s;
         display: flex;
         align-items: center;
         gap: 12px;
@@ -101,7 +298,7 @@
         width: 50px;
         height: 50px;
         background: #fff7ed;
-        color: var(--orange);
+        color: var(--primary);
         border-radius: 12px;
         display: flex;
         align-items: center;
@@ -127,6 +324,193 @@
         font-size: 12px;
         cursor: pointer;
         border: 1px solid #eee;
+      }
+      .listItem.nearest {
+        background: #f0fdf4;
+        border: 1px solid #22c55e;
+        position: relative;
+      }
+      .listItem.nearest::after {
+        content: "Terdekat";
+        position: absolute;
+        top: -8px;
+        right: 10px;
+        background: #22c55e;
+        color: white;
+        font-size: 10px;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-weight: bold;
+      }
+
+      /* --- CHAT STYLES --- */
+      .chat-input-area {
+        gap: 8px;
+        padding: 10px;
+        background: white;
+        border-top: 1px solid var(--border);
+      }
+      .btn-attach {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: none;
+        background: #f1f5f9;
+        color: #64748b;
+        font-size: 20px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .attach-menu {
+        position: absolute;
+        bottom: 70px;
+        left: 10px;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        padding: 10px;
+        display: flex;
+        gap: 10px;
+        z-index: 100;
+        transform: scale(0);
+        transform-origin: bottom left;
+        transition: 0.2s;
+      }
+      .attach-menu.visible {
+        transform: scale(1);
+      }
+      .attach-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 8px;
+        cursor: pointer;
+        border-radius: 8px;
+        min-width: 60px;
+      }
+      .attach-item:active {
+        background: #f8fafc;
+      }
+      .attach-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: white;
+      }
+      .sticker-sheet {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        border-radius: 20px 20px 0 0;
+        padding: 16px;
+        box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.1);
+        z-index: 200;
+        transform: translateY(100%);
+        transition: 0.3s;
+        height: 300px;
+        display: flex;
+        flex-direction: column;
+      }
+      .sticker-sheet.visible {
+        transform: translateY(0);
+      }
+      .sticker-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        overflow-y: auto;
+        padding-top: 10px;
+      }
+      .sticker-item {
+        font-size: 40px;
+        text-align: center;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+      .bubble.image {
+        padding: 4px;
+        background: white !important;
+        border: 1px solid #eee;
+      }
+      .bubble.image img {
+        width: 100%;
+        max-width: 200px;
+        border-radius: 8px;
+        display: block;
+      }
+      .bubble.sticker {
+        background: transparent !important;
+        font-size: 50px;
+        padding: 0;
+      }
+      .bubble.location {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        text-decoration: none;
+      }
+
+      /* --- OTHER STYLES --- */
+      .vendorCard.closed {
+        opacity: 0.7;
+        background: #f9fafb;
+      }
+      .vendorCard.closed .vIco {
+        filter: grayscale(100%);
+        background: #e5e7eb;
+      }
+      .chip.closed {
+        background: #fecaca;
+        color: #ef4444;
+        border: 1px solid #fca5a5;
+      }
+      .shop-closed-banner {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #b91c1c;
+        padding: 12px;
+        border-radius: 12px;
+        text-align: center;
+        margin-bottom: 16px;
+        font-weight: 600;
+        font-size: 14px;
+      }
+      button:disabled {
+        background: #e2e8f0 !important;
+        color: #94a3b8 !important;
+        cursor: not-allowed;
+      }
+      .qris-display {
+        text-align: center;
+        margin-top: 10px;
+        background: white;
+        padding: 10px;
+        border-radius: 12px;
+        border: 2px dashed var(--primary);
+      }
+      .qris-display img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+      }
+      .proof-upload {
+        border: 2px dashed #cbd5e1;
+        padding: 15px;
+        text-align: center;
+        border-radius: 8px;
+        margin-top: 10px;
+        cursor: pointer;
+        background: #f8fafc;
       }
       .user-pulse {
         position: relative;
@@ -178,7 +562,7 @@
       }
       .vm-bubble.active {
         transform: scale(1.2);
-        border-color: var(--orange);
+        border-color: var(--primary);
         z-index: 500;
       }
       .vm-arrow {
@@ -192,7 +576,7 @@
       .auth-tabs {
         display: flex;
         margin-bottom: 20px;
-        background: var(--input-bg);
+        background: #e2e8f0;
         padding: 4px;
         border-radius: 12px;
       }
@@ -208,481 +592,9 @@
         transition: 0.2s;
       }
       .auth-tab.active {
-        background: var(--card-bg);
+        background: white;
         color: var(--text);
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-      }
-      @media (min-width: 768px) {
-        .desktop-brand {
-          display: flex;
-        }
-        .app {
-          overflow: hidden;
-        }
-        #screenMap {
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-        }
-        #map-container {
-          flex: 1;
-          height: auto;
-          min-height: 0;
-          border-radius: 16px;
-          margin-bottom: 0;
-        }
-      }
-
-      /* --- CHAT ENHANCEMENTS --- */
-      .chat-input-area {
-        gap: 8px; /* Jarak antar elemen input */
-        padding: 10px;
-        background: white;
-        border-top: 1px solid var(--border);
-      }
-      .btn-attach {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        border: none;
-        background: #f1f5f9;
-        color: #64748b;
-        font-size: 20px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      /* Attachment Menu (Popup) */
-      .attach-menu {
-        position: absolute;
-        bottom: 70px;
-        left: 10px;
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-        padding: 10px;
-        display: flex;
-        gap: 10px;
-        z-index: 100;
-        transform: scale(0);
-        transform-origin: bottom left;
-        transition: 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      }
-      .attach-menu.visible {
-        transform: scale(1);
-      }
-
-      .attach-item {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 4px;
-        padding: 8px;
-        cursor: pointer;
-        border-radius: 8px;
-        transition: 0.2s;
-        min-width: 60px;
-      }
-      .attach-item:active {
-        background: #f8fafc;
-      }
-      .attach-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 20px;
-        color: white;
-      }
-
-      /* Sticker/Emoji Sheet */
-      .sticker-sheet {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: white;
-        border-radius: 20px 20px 0 0;
-        padding: 16px;
-        box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.1);
-        z-index: 200;
-        transform: translateY(100%);
-        transition: 0.3s;
-        height: 300px;
-        display: flex;
-        flex-direction: column;
-      }
-      .sticker-sheet.visible {
-        transform: translateY(0);
-      }
-      .sticker-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 10px;
-        overflow-y: auto;
-        padding-top: 10px;
-      }
-      .sticker-item {
-        font-size: 40px;
-        text-align: center;
-        cursor: pointer;
-        transition: 0.2s;
-      }
-      .sticker-item:hover {
-        transform: scale(1.2);
-      }
-
-      /* Chat Bubble Variations */
-      .bubble.image {
-        padding: 4px;
-        background: white !important;
-        border: 1px solid #eee;
-      }
-      .bubble.image img {
-        width: 100%;
-        max-width: 200px;
-        border-radius: 8px;
-        display: block;
-      }
-      .bubble.sticker {
-        background: transparent !important;
-        font-size: 50px;
-        padding: 0;
-      }
-      .bubble.location {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-        text-decoration: none;
-      }
-
-      /* QRIS Modal Style */
-      .qris-display {
-        text-align: center;
-        margin-top: 10px;
-        background: white;
-        padding: 10px;
-        border-radius: 12px;
-        border: 2px dashed var(--orange);
-      }
-      .qris-display img {
-        max-width: 100%;
-        height: auto;
-        border-radius: 8px;
-      }
-
-      /* --- STATUS TOKO (NEW) --- */
-      .vendorCard.closed {
-        opacity: 0.7;
-        background: #f9fafb;
-      }
-      .vendorCard.closed .vIco {
-        filter: grayscale(100%); /* Ikon jadi hitam putih */
-        background: #e5e7eb;
-      }
-      .chip.closed {
-        background: #fecaca;
-        color: #ef4444;
-        border: 1px solid #fca5a5;
-      }
-
-      /* Banner di dalam Modal Menu */
-      .shop-closed-banner {
-        background: #fef2f2;
-        border: 1px solid #fecaca;
-        color: #b91c1c;
-        padding: 12px;
-        border-radius: 12px;
-        text-align: center;
-        margin-bottom: 16px;
-        font-weight: 600;
-        font-size: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-      }
-
-      /* Tombol Disabled */
-      button:disabled {
-        background: #e2e8f0 !important;
-        color: #94a3b8 !important;
-        cursor: not-allowed;
-        transform: none !important;
-        box-shadow: none !important;
-      }
-
-      /* --- NAVIGATION SYSTEM REVOLUTION --- */
-
-      /* Base Navigation Container */
-      .bottomNav {
-        position: fixed;
-        z-index: 1000;
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.5);
-      }
-
-      /* --- MOBILE VIEW (Floating Island) --- */
-      @media (max-width: 767px) {
-        .bottomNav {
-          bottom: 20px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 90%;
-          max-width: 400px;
-          height: 70px;
-          border-radius: 24px;
-          display: flex;
-          justify-content: space-around;
-          align-items: center;
-          padding: 0 10px;
-        }
-
-        .nav {
-          background: transparent;
-          border: none;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          color: #94a3b8;
-          font-family: "Plus Jakarta Sans", sans-serif;
-          font-size: 10px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-          width: 50px;
-          height: 50px;
-          border-radius: 16px;
-          position: relative;
-        }
-
-        .nav span:first-child {
-          /* Icon */
-          font-size: 22px;
-          margin-bottom: 2px;
-          transition: transform 0.3s;
-          filter: grayscale(1);
-        }
-
-        .nav span:last-child {
-          /* Text Label */
-          opacity: 0;
-          transform: translateY(10px);
-          transition: all 0.3s;
-          position: absolute;
-          bottom: 8px;
-        }
-
-        /* Active State Animation Mobile */
-        .nav.active {
-          color: var(--orange);
-          background: rgba(255, 122, 0, 0.1);
-          transform: translateY(-5px);
-          box-shadow: 0 5px 15px rgba(255, 122, 0, 0.15);
-        }
-
-        .nav.active span:first-child {
-          transform: translateY(-8px) scale(1.1); /* Icon naik */
-          filter: grayscale(0);
-        }
-
-        .nav.active span:last-child {
-          opacity: 1;
-          transform: translateY(14px); /* Text muncul */
-          font-size: 9px;
-        }
-
-        /* Indikator Titik (Optional aesthetic) */
-        .nav.active::after {
-          content: "";
-          position: absolute;
-          bottom: 5px;
-          width: 4px;
-          height: 4px;
-          background: var(--orange);
-          border-radius: 50%;
-        }
-
-        /* Sembunyikan brand di mobile nav */
-        .desktop-brand {
-          display: none;
-        }
-      }
-
-      /* --- DESKTOP VIEW (Professional Sidebar) --- */
-      @media (min-width: 768px) {
-        /* 1. Sidebar Container */
-        .bottomNav {
-          top: 0;
-          left: 0;
-          bottom: 0;
-          width: 260px; /* Lebar Sidebar yang nyaman dibaca */
-          height: 100vh;
-          border-radius: 0;
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start; /* Rata kiri */
-          padding: 32px 20px;
-          background: #ffffff;
-          border-right: 1px solid var(--border);
-          box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02); /* Bayangan halus ke kanan */
-        }
-
-        /* 2. Logo Brand di Sidebar */
-        .desktop-brand {
-          display: flex;
-          flex-direction: row; /* Logo & Teks sebelahan */
-          align-items: center;
-          gap: 16px;
-          margin-bottom: 48px; /* Jarak ke menu */
-          padding-left: 12px;
-          width: 100%;
-        }
-        .desktop-brand img {
-          width: 40px !important;
-          height: 40px !important;
-          border-radius: 10px;
-          box-shadow: 0 4px 10px rgba(255, 122, 0, 0.2);
-        }
-        .desktop-brand div {
-          display: block !important; /* Tampilkan teks PIKUL */
-          font-size: 20px;
-          color: #1e293b;
-          letter-spacing: -0.5px;
-        }
-
-        /* 3. Navigation Items (Tombol Menu) */
-        .nav {
-          background: transparent;
-          border: none;
-          width: 100%;
-          height: 52px; /* Lebih tinggi agar mudah diklik */
-          border-radius: 12px;
-          margin-bottom: 8px;
-          cursor: pointer;
-          color: #64748b; /* Warna teks tidak aktif */
-          display: flex;
-          flex-direction: row; /* Ikon di kiri, Teks di kanan */
-          align-items: center;
-          justify-content: flex-start;
-          padding-left: 16px; /* Indentasi teks */
-          position: relative;
-          transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
-          font-family: "Plus Jakarta Sans", sans-serif;
-          font-weight: 600;
-          font-size: 15px;
-          overflow: hidden;
-        }
-
-        /* Ikon di Desktop */
-        .nav span:first-child {
-          font-size: 20px;
-          margin-right: 16px;
-          margin-bottom: 0; /* Reset margin mobile */
-          width: 24px;
-          text-align: center;
-          transition: transform 0.2s;
-        }
-
-        /* Teks Label di Desktop */
-        .nav span:last-child {
-          position: static; /* Reset posisi absolute mobile */
-          opacity: 1;
-          transform: none;
-          background: transparent;
-          color: inherit;
-          padding: 0;
-          pointer-events: auto;
-          box-shadow: none;
-          font-size: 15px;
-        }
-
-        /* Reset panah tooltip css lama */
-        .nav span:last-child::before {
-          display: none;
-        }
-
-        /* 4. Hover State (Interaktif) */
-        .nav:hover {
-          background: #f8fafc;
-          color: var(--primary);
-          transform: translateX(5px); /* Efek geser sedikit ke kanan */
-        }
-        .nav:hover span:first-child {
-          transform: scale(1.1); /* Ikon membesar sedikit */
-        }
-
-        /* 5. Active State (Menu Terpilih) */
-        .nav.active {
-          background: #fff7ed; /* Orange sangat muda */
-          color: var(--primary);
-        }
-
-        /* Indikator Garis di Kiri untuk Active State */
-        .nav.active::before {
-          content: "";
-          position: absolute;
-          left: 0;
-          top: 50%;
-          transform: translateY(-50%);
-          height: 60%;
-          width: 4px;
-          background: var(--primary);
-          border-radius: 0 4px 4px 0;
-        }
-
-        /* 6. Layout Adjustment */
-        /* Geser konten utama agar tidak tertutup sidebar */
-        #app {
-          padding-left: 260px; /* Sesuai lebar sidebar */
-          box-sizing: border-box;
-        }
-
-        /* Geser Header Topbar */
-        .topbar {
-          left: 260px;
-          width: calc(100% - 260px);
-          padding: 16px 32px;
-          background: rgba(255, 255, 255, 0.8);
-          backdrop-filter: blur(12px);
-        }
-
-        /* Brand di Header Desktop disembunyikan (karena sudah ada di sidebar) */
-        .topbar .rowBetween > div:first-child {
-          opacity: 0; /* Sembunyikan logo PIKUL di header atas */
-          pointer-events: none;
-        }
-
-        /* Content Area */
-        .content {
-          padding: 32px 40px;
-          max-width: 1280px;
-          margin: 0 auto;
-          width: 100%;
-        }
-
-        /* Peta Desktop */
-        #map-container {
-          height: 600px !important;
-          border-radius: 24px;
-          border: 1px solid var(--border);
-        }
-
-        /* Sembunyikan tombol Back/Logout di header jika ingin lebih bersih */
-        #logoutBtn {
-          border: 1px solid var(--border);
-          border-radius: 8px;
-        }
       }
     </style>
   </head>
@@ -709,6 +621,7 @@
         PIKUL
       </div>
     </div>
+
     <main id="auth" class="auth hidden">
       <div class="authCard" style="position: relative">
         <button
@@ -740,10 +653,11 @@
             Daftar
           </div>
         </div>
+
         <form id="loginForm" class="auth-form">
           <h3 style="margin: 0 0 8px">Selamat Datang</h3>
           <p class="muted" style="margin-bottom: 20px; font-size: 13px">
-            Login untuk memesan makanan.
+            Login untuk keamanan transaksi.
           </p>
           <input
             id="loginEmail"
@@ -751,20 +665,23 @@
             placeholder="Email"
             required
             style="margin-bottom: 10px"
-          /><input
+          />
+          <input
             id="loginPass"
             type="password"
             placeholder="Password"
             required
             style="margin-bottom: 20px"
-          /><button class="btn primary" style="width: 100%" type="submit">
+          />
+          <button class="btn primary" style="width: 100%" type="submit">
             Masuk
           </button>
         </form>
+
         <form id="registerForm" class="auth-form hidden">
           <h3 style="margin: 0 0 8px">Buat Akun Baru</h3>
           <p class="muted" style="margin-bottom: 20px; font-size: 13px">
-            Isi data diri kamu.
+            Data asli untuk keamanan bersama.
           </p>
           <input
             id="regName"
@@ -772,22 +689,33 @@
             placeholder="Nama Lengkap"
             required
             style="margin-bottom: 10px"
-          /><input
+          />
+          <input
             id="regEmail"
             type="email"
             placeholder="Email"
             required
             style="margin-bottom: 10px"
-          /><input
+          />
+          <input
+            id="regPhone"
+            type="tel"
+            placeholder="Nomor WhatsApp (Wajib)"
+            required
+            style="margin-bottom: 10px"
+          />
+          <input
             id="regPass"
             type="password"
             placeholder="Password"
             required
             style="margin-bottom: 20px"
-          /><button class="btn primary" style="width: 100%" type="submit">
+          />
+          <button class="btn primary" style="width: 100%" type="submit">
             Daftar Sekarang
           </button>
         </form>
+
         <div
           style="
             margin-top: 20px;
@@ -813,6 +741,7 @@
         </div>
       </div>
     </main>
+
     <div id="app" class="app hidden">
       <nav class="bottomNav">
         <div class="desktop-brand">
@@ -821,30 +750,22 @@
         </div>
 
         <button class="nav active" data-go="Home">
-          <span>🏠</span>
-          <span>Home</span>
+          <span>🏠</span><span>Home</span>
         </button>
-
         <button class="nav" data-go="Map">
-          <span>🗺️</span>
-          <span>Peta</span>
+          <span>🗺️</span><span>Peta</span>
         </button>
-
         <button class="nav" data-go="Orders">
-          <span>🧾</span>
-          <span>Order</span>
+          <span>🧾</span><span>Order</span>
         </button>
-
         <button class="nav" data-go="Messages">
-          <span>💬</span>
-          <span>Chat</span>
+          <span>💬</span><span>Chat</span>
         </button>
-
         <button class="nav" data-go="Profile">
-          <span>👤</span>
-          <span>Akun</span>
+          <span>👤</span><span>Akun</span>
         </button>
       </nav>
+
       <header id="mainHeader" class="topbar">
         <div class="rowBetween">
           <div style="display: flex; align-items: center; gap: 8px">
@@ -868,12 +789,13 @@
           </button>
         </div>
       </header>
+
       <main class="content">
         <section id="screenHome">
           <div style="margin-bottom: 20px">
             <h2 style="margin: 0">
               Hai,
-              <span id="userName" style="color: var(--orange)">Tamu</span> 👋
+              <span id="userName" style="color: var(--primary)">Tamu</span> 👋
             </h2>
             <p class="muted" style="margin: 4px 0 0">
               Lapar? Cari pedagang dekat sini.
@@ -906,11 +828,10 @@
           </div>
           <div id="vendorList"></div>
         </section>
+
         <section id="screenMap" class="hidden">
-          <h2 style="margin: 0 0 16px; flex-shrink: 0">Peta Sekitar</h2>
           <div id="map-container">
             <div class="map-controls" id="mapChipsContainer"></div>
-
             <div id="map"></div>
             <div id="mapCard" class="map-vendor-card">
               <div class="mvc-close" onclick="closeMapCard()">✕</div>
@@ -949,6 +870,7 @@
             "
           ></div>
         </section>
+
         <section id="screenOrders" class="hidden">
           <h2 style="margin: 0 0 16px">Pesanan Saya</h2>
           <div class="segment-control">
@@ -956,8 +878,9 @@
               class="segment-btn active"
               onclick="switchOrderTab('active')"
             >
-              Dalam Proses</button
-            ><button class="segment-btn" onclick="switchOrderTab('history')">
+              Dalam Proses
+            </button>
+            <button class="segment-btn" onclick="switchOrderTab('history')">
               Riwayat
             </button>
           </div>
@@ -970,10 +893,10 @@
             "
           ></div>
         </section>
+
         <section id="screenMessages" class="hidden">
           <div class="chat-container">
             <div class="chat-bg-pattern"></div>
-
             <div class="chat-header">
               <div style="display: flex; align-items: center; gap: 10px">
                 <div
@@ -1001,7 +924,6 @@
               </div>
               <button id="pickChatBtn" class="btn small ghost">Ganti</button>
             </div>
-
             <div id="chatBox"></div>
 
             <div id="attachMenu" class="attach-menu">
@@ -1050,23 +972,24 @@
 
             <div id="stickerSheet" class="sticker-sheet">
               <div class="rowBetween" style="margin-bottom: 10px">
-                <b>Pilih Stiker / Emoji</b>
-                <button class="iconBtn" onclick="toggleSticker()">✕</button>
+                <b>Pilih Stiker</b
+                ><button class="iconBtn" onclick="toggleSticker()">✕</button>
               </div>
               <div class="segment-control" style="margin-bottom: 10px">
                 <button
                   class="segment-btn active"
                   onclick="renderStickers('emoji')"
                 >
-                  Emoji
-                </button>
-                <button class="segment-btn" onclick="renderStickers('sticker')">
+                  Emoji</button
+                ><button
+                  class="segment-btn"
+                  onclick="renderStickers('sticker')"
+                >
                   Stiker
                 </button>
               </div>
               <div id="stickerGrid" class="sticker-grid"></div>
             </div>
-
             <input
               type="file"
               id="imageInput"
@@ -1076,10 +999,20 @@
             />
           </div>
         </section>
+
         <section id="screenProfile" class="hidden">
           <h2 style="margin: 0 0 16px">Akun Saya</h2>
           <div id="profileContent"></div>
-
+          <div class="card" style="margin-top: 12px">
+            <div class="rowBetween">
+              <span>🌙 Mode Gelap</span
+              ><input
+                type="checkbox"
+                id="themeSwitch"
+                style="width: auto; margin: 0"
+              />
+            </div>
+          </div>
           <button
             id="mobileProfileLogout"
             class="btn ghost"
@@ -1100,6 +1033,7 @@
         <div id="cartBadge" class="cart-badge">0</div>
       </button>
     </div>
+
     <div id="vendorModal" class="modal hidden">
       <div class="overlay" data-close="vendorModal"></div>
       <div class="sheet">
@@ -1123,6 +1057,7 @@
         <div id="menuList"></div>
       </div>
     </div>
+
     <div id="checkoutModal" class="modal hidden">
       <div class="overlay" data-close="checkoutModal"></div>
       <div class="sheet">
@@ -1149,7 +1084,6 @@
             placeholder="Catatan..."
             style="margin-top: 10px"
           />
-
           <label
             style="
               display: block;
@@ -1170,10 +1104,29 @@
           >
             <option value="cash">💵 Tunai</option>
           </select>
-
           <div id="qrisContainer" class="qris-display hidden">
             <small>Scan untuk membayar</small>
             <img id="qrisImageDisplay" src="" alt="QRIS" />
+            <label
+              style="
+                display: block;
+                text-align: left;
+                font-size: 12px;
+                font-weight: 600;
+                margin-top: 10px;
+              "
+              >Upload Bukti (Wajib)</label
+            >
+            <div class="proof-upload" onclick="triggerProofUpload()">
+              <span id="proofText">📷 Klik untuk upload bukti</span>
+            </div>
+            <input
+              type="file"
+              id="paymentProofInput"
+              accept="image/*"
+              class="hidden"
+              onchange="handleProofUpload(this)"
+            />
           </div>
         </div>
         <button
@@ -1181,10 +1134,11 @@
           class="btn primary"
           style="width: 100%; margin-top: 16px"
         >
-          Pesan Sekarang
+          Pesan & Verifikasi
         </button>
       </div>
     </div>
+
     <div id="pickChatModal" class="modal hidden">
       <div class="overlay" data-close="pickChatModal"></div>
       <div class="sheet">
@@ -1192,6 +1146,7 @@
         <div id="pickChatList"></div>
       </div>
     </div>
+
     <script type="module" src="app.js"></script>
   </body>
 </html>

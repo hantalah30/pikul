@@ -12,6 +12,7 @@ import {
   updateDoc,
   orderBy,
   setDoc,
+  deleteDoc,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { firebaseConfig } from "../firebase-config.js";
 
@@ -35,6 +36,15 @@ let state = {
   orders: [],
   editingMenuIndex: null,
 };
+
+// --- HELPER: FORMAT WA ---
+function formatWA(phone) {
+  if (!phone) return "";
+  let p = phone.replace(/[^0-9]/g, "");
+  if (p.startsWith("08")) p = "62" + p.substring(1);
+  if (p.startsWith("8")) p = "62" + p;
+  return p;
+}
 
 // --- AUTH LOGIC ---
 window.switchAuthMode = (mode) => {
@@ -158,10 +168,11 @@ async function initApp() {
       if (doc.exists()) {
         state.vendor = { id: doc.id, ...doc.data() };
         renderUI();
-        renderPaymentSettings(); // Update UI Payment
+        renderPaymentSettings();
       }
     });
 
+    // Listen Orders
     const qOrd = query(
       collection(db, "orders"),
       where("vendorId", "==", state.vendor.id)
@@ -196,7 +207,6 @@ function renderUI() {
     $("#expDate").textContent = new Date(
       state.vendor.subscriptionExpiry
     ).toLocaleDateString();
-    // Fix: Pastikan tombol enable jika tidak expired
     $("#statusToggle").disabled = false;
     $("#statusToggle").checked = state.vendor.isLive;
     if (state.vendor.isLive) {
@@ -227,16 +237,13 @@ function renderUI() {
       .join("") || `<div class="empty-state-box">Belum ada menu.</div>`;
 }
 
-// --- PAYMENT METHOD LOGIC (FIXED: ATTACH TO WINDOW) ---
+// --- PAYMENT SETTINGS ---
 function renderPaymentSettings() {
   const methods = state.vendor.paymentMethods || ["cash"];
   const hasQris = methods.includes("qris");
-
-  // Update Checkbox UI
   $("#chkCash").checked = methods.includes("cash");
   $("#chkQris").checked = hasQris;
 
-  // UI QRIS Area
   const qrisConfig = $("#qrisConfig");
   const qrisStatus = $("#qrisStatus");
   const qrisImg = $("#qrisImg");
@@ -265,11 +272,9 @@ function renderPaymentSettings() {
   }
 }
 
-// EXPOSE TO GLOBAL WINDOW
 window.updatePaymentMethod = async () => {
   const cash = $("#chkCash").checked;
   const qris = $("#chkQris").checked;
-
   let newMethods = [];
   if (cash) newMethods.push("cash");
   if (qris) newMethods.push("qris");
@@ -287,7 +292,6 @@ window.updatePaymentMethod = async () => {
 window.triggerQrisUpload = () => {
   $("#qrisInput").click();
 };
-
 window.handleQrisUpload = (input) => {
   if (input.files && input.files[0]) {
     const reader = new FileReader();
@@ -302,17 +306,192 @@ window.handleQrisUpload = (input) => {
   }
 };
 
+// --- RENDER ORDERS LIST (SMART WA & DELETE) ---
+function renderOrdersList() {
+  const list = state.orders.sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  );
+  const activeOrders = list.filter(
+    (o) => o.status !== "Selesai" && !o.status.includes("Dibatalkan")
+  );
+  const historyOrders = list.filter(
+    (o) => o.status === "Selesai" || o.status.includes("Dibatalkan")
+  );
+  $("#incomingCount").textContent = activeOrders.length;
+
+  const renderItem = (o, active) => {
+    // 1. Format Item List (Untuk UI)
+    const itemsUI = (o.items || [])
+      .map((i) => `${i.qty}x ${i.name}`)
+      .join(", ");
+
+    // 2. Format Item List (Untuk WhatsApp - pakai Enter \n)
+    const itemsWA = (o.items || [])
+      .map((i) => `- ${i.qty}x ${i.name}`)
+      .join("\n");
+
+    let stCls =
+      o.status === "Diproses"
+        ? "status-process"
+        : o.status === "Siap Diambil/Diantar"
+        ? "status-deliv"
+        : "status-done";
+    if (o.status.includes("Dibatalkan")) stCls = "status-cancel";
+
+    // 3. Logic Tombol Aksi Order
+    let btn = "";
+    if (active) {
+      if (o.status === "Menunggu Konfirmasi Bayar") {
+        btn = `<div style="background:#f8fafc; padding:10px; border-radius:8px; margin-bottom:10px;">
+                <p style="margin:0 0 5px 0; font-size:12px;"><b>Bukti Transfer:</b></p>
+                <img src="${o.paymentProof}" style="width:100%; border-radius:8px; margin-bottom:8px; border:1px solid #ccc; cursor:pointer;" onclick="window.open(this.src)" />
+                <div style="display:flex; gap:8px;">
+                    <button class="btn full" style="background:#ef4444; color:white;" onclick="updStat('${o.id}','Dibatalkan (Bukti Salah)')">Tolak</button>
+                    <button class="btn primary full" onclick="updStat('${o.id}','Diproses')">Terima</button>
+                </div>
+            </div>`;
+      } else if (o.status === "Diproses") {
+        btn = `<button class="btn primary full" onclick="updStat('${o.id}','Siap Diambil/Diantar')">✅ Selesai Masak</button>`;
+      } else if (o.status === "Siap Diambil/Diantar") {
+        btn = `<div style="display:flex; gap:8px;">
+                <input id="pin-${o.id}" placeholder="PIN (4 digit)" style="width:100px; padding:8px; border:1px solid #ccc; border-radius:8px; font-size:14px;" maxlength="4" />
+                <button class="btn full" style="background:#10b981; color:white;" onclick="verifyPin('${o.id}', '${o.securePin}')">Verifikasi</button>
+            </div>`;
+      }
+    }
+
+    // 4. SMART WHATSAPP LOGIC
+    const waNum = formatWA(o.userPhone);
+
+    // Susun pesan otomatis
+    const waMessage = `Halo Kak ${o.userName}, ini dari ${state.vendor.name}. 👋
+
+Konfirmasi pesanan kamu ya:
+${itemsWA}
+
+Total: ${rupiah(o.total)}
+Status: ${o.status}
+
+Mohon ditunggu ya! 🙏`;
+
+    const encodedMsg = encodeURIComponent(waMessage);
+    const waLink = waNum ? `https://wa.me/${waNum}?text=${encodedMsg}` : "#";
+    const waBtn = waNum
+      ? `<a href="${waLink}" target="_blank" style="font-size:12px; color:#22c55e; text-decoration:none; font-weight:600; background:#f0fdf4; padding:4px 8px; border-radius:6px; border:1px solid #22c55e;">📞 Hubungi WA</a>`
+      : `<span class="muted" style="font-size:12px">No WA Tidak Ada</span>`;
+
+    // 5. DELETE BUTTON
+    const deleteBtn = `<button onclick="deleteOrder('${o.id}')" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:12px; text-decoration:underline; margin-left:auto;">🗑️ Hapus Pesanan</button>`;
+
+    return `<div class="order-item">
+        <div class="ord-head">
+            <div>
+                <b>${
+                  o.userName
+                }</b> <span style="color:#94a3b8; font-size:12px;">• ${new Date(
+      o.createdAt
+    ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                <div style="margin-top:6px;">${waBtn}</div>
+            </div>
+            <span class="ord-status ${stCls}">${o.status}</span>
+        </div>
+        <div class="ord-body">
+            <p style="margin:0 0 10px 0; font-size:14px; line-height:1.5;">${itemsUI}</p>
+            ${
+              o.note
+                ? `<div style="background:#fff1f2; color:#be123c; padding:8px; border-radius:8px; font-size:12px; margin-bottom:10px;">📝 ${o.note}</div>`
+                : ""
+            }
+            <div class="rowBetween">
+                <span class="muted">Total (${
+                  o.paymentMethod === "qris" ? "QRIS" : "Tunai"
+                })</span>
+                <b style="font-size:16px;">${rupiah(o.total)}</b>
+            </div>
+            <div style="display:flex; margin-top:8px;">${deleteBtn}</div>
+        </div>
+        ${btn ? `<div class="ord-foot">${btn}</div>` : ""}
+    </div>`;
+  };
+
+  $("#incomingOrdersList").innerHTML =
+    activeOrders.map((o) => renderItem(o, true)).join("") ||
+    `<div class="empty-state-box">Tidak ada pesanan aktif.</div>`;
+  $("#historyOrdersList").innerHTML = historyOrders
+    .map((o) => renderItem(o, false))
+    .join("");
+}
+
+// --- ORDER ACTIONS ---
+window.updStat = async (oid, st) => {
+  if (confirm("Update status pesanan?"))
+    await updateDoc(doc(db, "orders", oid), { status: st });
+};
+window.verifyPin = async (oid, correctPin) => {
+  const inputPin = document.getElementById(`pin-${oid}`).value;
+  if (inputPin === correctPin) {
+    if (confirm("PIN Benar! Selesaikan pesanan?"))
+      await updateDoc(doc(db, "orders", oid), { status: "Selesai" });
+  } else {
+    alert("PIN SALAH!");
+  }
+};
+window.deleteOrder = async (oid) => {
+  if (confirm("HAPUS PERMANEN? Data akan hilang dari customer juga.")) {
+    await deleteDoc(doc(db, "orders", oid));
+  }
+};
+
 // --- CHAT SYSTEM ---
+function loadChatList() {
+  const q = query(
+    collection(db, "chats"),
+    where("vendorId", "==", state.vendor.id)
+  );
+  onSnapshot(q, (snap) => {
+    let list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    list.sort((a, b) => b.lastUpdate - a.lastUpdate);
+    $("#chatList").innerHTML =
+      list
+        .map(
+          (c) => `
+      <div class="chat-entry" onclick="openChat('${c.id}', '${c.userName}')">
+        <div style="width:40px; height:40px; background:#f1f5f9; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px;">👤</div>
+        <div style="flex:1; min-width:0;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+                <b style="font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${
+                  c.userName
+                }</b>
+                <span style="font-size:11px; color:#94a3b8;">${new Date(
+                  c.lastUpdate || Date.now()
+                ).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}</span>
+            </div>
+            <div style="font-size:13px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${
+              c.lastMessage
+            }</div>
+        </div>
+      </div>`
+        )
+        .join("") ||
+      '<div style="text-align:center; padding:40px; color:#94a3b8;"><div style="font-size:40px; margin-bottom:10px;">💬</div>Belum ada chat.</div>';
+  });
+}
+
 window.openChat = (chatId, userName) => {
   state.activeChatId = chatId;
   $("#chatRoom").classList.add("active");
   $("#chattingWith").textContent = userName;
   $$(".chat-entry").forEach((el) => el.classList.remove("active"));
+
   if (state.unsubMsg) state.unsubMsg();
   const q = query(
     collection(db, "chats", chatId, "messages"),
     orderBy("ts", "asc")
   );
+
   state.unsubMsg = onSnapshot(q, (snap) => {
     $("#msgBox").innerHTML = snap.docs
       .map((d) => {
@@ -346,56 +525,6 @@ window.openChat = (chatId, userName) => {
   });
 };
 
-window.goSeller = (screen) => {
-  $$(".nav-item").forEach((n) => n.classList.remove("active"));
-  $$(".sb-item").forEach((n) => n.classList.remove("active"));
-  $("#sellerHome").classList.add("hidden");
-  $("#sellerChat").classList.add("hidden");
-  $("#sellerOrders").classList.add("hidden");
-  if (screen === "Home") {
-    $$(".nav-item")[0].classList.add("active");
-    $$(".sb-item")[0].classList.add("active");
-    $("#sellerHome").classList.remove("hidden");
-  } else if (screen === "Orders") {
-    $$(".nav-item")[1].classList.add("active");
-    $$(".sb-item")[1].classList.add("active");
-    $("#sellerOrders").classList.remove("hidden");
-  } else {
-    $$(".nav-item")[2].classList.add("active");
-    $$(".sb-item")[2].classList.add("active");
-    $("#sellerChat").classList.remove("hidden");
-    loadChatList();
-  }
-};
-function loadChatList() {
-  const q = query(
-    collection(db, "chats"),
-    where("vendorId", "==", state.vendor.id)
-  );
-  onSnapshot(q, (snap) => {
-    let list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    list.sort((a, b) => b.lastUpdate - a.lastUpdate);
-    $("#chatList").innerHTML =
-      list
-        .map(
-          (c) =>
-            `<div class="chat-entry" onclick="openChat('${c.id}', '${
-              c.userName
-            }')"><div style="width:40px; height:40px; background:#f1f5f9; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px;">👤</div><div style="flex:1; min-width:0;"><div style="display:flex; justify-content:space-between; margin-bottom:2px;"><b style="font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${
-              c.userName
-            }</b><span style="font-size:11px; color:#94a3b8;">${new Date(
-              c.lastUpdate || Date.now()
-            ).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}</span></div><div style="font-size:13px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${
-              c.lastMessage
-            }</div></div></div>`
-        )
-        .join("") ||
-      '<div style="text-align:center; padding:40px; color:#94a3b8;"><div style="font-size:40px; margin-bottom:10px;">💬</div>Belum ada chat.</div>';
-  });
-}
 window.closeChat = () => {
   state.activeChatId = null;
   $("#chatRoom").classList.remove("active");
@@ -507,6 +636,29 @@ $("#sendReplyBtn").addEventListener("click", () => {
     $("#replyInput").value = "";
   }
 });
+
+// --- NAVIGATION & UTILS ---
+window.goSeller = (screen) => {
+  $$(".nav-item").forEach((n) => n.classList.remove("active"));
+  $$(".sb-item").forEach((n) => n.classList.remove("active"));
+  $("#sellerHome").classList.add("hidden");
+  $("#sellerChat").classList.add("hidden");
+  $("#sellerOrders").classList.add("hidden");
+  if (screen === "Home") {
+    $$(".nav-item")[0].classList.add("active");
+    $$(".sb-item")[0].classList.add("active");
+    $("#sellerHome").classList.remove("hidden");
+  } else if (screen === "Orders") {
+    $$(".nav-item")[1].classList.add("active");
+    $$(".sb-item")[1].classList.add("active");
+    $("#sellerOrders").classList.remove("hidden");
+  } else {
+    $$(".nav-item")[2].classList.add("active");
+    $$(".sb-item")[2].classList.add("active");
+    $("#sellerChat").classList.remove("hidden");
+    loadChatList();
+  }
+};
 function calculateStats() {
   const now = new Date();
   const d = new Date(
@@ -558,54 +710,6 @@ function calculateStats() {
   $("#bestSellerName").textContent = bestName;
   $("#bestSellerCount").textContent = `${bestQty} Terjual`;
 }
-function renderOrdersList() {
-  const list = state.orders.sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  );
-  const activeOrders = list.filter((o) => o.status !== "Selesai");
-  const historyOrders = list.filter((o) => o.status === "Selesai");
-  $("#incomingCount").textContent = activeOrders.length;
-  const renderItem = (o, active) => {
-    const items = (o.items || []).map((i) => `${i.qty}x ${i.name}`).join(", ");
-    let stCls =
-      o.status === "Diproses"
-        ? "status-process"
-        : o.status === "Dalam perjalanan"
-        ? "status-deliv"
-        : "status-done";
-    let btn = active
-      ? o.status === "Diproses"
-        ? `<button class="btn primary full" onclick="updStat('${o.id}','Dalam perjalanan')">🍳 Proses & Antar</button>`
-        : `<button class="btn full" style="background:#10b981; color:white;" onclick="updStat('${o.id}','Selesai')">✅ Selesaikan</button>`
-      : "";
-    return `<div class="order-item"><div class="ord-head"><div><b>${
-      o.userName
-    }</b> <span style="color:#94a3b8; font-size:12px;">• ${new Date(
-      o.createdAt
-    ).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    })}</span></div><span class="ord-status ${stCls}">${
-      o.status
-    }</span></div><div class="ord-body"><p style="margin:0 0 10px 0; font-size:14px; line-height:1.5;">${items}</p>${
-      o.note
-        ? `<div style="background:#fff1f2; color:#be123c; padding:8px; border-radius:8px; font-size:12px; margin-bottom:10px;">📝 ${o.note}</div>`
-        : ""
-    }<div class="rowBetween"><span class="muted">Total</span><b style="font-size:16px;">${rupiah(
-      o.total
-    )}</b></div></div>${btn ? `<div class="ord-foot">${btn}</div>` : ""}</div>`;
-  };
-  $("#incomingOrdersList").innerHTML =
-    activeOrders.map((o) => renderItem(o, true)).join("") ||
-    `<div class="empty-state-box">Tidak ada pesanan aktif.</div>`;
-  $("#historyOrdersList").innerHTML = historyOrders
-    .map((o) => renderItem(o, false))
-    .join("");
-}
-window.updStat = async (oid, st) => {
-  if (confirm("Update status?"))
-    await updateDoc(doc(db, "orders", oid), { status: st });
-};
 $("#addMenuBtn").addEventListener("click", () => {
   state.editingMenuIndex = null;
   $("#menuModalTitle").textContent = "Tambah Menu";
@@ -729,4 +833,5 @@ $("#payBtn").addEventListener("click", async () => {
       subscriptionExpiry: Date.now() + 2592000000,
     });
 });
+
 initApp();
