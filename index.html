@@ -375,6 +375,315 @@
         height: auto;
         border-radius: 8px;
       }
+
+      /* --- STATUS TOKO (NEW) --- */
+      .vendorCard.closed {
+        opacity: 0.7;
+        background: #f9fafb;
+      }
+      .vendorCard.closed .vIco {
+        filter: grayscale(100%); /* Ikon jadi hitam putih */
+        background: #e5e7eb;
+      }
+      .chip.closed {
+        background: #fecaca;
+        color: #ef4444;
+        border: 1px solid #fca5a5;
+      }
+
+      /* Banner di dalam Modal Menu */
+      .shop-closed-banner {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #b91c1c;
+        padding: 12px;
+        border-radius: 12px;
+        text-align: center;
+        margin-bottom: 16px;
+        font-weight: 600;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      /* Tombol Disabled */
+      button:disabled {
+        background: #e2e8f0 !important;
+        color: #94a3b8 !important;
+        cursor: not-allowed;
+        transform: none !important;
+        box-shadow: none !important;
+      }
+
+      /* --- NAVIGATION SYSTEM REVOLUTION --- */
+
+      /* Base Navigation Container */
+      .bottomNav {
+        position: fixed;
+        z-index: 1000;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+      }
+
+      /* --- MOBILE VIEW (Floating Island) --- */
+      @media (max-width: 767px) {
+        .bottomNav {
+          bottom: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 90%;
+          max-width: 400px;
+          height: 70px;
+          border-radius: 24px;
+          display: flex;
+          justify-content: space-around;
+          align-items: center;
+          padding: 0 10px;
+        }
+
+        .nav {
+          background: transparent;
+          border: none;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          color: #94a3b8;
+          font-family: "Plus Jakarta Sans", sans-serif;
+          font-size: 10px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+          width: 50px;
+          height: 50px;
+          border-radius: 16px;
+          position: relative;
+        }
+
+        .nav span:first-child {
+          /* Icon */
+          font-size: 22px;
+          margin-bottom: 2px;
+          transition: transform 0.3s;
+          filter: grayscale(1);
+        }
+
+        .nav span:last-child {
+          /* Text Label */
+          opacity: 0;
+          transform: translateY(10px);
+          transition: all 0.3s;
+          position: absolute;
+          bottom: 8px;
+        }
+
+        /* Active State Animation Mobile */
+        .nav.active {
+          color: var(--orange);
+          background: rgba(255, 122, 0, 0.1);
+          transform: translateY(-5px);
+          box-shadow: 0 5px 15px rgba(255, 122, 0, 0.15);
+        }
+
+        .nav.active span:first-child {
+          transform: translateY(-8px) scale(1.1); /* Icon naik */
+          filter: grayscale(0);
+        }
+
+        .nav.active span:last-child {
+          opacity: 1;
+          transform: translateY(14px); /* Text muncul */
+          font-size: 9px;
+        }
+
+        /* Indikator Titik (Optional aesthetic) */
+        .nav.active::after {
+          content: "";
+          position: absolute;
+          bottom: 5px;
+          width: 4px;
+          height: 4px;
+          background: var(--orange);
+          border-radius: 50%;
+        }
+
+        /* Sembunyikan brand di mobile nav */
+        .desktop-brand {
+          display: none;
+        }
+      }
+
+      /* --- DESKTOP VIEW (Professional Sidebar) --- */
+      @media (min-width: 768px) {
+        /* 1. Sidebar Container */
+        .bottomNav {
+          top: 0;
+          left: 0;
+          bottom: 0;
+          width: 260px; /* Lebar Sidebar yang nyaman dibaca */
+          height: 100vh;
+          border-radius: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start; /* Rata kiri */
+          padding: 32px 20px;
+          background: #ffffff;
+          border-right: 1px solid var(--border);
+          box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02); /* Bayangan halus ke kanan */
+        }
+
+        /* 2. Logo Brand di Sidebar */
+        .desktop-brand {
+          display: flex;
+          flex-direction: row; /* Logo & Teks sebelahan */
+          align-items: center;
+          gap: 16px;
+          margin-bottom: 48px; /* Jarak ke menu */
+          padding-left: 12px;
+          width: 100%;
+        }
+        .desktop-brand img {
+          width: 40px !important;
+          height: 40px !important;
+          border-radius: 10px;
+          box-shadow: 0 4px 10px rgba(255, 122, 0, 0.2);
+        }
+        .desktop-brand div {
+          display: block !important; /* Tampilkan teks PIKUL */
+          font-size: 20px;
+          color: #1e293b;
+          letter-spacing: -0.5px;
+        }
+
+        /* 3. Navigation Items (Tombol Menu) */
+        .nav {
+          background: transparent;
+          border: none;
+          width: 100%;
+          height: 52px; /* Lebih tinggi agar mudah diklik */
+          border-radius: 12px;
+          margin-bottom: 8px;
+          cursor: pointer;
+          color: #64748b; /* Warna teks tidak aktif */
+          display: flex;
+          flex-direction: row; /* Ikon di kiri, Teks di kanan */
+          align-items: center;
+          justify-content: flex-start;
+          padding-left: 16px; /* Indentasi teks */
+          position: relative;
+          transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+          font-family: "Plus Jakarta Sans", sans-serif;
+          font-weight: 600;
+          font-size: 15px;
+          overflow: hidden;
+        }
+
+        /* Ikon di Desktop */
+        .nav span:first-child {
+          font-size: 20px;
+          margin-right: 16px;
+          margin-bottom: 0; /* Reset margin mobile */
+          width: 24px;
+          text-align: center;
+          transition: transform 0.2s;
+        }
+
+        /* Teks Label di Desktop */
+        .nav span:last-child {
+          position: static; /* Reset posisi absolute mobile */
+          opacity: 1;
+          transform: none;
+          background: transparent;
+          color: inherit;
+          padding: 0;
+          pointer-events: auto;
+          box-shadow: none;
+          font-size: 15px;
+        }
+
+        /* Reset panah tooltip css lama */
+        .nav span:last-child::before {
+          display: none;
+        }
+
+        /* 4. Hover State (Interaktif) */
+        .nav:hover {
+          background: #f8fafc;
+          color: var(--primary);
+          transform: translateX(5px); /* Efek geser sedikit ke kanan */
+        }
+        .nav:hover span:first-child {
+          transform: scale(1.1); /* Ikon membesar sedikit */
+        }
+
+        /* 5. Active State (Menu Terpilih) */
+        .nav.active {
+          background: #fff7ed; /* Orange sangat muda */
+          color: var(--primary);
+        }
+
+        /* Indikator Garis di Kiri untuk Active State */
+        .nav.active::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 50%;
+          transform: translateY(-50%);
+          height: 60%;
+          width: 4px;
+          background: var(--primary);
+          border-radius: 0 4px 4px 0;
+        }
+
+        /* 6. Layout Adjustment */
+        /* Geser konten utama agar tidak tertutup sidebar */
+        #app {
+          padding-left: 260px; /* Sesuai lebar sidebar */
+          box-sizing: border-box;
+        }
+
+        /* Geser Header Topbar */
+        .topbar {
+          left: 260px;
+          width: calc(100% - 260px);
+          padding: 16px 32px;
+          background: rgba(255, 255, 255, 0.8);
+          backdrop-filter: blur(12px);
+        }
+
+        /* Brand di Header Desktop disembunyikan (karena sudah ada di sidebar) */
+        .topbar .rowBetween > div:first-child {
+          opacity: 0; /* Sembunyikan logo PIKUL di header atas */
+          pointer-events: none;
+        }
+
+        /* Content Area */
+        .content {
+          padding: 32px 40px;
+          max-width: 1280px;
+          margin: 0 auto;
+          width: 100%;
+        }
+
+        /* Peta Desktop */
+        #map-container {
+          height: 600px !important;
+          border-radius: 24px;
+          border: 1px solid var(--border);
+        }
+
+        /* Sembunyikan tombol Back/Logout di header jika ingin lebih bersih */
+        #logoutBtn {
+          border: 1px solid var(--border);
+          border-radius: 8px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -507,27 +816,33 @@
     <div id="app" class="app hidden">
       <nav class="bottomNav">
         <div class="desktop-brand">
-          <img
-            src="pikul.jpeg"
-            class="brand-img"
-            style="width: 40px; height: 40px; border-radius: 12px"
-          />
-          <div style="font-weight: 800; font-size: 20px">PIKUL</div>
+          <img src="pikul.jpeg" class="brand-img" />
+          <div>PIKUL</div>
         </div>
+
         <button class="nav active" data-go="Home">
-          <span style="font-size: 18px">🏠</span><span>Home</span>
+          <span>🏠</span>
+          <span>Home</span>
         </button>
+
         <button class="nav" data-go="Map">
-          <span style="font-size: 18px">🗺️</span><span>Map</span>
+          <span>🗺️</span>
+          <span>Peta</span>
         </button>
+
         <button class="nav" data-go="Orders">
-          <span style="font-size: 18px">🧾</span><span>Orders</span>
+          <span>🧾</span>
+          <span>Order</span>
         </button>
+
         <button class="nav" data-go="Messages">
-          <span style="font-size: 18px">💬</span><span>Chat</span>
+          <span>💬</span>
+          <span>Chat</span>
         </button>
+
         <button class="nav" data-go="Profile">
-          <span style="font-size: 18px">👤</span><span>Akun</span>
+          <span>👤</span>
+          <span>Akun</span>
         </button>
       </nav>
       <header id="mainHeader" class="topbar">
@@ -594,20 +909,8 @@
         <section id="screenMap" class="hidden">
           <h2 style="margin: 0 0 16px; flex-shrink: 0">Peta Sekitar</h2>
           <div id="map-container">
-            <div class="map-controls">
-              <div class="map-chip active" onclick="filterMap('Semua', this)">
-                Semua
-              </div>
-              <div class="map-chip" onclick="filterMap('Bakso', this)">
-                🍜 Bakso
-              </div>
-              <div class="map-chip" onclick="filterMap('Kopi', this)">
-                ☕ Kopi
-              </div>
-              <div class="map-chip" onclick="filterMap('Nasi', this)">
-                🍛 Nasi
-              </div>
-            </div>
+            <div class="map-controls" id="mapChipsContainer"></div>
+
             <div id="map"></div>
             <div id="mapCard" class="map-vendor-card">
               <div class="mvc-close" onclick="closeMapCard()">✕</div>
@@ -617,7 +920,8 @@
                   id="mvcName"
                   style="display: block; font-size: 15px; margin-bottom: 2px"
                   >-</b
-                ><span
+                >
+                <span
                   id="mvcDist"
                   class="muted"
                   style="font-size: 12px; display: block; margin-bottom: 4px"
@@ -775,16 +1079,7 @@
         <section id="screenProfile" class="hidden">
           <h2 style="margin: 0 0 16px">Akun Saya</h2>
           <div id="profileContent"></div>
-          <div class="card" style="margin-top: 12px">
-            <div class="rowBetween">
-              <span>🌙 Mode Gelap</span
-              ><input
-                type="checkbox"
-                id="themeSwitch"
-                style="width: auto; margin: 0"
-              />
-            </div>
-          </div>
+
           <button
             id="mobileProfileLogout"
             class="btn ghost"

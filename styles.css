@@ -1069,3 +1069,22 @@ select {
   }
 }
 /* ... Sisanya sama ... */
+
+/* --- NEAREST VENDOR HIGHLIGHT --- */
+.listItem.nearest {
+  background: #f0fdf4; /* Hijau muda lembut */
+  border: 1px solid #22c55e;
+  position: relative;
+}
+.listItem.nearest::after {
+  content: "Terdekat";
+  position: absolute;
+  top: -8px;
+  right: 10px;
+  background: #22c55e;
+  color: white;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: bold;
+}

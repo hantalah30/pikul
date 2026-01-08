@@ -169,11 +169,26 @@ async function bootApp() {
   $("#userName").textContent = state.user ? state.user.name : "Tamu";
   initTheme();
 
+  // Listen Vendors
   onSnapshot(collection(db, "vendors"), (s) => {
     state.vendors = s.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    // UPDATE CHIPS SECARA DINAMIS
+    renderMapChips();
+
     if (!$("#screenHome").classList.contains("hidden")) renderVendors();
-    if (!$("#screenMap").classList.contains("hidden") || state.trackingVendorId)
+    if (
+      !$("#screenMap").classList.contains("hidden") ||
+      state.trackingVendorId
+    ) {
       updateMapMarkers();
+    }
+    if (
+      !$("#vendorModal").classList.contains("hidden") &&
+      state.selectedVendorId
+    ) {
+      openVendor(state.selectedVendorId);
+    }
   });
 
   onSnapshot(collection(db, "banners"), (s) => {
@@ -203,7 +218,48 @@ async function bootApp() {
   updateFab();
 }
 
-// --- HOME & VENDOR ---
+// --- HELPER EMOJI ---
+function getEmojiForType(t) {
+  t = t.toLowerCase();
+  if (t === "semua") return "♾️";
+  if (t.includes("bakso") || t.includes("mie")) return "🍜";
+  if (t.includes("kopi") || t.includes("es") || t.includes("minum"))
+    return "☕";
+  if (t.includes("nasi") || t.includes("ayam") || t.includes("bebek"))
+    return "🍚";
+  if (t.includes("sate")) return "🍢";
+  if (t.includes("snack") || t.includes("cemilan") || t.includes("roti"))
+    return "🥪";
+  return "🍴"; // Default
+}
+
+// --- DYNAMIC MAP CHIPS ---
+function renderMapChips() {
+  // 1. Ambil list type unik dari database
+  const rawTypes = state.vendors.map((v) => v.type);
+  const uniqueTypes = ["Semua", ...new Set(rawTypes)];
+
+  // 2. Generate HTML
+  const container = $("#mapChipsContainer");
+  if (container) {
+    container.innerHTML = uniqueTypes
+      .map((type) => {
+        // Cek apakah type ini sedang aktif
+        const isActive = state.mapCategory.toLowerCase() === type.toLowerCase();
+        const label = type.charAt(0).toUpperCase() + type.slice(1);
+        const emoji = getEmojiForType(type);
+
+        return `<div class="map-chip ${
+          isActive ? "active" : ""
+        }" onclick="filterMap('${type}')">
+                ${emoji} ${label}
+            </div>`;
+      })
+      .join("");
+  }
+}
+
+// --- HOME ---
 let bannerInterval;
 function renderHome() {
   let promoData =
@@ -259,35 +315,52 @@ window.setCategory = (c) => {
   state.activeCategory = c;
   renderVendors();
 };
+
+function getDistanceVal(v) {
+  if (!state.you.ok) return 999999;
+  return Math.sqrt(
+    Math.pow(v.lat - state.you.lat, 2) + Math.pow(v.lon - state.you.lon, 2)
+  );
+}
+
 function renderVendors() {
   const q = ($("#search").value || "").toLowerCase();
   const cat = state.activeCategory.toLowerCase();
-  const list = state.vendors.filter(
+  let list = state.vendors.filter(
     (v) =>
       v.name.toLowerCase().includes(q) &&
       (cat === "semua" || v.type.includes(cat))
   );
+
+  if (state.you.ok) {
+    list.sort((a, b) => getDistanceVal(a) - getDistanceVal(b));
+  }
+
   $("#vendorList").innerHTML =
     list
-      .map(
-        (v) =>
-          `<div class="vendorCard" onclick="openVendor('${
-            v.id
-          }')"><div class="vIco">${v.ico}</div><div class="vMeta"><b>${
-            v.name
-          }</b><div class="muted">⭐ ${
-            v.rating ? v.rating.toFixed(1) : "New"
-          } • ${
-            v.busy
-          }</div><div class="chips"><span class="chip">${v.type.toUpperCase()}</span><span class="chip">📍 ${distText(
-            v
-          )}</span></div></div><b style="color:var(--orange)">Lihat</b></div>`
-      )
+      .map((v) => {
+        const isClosed = !v.isLive;
+        const statusBadge = isClosed
+          ? `<span class="chip closed">🔴 Tutup</span>`
+          : `<span class="chip">📍 ${distText(v)}</span>`;
+        const cardClass = isClosed ? "vendorCard closed" : "vendorCard";
+        return `<div class="${cardClass}" onclick="openVendor('${v.id}')">
+        <div class="vIco">${v.ico}</div>
+        <div class="vMeta">
+          <b>${v.name}</b>
+          <div class="muted">⭐ ${v.rating ? v.rating.toFixed(1) : "New"} • ${
+          v.busy
+        }</div>
+          <div class="chips"><span class="chip">${v.type.toUpperCase()}</span>${statusBadge}</div>
+        </div>
+        <b style="color:var(--orange)">Lihat</b>
+      </div>`;
+      })
       .join("") || `<div class="card muted">Tidak ada pedagang aktif.</div>`;
 }
 $("#search").addEventListener("input", renderVendors);
 
-// --- MAP ---
+// --- MAP ENGINE ---
 function initMap() {
   if (state.map) return;
   if (!$("#map")) return;
@@ -311,35 +384,57 @@ function initMap() {
   }).addTo(state.map);
   updateMapMarkers();
 }
-window.filterMap = (cat, el) => {
+
+window.filterMap = (cat) => {
   state.mapCategory = cat;
-  $$(".map-chip").forEach((c) => c.classList.remove("active"));
-  el.classList.add("active");
-  updateMapMarkers();
+
+  // Re-render chips untuk mengupdate class 'active'
+  renderMapChips();
+
+  updateMapMarkers(true); // Param true = Zoom to fit
   closeMapCard();
 };
-function updateMapMarkers() {
+
+function updateMapMarkers(fitBounds = false) {
   if (!state.map) return;
   const cat = state.mapCategory.toLowerCase();
-  const filtered = state.vendors.filter(
-    (v) => cat === "semua" || v.type.includes(cat)
+  let filtered = state.vendors.filter(
+    (v) => cat === "semua" || v.type.toLowerCase().includes(cat)
   );
+
+  if (state.you.ok) {
+    filtered.sort((a, b) => getDistanceVal(a) - getDistanceVal(b));
+  }
+
+  // Render List di Bawah Peta
   $("#realtimeList").innerHTML = filtered
-    .map(
-      (v) =>
-        `<div class="listItem" onclick="openVendor('${
-          v.id
-        }')" style="cursor:pointer"><div class="rowBetween"><div><b>${v.ico} ${
-          v.name
-        }</b><div class="muted" style="font-size:12px">(${v.lat.toFixed(
-          4
-        )}, ${v.lon.toFixed(
-          4
-        )})</div></div><div class="pill small">📍 ${distText(
-          v
-        )}</div></div></div>`
-    )
+    .map((v, idx) => {
+      const isClosed = !v.isLive;
+      const statusText = isClosed ? "🔴 Tutup" : `📍 ${distText(v)}`;
+
+      const isNearest = idx === 0 && !isClosed && state.you.ok;
+      const itemClass = isNearest
+        ? "listItem nearest"
+        : isClosed
+        ? "listItem closed"
+        : "listItem";
+
+      return `<div class="${itemClass}" onclick="openVendor('${
+        v.id
+      }')" style="cursor:pointer"><div class="rowBetween"><div><b>${v.ico} ${
+        v.name
+      }</b><div class="muted" style="font-size:12px">(${v.lat.toFixed(
+        4
+      )}, ${v.lon.toFixed(
+        4
+      )})</div></div><div class="pill small">${statusText}</div></div></div>`;
+    })
     .join("");
+
+  // Manage Markers
+  const bounds = L.latLngBounds();
+  if (state.you.ok) bounds.extend([state.you.lat, state.you.lon]);
+
   Object.keys(state.markers).forEach((id) => {
     const v = filtered.find((x) => x.id === id);
     if (!v) {
@@ -347,7 +442,9 @@ function updateMapMarkers() {
       delete state.markers[id];
     }
   });
+
   filtered.forEach((v) => {
+    bounds.extend([v.lat, v.lon]);
     if (state.markers[v.id]) {
       state.markers[v.id].setLatLng([v.lat, v.lon]);
     } else {
@@ -363,10 +460,25 @@ function updateMapMarkers() {
       state.markers[v.id] = m;
     }
   });
+
+  if (fitBounds && filtered.length > 0) {
+    state.map.fitBounds(bounds, { padding: [50, 50] });
+  }
+
+  // Live Tracking
   if (state.activeMapVendorId) {
     const v = state.vendors.find((x) => x.id === state.activeMapVendorId);
     if (v) {
       $("#mvcDist").textContent = distText(v) + " dari Anda";
+      if (!v.isLive) {
+        $("#mvcType").textContent = "🔴 TUTUP";
+        $("#mvcType").style.color = "red";
+        $("#mvcType").style.background = "#fee2e2";
+      } else {
+        $("#mvcType").textContent = v.type.toUpperCase();
+        $("#mvcType").style.color = "#666";
+        $("#mvcType").style.background = "#eee";
+      }
       if (state.routeLine && state.you.ok)
         state.routeLine.setLatLngs([
           [state.you.lat, state.you.lon],
@@ -383,6 +495,7 @@ function updateMapMarkers() {
     state.trackingVendorId = null;
   }
 }
+
 function selectVendorOnMap(v) {
   state.activeMapVendorId = v.id;
   $$(".vm-bubble").forEach((b) => b.classList.remove("active"));
@@ -391,7 +504,17 @@ function selectVendorOnMap(v) {
   $("#mvcIcon").textContent = v.ico;
   $("#mvcName").textContent = v.name;
   $("#mvcDist").textContent = distText(v) + " dari Anda";
-  $("#mvcType").textContent = v.type.toUpperCase();
+
+  if (!v.isLive) {
+    $("#mvcType").textContent = "🔴 TUTUP";
+    $("#mvcType").style.color = "red";
+    $("#mvcType").style.background = "#fee2e2";
+  } else {
+    $("#mvcType").textContent = v.type.toUpperCase();
+    $("#mvcType").style.color = "#666";
+    $("#mvcType").style.background = "#eee";
+  }
+
   $("#mvcBtn").onclick = () => openVendor(v.id);
   const card = $("#mapCard");
   card.classList.remove("hidden");
@@ -432,8 +555,7 @@ window.closeMapCard = () => {
 window.trackOrder = (vid) => {
   state.trackingVendorId = vid;
   state.mapCategory = "Semua";
-  $$(".map-chip").forEach((c) => c.classList.remove("active"));
-  if ($$(".map-chip")[0]) $$(".map-chip")[0].classList.add("active");
+  renderMapChips(); // Reset chips visual
   window.go("Map");
 };
 
@@ -450,7 +572,6 @@ window.triggerImage = () => {
   $("#attachMenu").classList.remove("visible");
   $("#imageInput").click();
 };
-
 window.handleImageUpload = (input) => {
   if (input.files && input.files[0]) {
     const reader = new FileReader();
@@ -461,7 +582,6 @@ window.handleImageUpload = (input) => {
     reader.readAsDataURL(input.files[0]);
   }
 };
-
 window.sendLocation = async () => {
   $("#attachMenu").classList.remove("visible");
   if (!state.you.ok) return showToast("GPS belum aktif");
@@ -469,7 +589,6 @@ window.sendLocation = async () => {
   await sendMessage(mapsUrl, "location");
   showToast("Lokasi dikirim!");
 };
-
 window.renderStickers = (type) => {
   const grid = $("#stickerGrid");
   $$(".segment-btn").forEach((b) => b.classList.remove("active"));
@@ -527,21 +646,17 @@ window.sendSticker = async (content, type) => {
   $("#stickerSheet").classList.remove("visible");
   await sendMessage(content, type === "emoji" ? "text" : "sticker");
 };
-
 async function sendMessage(content, type = "text") {
   if (!state.user) return requireLogin();
   if (!content || !state.chatWithVendorId) return;
-
   const cid = `${state.user.id}_${state.chatWithVendorId}`;
   const vid = state.chatWithVendorId;
-
   await addDoc(collection(db, "chats", cid, "messages"), {
     text: content,
     type: type,
     from: state.user.id,
     ts: Date.now(),
   });
-
   let preview =
     type === "text"
       ? content
@@ -564,7 +679,6 @@ async function sendMessage(content, type = "text") {
     { merge: true }
   );
 }
-
 $("#sendChatBtn").addEventListener("click", () => {
   const t = $("#chatInput").value.trim();
   if (t) {
@@ -572,7 +686,6 @@ $("#sendChatBtn").addEventListener("click", () => {
     $("#chatInput").value = "";
   }
 });
-
 async function renderChat() {
   const vid = state.chatWithVendorId;
   if (!vid) {
@@ -584,19 +697,16 @@ async function renderChat() {
   const v = state.vendors.find((x) => x.id === vid);
   $("#chatWith").textContent = v ? v.name : "Unknown";
   $("#chatBox").innerHTML = "";
-
   if (state.unsubChats) state.unsubChats();
   const q = query(
     collection(db, "chats", `${state.user.id}_${vid}`, "messages"),
     orderBy("ts", "asc")
   );
-
   state.unsubChats = onSnapshot(q, (s) => {
     $("#chatBox").innerHTML = s.docs
       .map((d) => {
         const m = d.data();
         const isMe = m.from === state.user.id;
-
         let contentHtml = "";
         if (m.type === "image") {
           contentHtml = `<div class="bubble image ${
@@ -621,7 +731,6 @@ async function renderChat() {
             isMe ? "white" : "black"
           }; padding:8px 12px; border-radius:12px;">${m.text}</div>`;
         }
-
         return `<div style="display:flex; justify-content:${
           isMe ? "flex-end" : "flex-start"
         }; margin-bottom:4px; max-width:85%; align-self:${
@@ -632,7 +741,6 @@ async function renderChat() {
     $("#chatBox").scrollTop = $("#chatBox").scrollHeight;
   });
 }
-
 window.openPickChat = () => {
   if (!state.user) return requireLogin();
   const list = state.vendors.length
@@ -653,37 +761,61 @@ window.selectChat = (id) => {
   renderChat();
 };
 
-// --- MENU & CART ---
+// --- MENU & CART (UPDATED FOR CLOSED SHOP) ---
 const MENU_DEFAULTS = {
   bakso: [{ id: "m1", name: "Bakso Urat", price: 15000 }],
   kopi: [{ id: "k1", name: "Kopi Susu", price: 12000 }],
   nasi: [{ id: "n1", name: "Nasi Goreng", price: 18000 }],
 };
+
 window.openVendor = (id) => {
   state.selectedVendorId = id;
   const v = state.vendors.find((x) => x.id === id);
   if (!v) return;
+
   $("#vTitle").textContent = v.name;
   $("#vMeta").textContent = v.type;
+
+  const isClosed = !v.isLive;
+  let banner = "";
+  if (isClosed) {
+    banner = `<div class="shop-closed-banner">🔒 Maaf, Toko Sedang Tutup</div>`;
+  }
+
   let menuData =
     v.menu && v.menu.length > 0 ? v.menu : MENU_DEFAULTS[v.type] || [];
-  $("#menuList").innerHTML = menuData
-    .map(
-      (m) =>
-        `<div class="listItem"><div style="flex:1"><b>${
-          m.name
-        }</b><div class="muted">${rupiah(
+
+  $("#menuList").innerHTML =
+    banner +
+    menuData
+      .map((m) => {
+        const btnState = isClosed ? "disabled" : "";
+        const btnText = isClosed ? "Tutup" : "+ Tambah";
+        const btnClass = isClosed ? "btn small" : "btn small primary";
+
+        return `
+    <div class="listItem">
+      <div style="flex:1"><b>${m.name}</b><div class="muted">${rupiah(
           m.price
-        )}</div></div><button class="btn small primary" onclick="addToCart('${id}', '${
+        )}</div></div>
+      <button class="${btnClass}" ${btnState} onclick="addToCart('${id}', '${
           m.id
-        }', '${m.name}', ${m.price})">+ Tambah</button></div>`
-    )
-    .join("");
+        }', '${m.name}', ${m.price})">${btnText}</button>
+    </div>`;
+      })
+      .join("");
+
   openModal("vendorModal");
 };
+
 window.addToCart = (vid, mid, mName, mPrice) => {
   if (!state.user) return requireLogin();
+
   const v = state.vendors.find((x) => x.id === vid);
+  if (v && !v.isLive) {
+    return alert("Maaf, toko ini sedang tutup. Tidak bisa memesan.");
+  }
+
   if (!mName) {
     const type = v ? v.type : "bakso";
     const item = MENU_DEFAULTS[type].find((x) => x.id === mid);
@@ -706,6 +838,7 @@ window.addToCart = (vid, mid, mName, mPrice) => {
   updateFab();
   showToast("Masuk keranjang");
 };
+
 function updateFab() {
   const t = state.cart.reduce((a, b) => a + b.qty, 0);
   $("#cartBadge").textContent = t;
@@ -716,7 +849,6 @@ function updateFab() {
 window.openGlobalCart = () => {
   if (!state.user) return requireLogin();
   if (!state.cart.length) return showToast("Keranjang kosong");
-
   renderCartModal();
   openModal("checkoutModal");
 };
@@ -738,14 +870,12 @@ function renderCartModal() {
     state.cart.reduce((a, b) => a + b.price * b.qty, 0)
   );
 
-  // --- LOGIC PEMBAYARAN DINAMIS ---
   const vendorId = state.cart[0].vendorId;
   const vendor = state.vendors.find((v) => v.id === vendorId);
   const paySelect = $("#payMethod");
   const qrisCont = $("#qrisContainer");
   const qrisImg = $("#qrisImageDisplay");
 
-  // Reset
   paySelect.innerHTML = "";
   qrisCont.classList.add("hidden");
 
@@ -757,11 +887,9 @@ function renderCartModal() {
       paySelect.innerHTML += `<option value="qris">📱 QRIS</option>`;
     }
   } else {
-    // Fallback jika data lama belum ada paymentMethods
     paySelect.innerHTML = `<option value="cash">💵 Tunai</option>`;
   }
 
-  // Handle Perubahan Dropdown
   paySelect.onchange = () => {
     if (paySelect.value === "qris") {
       qrisImg.src = vendor.qrisImage;
@@ -772,7 +900,6 @@ function renderCartModal() {
   };
 }
 
-// --- FIX DOUBLE ORDER: HANYA ADA SATU LISTENER ---
 $("#placeOrderBtn").addEventListener("click", async () => {
   if (!state.user) return requireLogin();
   const btn = $("#placeOrderBtn");
@@ -782,7 +909,7 @@ $("#placeOrderBtn").addEventListener("click", async () => {
     const total = state.cart.reduce((a, b) => a + b.price * b.qty, 0);
     const vName = state.cart[0].vendorName;
     const vId = state.cart[0].vendorId;
-    const payment = $("#payMethod").value; // Ambil metode bayar
+    const payment = $("#payMethod").value;
 
     await addDoc(collection(db, "orders"), {
       userId: state.user.id,
@@ -792,7 +919,7 @@ $("#placeOrderBtn").addEventListener("click", async () => {
       items: state.cart,
       total: total,
       note: $("#orderNote").value,
-      paymentMethod: payment, // Simpan metode bayar
+      paymentMethod: payment,
       status: "Diproses",
       createdAt: new Date().toISOString(),
     });
@@ -972,7 +1099,7 @@ window.doTopup = async () => {
   renderProfile();
   showToast("Saldo bertambah!");
 };
-function showToast(m) {
+function showToast(m, type = "info") {
   let c = $(".toast-container");
   if (!c) {
     c = document.createElement("div");
