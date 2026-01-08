@@ -4,12 +4,14 @@ import {
   collection,
   addDoc,
   getDocs,
+  getDoc,
   doc,
   onSnapshot,
   query,
   where,
   updateDoc,
   orderBy,
+  setDoc,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { firebaseConfig } from "../firebase-config.js";
 
@@ -34,19 +36,75 @@ let state = {
   editingMenuIndex: null,
 };
 
-// --- AUTH ---
-async function login(email, password) {
-  const q = query(collection(db, "vendors"), where("email", "==", email));
-  const snap = await getDocs(q);
-  if (!snap.empty) {
-    const d = snap.docs[0];
-    state.vendor = { id: d.id, ...d.data() };
-    if (state.vendor.password && state.vendor.password !== password)
-      return alert("Password salah!");
+// --- AUTH LOGIC ---
+window.switchAuthMode = (mode) => {
+  const tabs = $$(".auth-tab");
+  const forms = $$(".auth-form");
+  if (mode === "login") {
+    tabs[0].classList.add("active");
+    tabs[1].classList.remove("active");
+    forms[0].classList.remove("hidden");
+    forms[1].classList.add("hidden");
   } else {
-    const name = prompt("Nama Warung?");
-    const type = prompt("Kategori? (bakso/kopi/nasi)");
-    if (!name || !type) return;
+    tabs[1].classList.add("active");
+    tabs[0].classList.remove("active");
+    forms[1].classList.remove("hidden");
+    forms[0].classList.add("hidden");
+  }
+};
+
+$("#loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = $("#email").value.trim(),
+    password = $("#password").value,
+    btn = e.target.querySelector("button");
+  btn.disabled = true;
+  btn.textContent = "Memproses...";
+  try {
+    const q = query(collection(db, "vendors"), where("email", "==", email));
+    const snap = await getDocs(q);
+    if (snap.empty) {
+      alert("Email tidak ditemukan.");
+      btn.disabled = false;
+      btn.textContent = "Masuk";
+      return;
+    }
+    const vData = snap.docs[0].data();
+    if (vData.password && vData.password !== password) {
+      alert("Password salah!");
+      btn.disabled = false;
+      btn.textContent = "Masuk";
+      return;
+    }
+    state.vendor = { id: snap.docs[0].id, ...vData };
+    localStorage.setItem("pikul_seller_id", state.vendor.id);
+    initApp();
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+  btn.disabled = false;
+  btn.textContent = "Masuk Dashboard";
+});
+
+$("#registerForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = $("#regName").value.trim(),
+    type = $("#regType").value,
+    email = $("#regEmail").value.trim(),
+    password = $("#regPass").value,
+    btn = e.target.querySelector("button");
+  if (password.length < 6) return alert("Password minimal 6 karakter");
+  btn.disabled = true;
+  btn.textContent = "Mendaftar...";
+  try {
+    const q = query(collection(db, "vendors"), where("email", "==", email));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      alert("Email sudah terdaftar.");
+      btn.disabled = false;
+      btn.textContent = "Daftar";
+      return;
+    }
     const newVendor = {
       email,
       password,
@@ -58,54 +116,69 @@ async function login(email, password) {
       lat: -6.2,
       lon: 106.8,
       menu: [],
-      subscriptionExpiry: Date.now() - 1000,
+      subscriptionExpiry: Date.now() + 2592000000,
       isLive: false,
       locationMode: "gps",
+      paymentMethods: ["cash"],
+      qrisImage: null,
     };
     const ref = await addDoc(collection(db, "vendors"), newVendor);
     state.vendor = { id: ref.id, ...newVendor };
+    localStorage.setItem("pikul_seller_id", state.vendor.id);
+    initApp();
+  } catch (err) {
+    alert("Gagal daftar: " + err.message);
   }
-  localStorage.setItem("pikul_seller", JSON.stringify(state.vendor));
-  initApp();
-}
-$("#loginForm").addEventListener("submit", (e) => {
-  e.preventDefault();
-  login($("#email").value, $("#password").value);
+  btn.disabled = false;
+  btn.textContent = "Daftar Sekarang";
 });
 window.logout = () => {
-  if (confirm("Keluar?")) {
-    localStorage.removeItem("pikul_seller");
+  if (confirm("Keluar dari Mitra?")) {
+    localStorage.removeItem("pikul_seller_id");
     location.reload();
   }
 };
 
-// --- INIT ---
-function initApp() {
-  const saved = localStorage.getItem("pikul_seller");
-  if (!saved) return $("#auth").classList.remove("hidden");
-  state.vendor = JSON.parse(saved);
-  $("#auth").classList.add("hidden");
-  $(".app-layout").classList.remove("hidden"); // FIX: .app-layout
-
-  onSnapshot(doc(db, "vendors", state.vendor.id), (doc) => {
-    if (doc.exists()) {
-      state.vendor = { id: doc.id, ...doc.data() };
-      renderUI();
+// --- INIT APP ---
+async function initApp() {
+  const vid = localStorage.getItem("pikul_seller_id");
+  if (!vid) return $("#auth").classList.remove("hidden");
+  try {
+    const docSnap = await getDoc(doc(db, "vendors", vid));
+    if (!docSnap.exists()) {
+      localStorage.removeItem("pikul_seller_id");
+      return $("#auth").classList.remove("hidden");
     }
-  });
-  const qOrd = query(
-    collection(db, "orders"),
-    where("vendorId", "==", state.vendor.id)
-  );
-  onSnapshot(qOrd, (snap) => {
-    state.orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    renderOrdersList();
-    calculateStats();
-  });
+    state.vendor = { id: docSnap.id, ...docSnap.data() };
+    $("#auth").classList.add("hidden");
+    $(".app-layout").classList.remove("hidden");
+
+    // Listen Self (Profile & Settings)
+    onSnapshot(doc(db, "vendors", state.vendor.id), (doc) => {
+      if (doc.exists()) {
+        state.vendor = { id: doc.id, ...doc.data() };
+        renderUI();
+        renderPaymentSettings(); // Update UI Payment
+      }
+    });
+
+    const qOrd = query(
+      collection(db, "orders"),
+      where("vendorId", "==", state.vendor.id)
+    );
+    onSnapshot(qOrd, (snap) => {
+      state.orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      renderOrdersList();
+      calculateStats();
+    });
+  } catch (e) {
+    console.error(e);
+    $("#auth").classList.remove("hidden");
+  }
 }
 
-// --- UI RENDER ---
 function renderUI() {
+  if (!state.vendor) return;
   $("#vName").textContent = state.vendor.name;
   const isExpired = state.vendor.subscriptionExpiry < Date.now();
   if (isExpired) {
@@ -123,6 +196,7 @@ function renderUI() {
     $("#expDate").textContent = new Date(
       state.vendor.subscriptionExpiry
     ).toLocaleDateString();
+    // Fix: Pastikan tombol enable jika tidak expired
     $("#statusToggle").disabled = false;
     $("#statusToggle").checked = state.vendor.isLive;
     if (state.vendor.isLive) {
@@ -143,30 +217,141 @@ function renderUI() {
   $("#menuList").innerHTML =
     (state.vendor.menu || [])
       .map(
-        (m, idx) => `
-    <div class="menu-card">
-      <div><div style="font-weight:700">${
-        m.name
-      }</div><div style="color:var(--text-muted); font-size:13px;">${rupiah(
-          m.price
-        )}</div></div>
-      <div class="menu-actions"><button class="btn-icon-action btn-edit" onclick="openEditMenu(${idx})">✎</button><button class="btn-icon-action btn-del" onclick="deleteMenu(${idx})">🗑</button></div>
-    </div>`
+        (m, idx) =>
+          `<div class="menu-card"><div><div style="font-weight:700">${
+            m.name
+          }</div><div style="color:var(--text-muted); font-size:13px;">${rupiah(
+            m.price
+          )}</div></div><div class="menu-actions"><button class="btn-icon-action btn-edit" onclick="openEditMenu(${idx})">✎</button><button class="btn-icon-action btn-del" onclick="deleteMenu(${idx})">🗑</button></div></div>`
       )
       .join("") || `<div class="empty-state-box">Belum ada menu.</div>`;
 }
 
-// --- NAVIGATION ---
-window.goSeller = (screen) => {
-  // Mobile Nav
-  $$(".nav-item").forEach((n) => n.classList.remove("active"));
-  // Desktop Nav
-  $$(".sb-item").forEach((n) => n.classList.remove("active"));
+// --- PAYMENT METHOD LOGIC (FIXED: ATTACH TO WINDOW) ---
+function renderPaymentSettings() {
+  const methods = state.vendor.paymentMethods || ["cash"];
+  const hasQris = methods.includes("qris");
 
+  // Update Checkbox UI
+  $("#chkCash").checked = methods.includes("cash");
+  $("#chkQris").checked = hasQris;
+
+  // UI QRIS Area
+  const qrisConfig = $("#qrisConfig");
+  const qrisStatus = $("#qrisStatus");
+  const qrisImg = $("#qrisImg");
+  const qrisPh = $("#qrisPlaceholder");
+
+  if (hasQris) {
+    qrisConfig.classList.remove("hidden");
+    if (state.vendor.qrisImage) {
+      qrisStatus.textContent = "✅ Aktif";
+      qrisStatus.style.color = "#10b981";
+      qrisImg.src = state.vendor.qrisImage;
+      qrisImg.classList.remove("hidden");
+      qrisPh.classList.add("hidden");
+      $(".qris-preview").classList.add("has-image");
+    } else {
+      qrisStatus.textContent = "⚠️ Upload Gambar";
+      qrisStatus.style.color = "#f59e0b";
+      qrisImg.classList.add("hidden");
+      qrisPh.classList.remove("hidden");
+      $(".qris-preview").classList.remove("has-image");
+    }
+  } else {
+    qrisConfig.classList.add("hidden");
+    qrisStatus.textContent = "Belum Aktif";
+    qrisStatus.style.color = "#94a3b8";
+  }
+}
+
+// EXPOSE TO GLOBAL WINDOW
+window.updatePaymentMethod = async () => {
+  const cash = $("#chkCash").checked;
+  const qris = $("#chkQris").checked;
+
+  let newMethods = [];
+  if (cash) newMethods.push("cash");
+  if (qris) newMethods.push("qris");
+
+  if (newMethods.length === 0) {
+    alert("Minimal satu metode pembayaran aktif.");
+    $("#chkCash").checked = true;
+    return;
+  }
+  await updateDoc(doc(db, "vendors", state.vendor.id), {
+    paymentMethods: newMethods,
+  });
+};
+
+window.triggerQrisUpload = () => {
+  $("#qrisInput").click();
+};
+
+window.handleQrisUpload = (input) => {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64 = e.target.result;
+      await updateDoc(doc(db, "vendors", state.vendor.id), {
+        qrisImage: base64,
+      });
+      alert("QRIS berhasil diupload!");
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+};
+
+// --- CHAT SYSTEM ---
+window.openChat = (chatId, userName) => {
+  state.activeChatId = chatId;
+  $("#chatRoom").classList.add("active");
+  $("#chattingWith").textContent = userName;
+  $$(".chat-entry").forEach((el) => el.classList.remove("active"));
+  if (state.unsubMsg) state.unsubMsg();
+  const q = query(
+    collection(db, "chats", chatId, "messages"),
+    orderBy("ts", "asc")
+  );
+  state.unsubMsg = onSnapshot(q, (snap) => {
+    $("#msgBox").innerHTML = snap.docs
+      .map((d) => {
+        const m = d.data();
+        const isMe = m.from === state.vendor.id;
+        let contentHtml = "";
+        if (m.type === "image")
+          contentHtml = `<div class="bubble image ${
+            isMe ? "me" : "them"
+          }"><img src="${m.text}" loading="lazy" /></div>`;
+        else if (m.type === "location")
+          contentHtml = `<a href="${
+            m.text
+          }" target="_blank" class="bubble location ${
+            isMe ? "me" : "them"
+          }"><span>📍</span> Lacak Lokasi</a>`;
+        else if (m.type === "sticker")
+          contentHtml = `<div class="bubble sticker ${isMe ? "me" : "them"}">${
+            m.text
+          }</div>`;
+        else
+          contentHtml = `<div class="bubble ${isMe ? "me" : "them"}">${
+            m.text
+          }</div>`;
+        return `<div style="display:flex; justify-content:${
+          isMe ? "flex-end" : "flex-start"
+        }; margin-bottom: 6px;">${contentHtml}</div>`;
+      })
+      .join("");
+    $("#msgBox").scrollTop = $("#msgBox").scrollHeight;
+  });
+};
+
+window.goSeller = (screen) => {
+  $$(".nav-item").forEach((n) => n.classList.remove("active"));
+  $$(".sb-item").forEach((n) => n.classList.remove("active"));
   $("#sellerHome").classList.add("hidden");
   $("#sellerChat").classList.add("hidden");
   $("#sellerOrders").classList.add("hidden");
-
   if (screen === "Home") {
     $$(".nav-item")[0].classList.add("active");
     $$(".sb-item")[0].classList.add("active");
@@ -182,8 +367,6 @@ window.goSeller = (screen) => {
     loadChatList();
   }
 };
-
-// --- CHAT DESKTOP SUPPORT ---
 function loadChatList() {
   const q = query(
     collection(db, "chats"),
@@ -195,76 +378,135 @@ function loadChatList() {
     $("#chatList").innerHTML =
       list
         .map(
-          (c) => `
-      <div class="chat-entry" onclick="openChat('${c.id}', '${c.userName}')">
-        <div><b style="font-size:14px;">${
-          c.userName
-        }</b><div style="font-size:13px; color:#64748b; margin-top:2px;">${
-            c.lastMessage
-          }</div></div>
-        <div style="font-size:11px; color:#94a3b8;">${new Date(
-          c.lastUpdate || Date.now()
-        ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
-      </div>`
+          (c) =>
+            `<div class="chat-entry" onclick="openChat('${c.id}', '${
+              c.userName
+            }')"><div style="width:40px; height:40px; background:#f1f5f9; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px;">👤</div><div style="flex:1; min-width:0;"><div style="display:flex; justify-content:space-between; margin-bottom:2px;"><b style="font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${
+              c.userName
+            }</b><span style="font-size:11px; color:#94a3b8;">${new Date(
+              c.lastUpdate || Date.now()
+            ).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}</span></div><div style="font-size:13px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${
+              c.lastMessage
+            }</div></div></div>`
         )
-        .join("") || '<div class="empty-state-box">Belum ada chat.</div>';
+        .join("") ||
+      '<div style="text-align:center; padding:40px; color:#94a3b8;"><div style="font-size:40px; margin-bottom:10px;">💬</div>Belum ada chat.</div>';
   });
 }
-window.openChat = (chatId, userName) => {
-  state.activeChatId = chatId;
-
-  // Mobile view logic
-  if (window.innerWidth < 1024) $("#chatRoom").classList.remove("hidden");
-
-  // Desktop view logic (hide placeholder)
-  const ph = $("#chatPlaceholder");
-  if (ph) ph.classList.add("hidden");
-  $("#chatRoom").classList.remove("hidden");
-
-  $("#chattingWith").textContent = userName;
-  if (state.unsubMsg) state.unsubMsg();
-  const q = query(
-    collection(db, "chats", chatId, "messages"),
-    orderBy("ts", "asc")
-  );
-  state.unsubMsg = onSnapshot(q, (snap) => {
-    $("#msgBox").innerHTML = snap.docs
-      .map((d) => {
-        const m = d.data();
-        const isMe = m.from === state.vendor.id;
-        return `<div style="display:flex; justify-content:${
-          isMe ? "flex-end" : "flex-start"
-        };"><div class="chat-bubble ${isMe ? "me" : "them"}">${
-          m.text
-        }</div></div>`;
-      })
-      .join("");
-    $("#msgBox").scrollTop = $("#msgBox").scrollHeight;
-  });
-};
 window.closeChat = () => {
   state.activeChatId = null;
-  $("#chatRoom").classList.add("hidden");
-  const ph = $("#chatPlaceholder");
-  if (ph) ph.classList.remove("hidden"); // Show desktop placeholder
+  $("#chatRoom").classList.remove("active");
   if (state.unsubMsg) state.unsubMsg();
 };
-$("#sendReplyBtn").addEventListener("click", async () => {
-  const txt = $("#replyInput").value.trim();
-  if (!txt || !state.activeChatId) return;
+window.toggleAttachMenu = () => {
+  $("#attachMenu").classList.toggle("visible");
+};
+window.toggleSticker = () => {
+  $("#attachMenu").classList.remove("visible");
+  $("#stickerSheet").classList.toggle("visible");
+  renderStickers("emoji");
+};
+window.triggerImage = () => {
+  $("#attachMenu").classList.remove("visible");
+  $("#imageInput").click();
+};
+window.handleImageUpload = (input) => {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      await sendMessage(e.target.result, "image");
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+};
+window.sendLocation = async () => {
+  $("#attachMenu").classList.remove("visible");
+  const lat = state.vendor.lat;
+  const lon = state.vendor.lon;
+  const mapsUrl = `https://www.google.com/maps?q=${lat},${lon}`;
+  await sendMessage(mapsUrl, "location");
+};
+window.renderStickers = (type) => {
+  const grid = $("#stickerGrid");
+  if (type === "emoji") {
+    const emojis = [
+      "😀",
+      "😂",
+      "😍",
+      "👍",
+      "🙏",
+      "🔥",
+      "❤️",
+      "🎉",
+      "👋",
+      "📦",
+      "🥘",
+      "🚲",
+    ];
+    grid.innerHTML = emojis
+      .map(
+        (e) =>
+          `<div class="sticker-item" onclick="sendSticker('${e}', 'emoji')">${e}</div>`
+      )
+      .join("");
+  } else {
+    const stickers = [
+      "🍔",
+      "🍕",
+      "🍜",
+      "☕",
+      "🛵",
+      "✅",
+      "❌",
+      "⏳",
+      "🏠",
+      "💵",
+      "😋",
+      "🥡",
+    ];
+    grid.innerHTML = stickers
+      .map(
+        (s) =>
+          `<div class="sticker-item" style="font-size:50px" onclick="sendSticker('${s}', 'sticker')">${s}</div>`
+      )
+      .join("");
+  }
+};
+window.sendSticker = async (content, type) => {
+  $("#stickerSheet").classList.remove("visible");
+  await sendMessage(content, type === "emoji" ? "text" : "sticker");
+};
+async function sendMessage(content, type = "text") {
+  if (!state.activeChatId || !content) return;
   await addDoc(collection(db, "chats", state.activeChatId, "messages"), {
-    text: txt,
+    text: content,
+    type: type,
     from: state.vendor.id,
     ts: Date.now(),
   });
+  let preview =
+    type === "text"
+      ? content
+      : type === "image"
+      ? "📷 Foto"
+      : type === "location"
+      ? "📍 Lokasi"
+      : "😊 Stiker";
   await updateDoc(doc(db, "chats", state.activeChatId), {
-    lastMessage: "Anda: " + txt,
+    lastMessage: "Anda: " + preview,
     lastUpdate: Date.now(),
   });
-  $("#replyInput").value = "";
+}
+$("#sendReplyBtn").addEventListener("click", () => {
+  const t = $("#replyInput").value.trim();
+  if (t) {
+    sendMessage(t, "text");
+    $("#replyInput").value = "";
+  }
 });
-
-// --- ORDERS, MAP, MENU (Logic Inti Sama, diadaptasi sedikit) ---
 function calculateStats() {
   const now = new Date();
   const d = new Date(
@@ -380,6 +622,9 @@ window.openEditMenu = (idx) => {
   $("#menuModal").classList.remove("hidden");
 };
 window.closeModal = () => $("#menuModal").classList.add("hidden");
+$$("[data-close]").forEach((b) =>
+  b.addEventListener("click", window.closeModal)
+);
 $("#menuForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = $("#mName").value,
@@ -409,7 +654,7 @@ function initMap() {
     15
   );
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OSM",
+    attribution: "© OSM",
   }).addTo(state.map);
   const icon = L.divIcon({
     className: "vendor-pin",
@@ -439,8 +684,9 @@ window.setLocMode = async (mode) => {
 };
 function updateModeButtons() {
   $$(".mode-tab").forEach((b) => b.classList.remove("active"));
-  if (state.locMode === "gps") $$(".mode-tab")[0].classList.add("active");
-  else $$(".mode-tab")[1].classList.add("active");
+  state.locMode === "gps"
+    ? $$(".mode-tab")[0].classList.add("active")
+    : $$(".mode-tab")[1].classList.add("active");
   $("#manualHint").classList.toggle("hidden", state.locMode !== "manual");
 }
 function handleLocationLogic() {
@@ -483,5 +729,4 @@ $("#payBtn").addEventListener("click", async () => {
       subscriptionExpiry: Date.now() + 2592000000,
     });
 });
-
 initApp();
