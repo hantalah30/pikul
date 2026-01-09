@@ -304,7 +304,71 @@
         cursor: pointer;
       }
 
-      /* PAYMENT SETTINGS STYLE */
+      /* IMAGE UPLOAD STYLES */
+      .image-upload-box {
+        width: 100%;
+        height: 150px;
+        background: #f8fafc;
+        border: 2px dashed #cbd5e1;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        cursor: pointer;
+        overflow: hidden;
+        position: relative;
+        transition: 0.2s;
+      }
+      .image-upload-box:hover {
+        border-color: var(--primary);
+        background: #fff7ed;
+      }
+      .image-upload-box img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .menu-thumb {
+        width: 60px;
+        height: 60px;
+        border-radius: 8px;
+        object-fit: cover;
+        margin-right: 12px;
+        background: #eee;
+      }
+      .shop-logo-upload {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: #eee;
+        border: 2px dashed #ccc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        overflow: hidden;
+        margin: 0 auto 10px;
+        position: relative;
+      }
+      .shop-logo-upload img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .shop-logo-upload:hover::after {
+        content: "Ubah";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.5);
+        color: white;
+        font-size: 10px;
+        text-align: center;
+        padding: 2px 0;
+      }
+
       .payment-card {
         padding: 16px;
         border-radius: 16px;
@@ -538,10 +602,35 @@
 
         <main class="content">
           <section id="sellerHome">
-            <div class="dashboard-card">
-              <div class="dash-header">
+            <div class="dashboard-card" style="text-align: center">
+              <div class="shop-logo-upload" onclick="triggerLogoUpload()">
+                <img id="shopLogoPreview" class="hidden" src="" />
+                <span
+                  id="shopLogoPlaceholder"
+                  style="font-size: 24px; color: #999"
+                  >📷</span
+                >
+              </div>
+              <input
+                type="file"
+                id="shopLogoInput"
+                class="hidden"
+                accept="image/*"
+                onchange="handleLogoUpload(this)"
+              />
+
+              <h2 id="vNameDisplay" style="margin: 0; font-size: 20px">
+                Nama Toko
+              </h2>
+              <p class="muted" style="margin: 5px 0 20px; font-size: 12px">
+                Klik foto di atas untuk ganti logo
+              </p>
+
+              <hr
+                style="border: none; border-top: 1px solid #eee; margin: 16px 0"
+              />
+              <div class="dash-header" style="justify-content: center">
                 <h3>📈 Ringkasan Penjualan</h3>
-                <span class="live-badge">LIVE DATA</span>
               </div>
               <div class="stats-grid">
                 <div class="stat-box">
@@ -560,14 +649,6 @@
                   <span class="stat-label">Total Omzet</span
                   ><span class="stat-value main" id="statTotal">Rp 0</span>
                 </div>
-              </div>
-              <div class="best-seller-box">
-                <div class="bs-icon">🏆</div>
-                <div class="bs-info">
-                  <span class="bs-label">Produk Terlaris</span
-                  ><b id="bestSellerName">-</b>
-                </div>
-                <span class="bs-count" id="bestSellerCount">0 Terjual</span>
               </div>
             </div>
 
@@ -874,14 +955,40 @@
         </button>
       </nav>
     </div>
+
     <div id="menuModal" class="modal hidden">
-      <div class="modal-overlay" data-close="menuModal"></div>
+      <div class="modal-overlay" onclick="closeModal()"></div>
       <div class="modal-sheet">
         <div class="modal-header">
           <h3 id="menuModalTitle">Tambah Menu</h3>
-          <button class="icon-btn-close" data-close="menuModal">✕</button>
+          <button class="icon-btn-close" onclick="closeModal()">✕</button>
         </div>
         <form id="menuForm">
+          <div class="input-group">
+            <label>Foto Makanan</label>
+            <div
+              class="image-upload-box"
+              id="menuImageBox"
+              onclick="triggerMenuImageUpload()"
+            >
+              <img id="mImagePreview" class="hidden" src="" />
+              <div
+                id="mImagePlaceholder"
+                style="text-align: center; color: #94a3b8"
+              >
+                <div style="font-size: 24px">🍲</div>
+                <small>Klik untuk upload</small>
+              </div>
+            </div>
+            <input
+              type="file"
+              id="mImageInput"
+              accept="image/*"
+              class="hidden"
+              onchange="handleMenuImageUpload(this)"
+            />
+          </div>
+
           <div class="input-group">
             <label>Nama Makanan</label
             ><input
@@ -900,6 +1007,7 @@
         </form>
       </div>
     </div>
+
     <script type="module" src="seller.js"></script>
   </body>
 </html>

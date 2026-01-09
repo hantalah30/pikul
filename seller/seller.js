@@ -35,7 +35,38 @@ let state = {
   unsubMsg: null,
   orders: [],
   editingMenuIndex: null,
+  tempMenuImage: null, // Menyimpan base64 gambar menu sementara
 };
+
+// --- HELPER: IMAGE COMPRESSOR (PENTING AGAR TIDAK GAGAL UPLOAD) ---
+function compressImage(file, maxWidth = 500, quality = 0.7) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height *= maxWidth / width));
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Hasil konversi ke string base64 yang lebih kecil
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+    };
+  });
+}
 
 // --- HELPER: FORMAT WA ---
 function formatWA(phone) {
@@ -131,6 +162,7 @@ $("#registerForm").addEventListener("submit", async (e) => {
       locationMode: "gps",
       paymentMethods: ["cash"],
       qrisImage: null,
+      logo: null,
     };
     const ref = await addDoc(collection(db, "vendors"), newVendor);
     state.vendor = { id: ref.id, ...newVendor };
@@ -191,6 +223,15 @@ async function initApp() {
 function renderUI() {
   if (!state.vendor) return;
   $("#vName").textContent = state.vendor.name;
+  $("#vNameDisplay").textContent = state.vendor.name;
+
+  // Render Logo dengan timestamp biar refresh
+  if (state.vendor.logo) {
+    $("#shopLogoPreview").src = state.vendor.logo;
+    $("#shopLogoPreview").classList.remove("hidden");
+    $("#shopLogoPlaceholder").classList.add("hidden");
+  }
+
   const isExpired = state.vendor.subscriptionExpiry < Date.now();
   if (isExpired) {
     $("#subAlert").classList.remove("hidden");
@@ -224,18 +265,160 @@ function renderUI() {
       stopGPS();
     }
   }
+
   $("#menuList").innerHTML =
     (state.vendor.menu || [])
       .map(
-        (m, idx) =>
-          `<div class="menu-card"><div><div style="font-weight:700">${
-            m.name
-          }</div><div style="color:var(--text-muted); font-size:13px;">${rupiah(
-            m.price
-          )}</div></div><div class="menu-actions"><button class="btn-icon-action btn-edit" onclick="openEditMenu(${idx})">✎</button><button class="btn-icon-action btn-del" onclick="deleteMenu(${idx})">🗑</button></div></div>`
+        (m, idx) => `
+    <div class="menu-card">
+      <div style="display:flex; align-items:center;">
+        ${
+          m.image
+            ? `<img src="${m.image}" class="menu-thumb" />`
+            : '<div class="menu-thumb" style="display:flex;align-items:center;justify-content:center;">🍲</div>'
+        }
+        <div><div style="font-weight:700">${
+          m.name
+        }</div><div style="color:var(--text-muted); font-size:13px;">${rupiah(
+          m.price
+        )}</div></div>
+      </div>
+      <div class="menu-actions">
+        <button class="btn-icon-action btn-edit" onclick="openEditMenu(${idx})">✎</button>
+        <button class="btn-icon-action btn-del" onclick="deleteMenu(${idx})">🗑</button>
+      </div>
+    </div>`
       )
       .join("") || `<div class="empty-state-box">Belum ada menu.</div>`;
 }
+
+// --- LOGO UPLOAD (FIXED WITH COMPRESSION) ---
+window.triggerLogoUpload = () => {
+  $("#shopLogoInput").click();
+};
+window.handleLogoUpload = async (input) => {
+  if (input.files && input.files[0]) {
+    try {
+      // 1. Kompres gambar dulu
+      const compressedBase64 = await compressImage(input.files[0], 300, 0.7); // Max width 300px
+
+      // 2. Upload ke Firestore
+      await updateDoc(doc(db, "vendors", state.vendor.id), {
+        logo: compressedBase64,
+      });
+
+      // 3. Update State Lokal Langsung (Biar kerasa cepet)
+      state.vendor.logo = compressedBase64;
+      renderUI();
+      alert("Logo berhasil diganti!");
+    } catch (e) {
+      alert("Gagal upload logo: " + e.message);
+    }
+    input.value = ""; // Reset input agar bisa pilih file yang sama lagi
+  }
+};
+
+// --- MENU ACTIONS (FIXED WITH COMPRESSION) ---
+$("#addMenuBtn").addEventListener("click", () => {
+  state.editingMenuIndex = null;
+  state.tempMenuImage = null;
+  $("#menuModalTitle").textContent = "Tambah Menu";
+  $("#mName").value = "";
+  $("#mPrice").value = "";
+
+  $("#mImagePreview").classList.add("hidden");
+  $("#mImagePlaceholder").classList.remove("hidden");
+  $("#menuModal").classList.remove("hidden");
+});
+
+window.openEditMenu = (idx) => {
+  state.editingMenuIndex = idx;
+  const item = state.vendor.menu[idx];
+  state.tempMenuImage = item.image || null;
+
+  $("#menuModalTitle").textContent = "Edit Menu";
+  $("#mName").value = item.name;
+  $("#mPrice").value = item.price;
+
+  if (state.tempMenuImage) {
+    $("#mImagePreview").src = state.tempMenuImage;
+    $("#mImagePreview").classList.remove("hidden");
+    $("#mImagePlaceholder").classList.add("hidden");
+  } else {
+    $("#mImagePreview").classList.add("hidden");
+    $("#mImagePlaceholder").classList.remove("hidden");
+  }
+
+  $("#menuModal").classList.remove("hidden");
+};
+
+window.triggerMenuImageUpload = () => {
+  $("#mImageInput").click();
+};
+window.handleMenuImageUpload = async (input) => {
+  if (input.files && input.files[0]) {
+    try {
+      // Kompres gambar menu (Max width 500px)
+      const compressedBase64 = await compressImage(input.files[0], 500, 0.8);
+
+      // Update Preview & State Sementara
+      state.tempMenuImage = compressedBase64;
+      $("#mImagePreview").src = state.tempMenuImage;
+      $("#mImagePreview").classList.remove("hidden");
+      $("#mImagePlaceholder").classList.add("hidden");
+    } catch (e) {
+      alert("Gagal memproses gambar: " + e.message);
+    }
+    input.value = ""; // Reset input
+  }
+};
+
+$("#menuForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const btn = e.target.querySelector("button");
+  btn.textContent = "Menyimpan...";
+  btn.disabled = true;
+
+  try {
+    const name = $("#mName").value;
+    const price = parseInt($("#mPrice").value);
+
+    let updMenu = [...(state.vendor.menu || [])];
+    const newItem = {
+      id:
+        state.editingMenuIndex !== null
+          ? updMenu[state.editingMenuIndex].id
+          : "m" + Date.now(),
+      name,
+      price,
+      image: state.tempMenuImage, // Gunakan gambar yang ada di state
+    };
+
+    if (state.editingMenuIndex !== null) {
+      updMenu[state.editingMenuIndex] = newItem;
+    } else {
+      updMenu.push(newItem);
+    }
+
+    await updateDoc(doc(db, "vendors", state.vendor.id), { menu: updMenu });
+    window.closeModal();
+  } catch (err) {
+    alert("Gagal simpan menu: " + err.message);
+  }
+
+  btn.textContent = "Simpan Menu";
+  btn.disabled = false;
+});
+
+window.closeModal = () => $("#menuModal").classList.add("hidden");
+window.deleteMenu = async (idx) => {
+  if (confirm("Hapus?")) {
+    const upd = [...state.vendor.menu];
+    upd.splice(idx, 1);
+    await updateDoc(doc(db, "vendors", state.vendor.id), { menu: upd });
+  }
+};
 
 // --- PAYMENT SETTINGS ---
 function renderPaymentSettings() {
@@ -292,21 +475,22 @@ window.updatePaymentMethod = async () => {
 window.triggerQrisUpload = () => {
   $("#qrisInput").click();
 };
-window.handleQrisUpload = (input) => {
+window.handleQrisUpload = async (input) => {
   if (input.files && input.files[0]) {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const base64 = e.target.result;
+    try {
+      const compressedBase64 = await compressImage(input.files[0], 500, 0.7);
       await updateDoc(doc(db, "vendors", state.vendor.id), {
-        qrisImage: base64,
+        qrisImage: compressedBase64,
       });
       alert("QRIS berhasil diupload!");
-    };
-    reader.readAsDataURL(input.files[0]);
+    } catch (e) {
+      alert("Gagal upload QRIS: " + e.message);
+    }
+    input.value = "";
   }
 };
 
-// --- RENDER ORDERS LIST (SMART WA & DELETE) ---
+// --- RENDER ORDERS LIST (SMART WA & SECURITY) ---
 function renderOrdersList() {
   const list = state.orders.sort(
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
@@ -320,16 +504,12 @@ function renderOrdersList() {
   $("#incomingCount").textContent = activeOrders.length;
 
   const renderItem = (o, active) => {
-    // 1. Format Item List (Untuk UI)
     const itemsUI = (o.items || [])
       .map((i) => `${i.qty}x ${i.name}`)
       .join(", ");
-
-    // 2. Format Item List (Untuk WhatsApp - pakai Enter \n)
     const itemsWA = (o.items || [])
       .map((i) => `- ${i.qty}x ${i.name}`)
       .join("\n");
-
     let stCls =
       o.status === "Diproses"
         ? "status-process"
@@ -338,82 +518,54 @@ function renderOrdersList() {
         : "status-done";
     if (o.status.includes("Dibatalkan")) stCls = "status-cancel";
 
-    // 3. Logic Tombol Aksi Order
     let btn = "";
     if (active) {
       if (o.status === "Menunggu Konfirmasi Bayar") {
-        btn = `<div style="background:#f8fafc; padding:10px; border-radius:8px; margin-bottom:10px;">
-                <p style="margin:0 0 5px 0; font-size:12px;"><b>Bukti Transfer:</b></p>
-                <img src="${o.paymentProof}" style="width:100%; border-radius:8px; margin-bottom:8px; border:1px solid #ccc; cursor:pointer;" onclick="window.open(this.src)" />
-                <div style="display:flex; gap:8px;">
-                    <button class="btn full" style="background:#ef4444; color:white;" onclick="updStat('${o.id}','Dibatalkan (Bukti Salah)')">Tolak</button>
-                    <button class="btn primary full" onclick="updStat('${o.id}','Diproses')">Terima</button>
-                </div>
-            </div>`;
+        btn = `<div style="background:#f8fafc; padding:10px; border-radius:8px; margin-bottom:10px;"><p style="margin:0 0 5px 0; font-size:12px;"><b>Bukti Transfer:</b></p><img src="${o.paymentProof}" style="width:100%; border-radius:8px; margin-bottom:8px; border:1px solid #ccc; cursor:pointer;" onclick="window.open(this.src)" /><div style="display:flex; gap:8px;"><button class="btn full" style="background:#ef4444; color:white;" onclick="updStat('${o.id}','Dibatalkan (Bukti Salah)')">Tolak</button><button class="btn primary full" onclick="updStat('${o.id}','Diproses')">Terima</button></div></div>`;
       } else if (o.status === "Diproses") {
         btn = `<button class="btn primary full" onclick="updStat('${o.id}','Siap Diambil/Diantar')">✅ Selesai Masak</button>`;
       } else if (o.status === "Siap Diambil/Diantar") {
-        btn = `<div style="display:flex; gap:8px;">
-                <input id="pin-${o.id}" placeholder="PIN (4 digit)" style="width:100px; padding:8px; border:1px solid #ccc; border-radius:8px; font-size:14px;" maxlength="4" />
-                <button class="btn full" style="background:#10b981; color:white;" onclick="verifyPin('${o.id}', '${o.securePin}')">Verifikasi</button>
-            </div>`;
+        btn = `<div style="display:flex; gap:8px;"><input id="pin-${o.id}" placeholder="PIN (4 digit)" style="width:100px; padding:8px; border:1px solid #ccc; border-radius:8px; font-size:14px;" maxlength="4" /><button class="btn full" style="background:#10b981; color:white;" onclick="verifyPin('${o.id}', '${o.securePin}')">Verifikasi</button></div>`;
       }
     }
 
-    // 4. SMART WHATSAPP LOGIC
     const waNum = formatWA(o.userPhone);
-
-    // Susun pesan otomatis
-    const waMessage = `Halo Kak ${o.userName}, ini dari ${state.vendor.name}. 👋
-
-Konfirmasi pesanan kamu ya:
-${itemsWA}
-
-Total: ${rupiah(o.total)}
-Status: ${o.status}
-
-Mohon ditunggu ya! 🙏`;
-
-    const encodedMsg = encodeURIComponent(waMessage);
-    const waLink = waNum ? `https://wa.me/${waNum}?text=${encodedMsg}` : "#";
+    const waMessage = `Halo Kak ${o.userName}, ini dari ${
+      state.vendor.name
+    }. 👋\n\nKonfirmasi pesanan:\n${itemsWA}\n\nTotal: ${rupiah(
+      o.total
+    )}\nStatus: ${o.status}\n\nMohon ditunggu ya! 🙏`;
+    const waLink = waNum
+      ? `https://wa.me/${waNum}?text=${encodeURIComponent(waMessage)}`
+      : "#";
     const waBtn = waNum
-      ? `<a href="${waLink}" target="_blank" style="font-size:12px; color:#22c55e; text-decoration:none; font-weight:600; background:#f0fdf4; padding:4px 8px; border-radius:6px; border:1px solid #22c55e;">📞 Hubungi WA</a>`
+      ? `<a href="${waLink}" target="_blank" style="font-size:12px; color:#22c55e; text-decoration:none; font-weight:600; background:#f0fdf4; padding:4px 8px; border-radius:6px; border:1px solid #22c55e;">📞 WhatsApp</a>`
       : `<span class="muted" style="font-size:12px">No WA Tidak Ada</span>`;
-
-    // 5. DELETE BUTTON
     const deleteBtn = `<button onclick="deleteOrder('${o.id}')" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:12px; text-decoration:underline; margin-left:auto;">🗑️ Hapus Pesanan</button>`;
 
     return `<div class="order-item">
-        <div class="ord-head">
-            <div>
-                <b>${
-                  o.userName
-                }</b> <span style="color:#94a3b8; font-size:12px;">• ${new Date(
+        <div class="ord-head"><div><b>${
+          o.userName
+        }</b> <span style="color:#94a3b8; font-size:12px;">• ${new Date(
       o.createdAt
-    ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                <div style="margin-top:6px;">${waBtn}</div>
-            </div>
-            <span class="ord-status ${stCls}">${o.status}</span>
-        </div>
-        <div class="ord-body">
-            <p style="margin:0 0 10px 0; font-size:14px; line-height:1.5;">${itemsUI}</p>
-            ${
-              o.note
-                ? `<div style="background:#fff1f2; color:#be123c; padding:8px; border-radius:8px; font-size:12px; margin-bottom:10px;">📝 ${o.note}</div>`
-                : ""
-            }
-            <div class="rowBetween">
-                <span class="muted">Total (${
-                  o.paymentMethod === "qris" ? "QRIS" : "Tunai"
-                })</span>
-                <b style="font-size:16px;">${rupiah(o.total)}</b>
-            </div>
-            <div style="display:flex; margin-top:8px;">${deleteBtn}</div>
-        </div>
-        ${btn ? `<div class="ord-foot">${btn}</div>` : ""}
-    </div>`;
+    ).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}</span><div style="margin-top:6px;">${waBtn}</div></div><span class="ord-status ${stCls}">${
+      o.status
+    }</span></div>
+        <div class="ord-body"><p style="margin:0 0 10px 0; font-size:14px; line-height:1.5;">${itemsUI}</p>${
+      o.note
+        ? `<div style="background:#fff1f2; color:#be123c; padding:8px; border-radius:8px; font-size:12px; margin-bottom:10px;">📝 ${o.note}</div>`
+        : ""
+    }<div class="rowBetween"><span class="muted">Total (${
+      o.paymentMethod === "qris" ? "QRIS" : "Tunai"
+    })</span><b style="font-size:16px;">${rupiah(
+      o.total
+    )}</b></div><div style="display:flex; margin-top:8px;">${deleteBtn}</div></div>${
+      btn ? `<div class="ord-foot">${btn}</div>` : ""
+    }</div>`;
   };
-
   $("#incomingOrdersList").innerHTML =
     activeOrders.map((o) => renderItem(o, true)).join("") ||
     `<div class="empty-state-box">Tidak ada pesanan aktif.</div>`;
@@ -422,7 +574,6 @@ Mohon ditunggu ya! 🙏`;
     .join("");
 }
 
-// --- ORDER ACTIONS ---
 window.updStat = async (oid, st) => {
   if (confirm("Update status pesanan?"))
     await updateDoc(doc(db, "orders", oid), { status: st });
@@ -455,25 +606,18 @@ function loadChatList() {
       list
         .map(
           (c) => `
-      <div class="chat-entry" onclick="openChat('${c.id}', '${c.userName}')">
-        <div style="width:40px; height:40px; background:#f1f5f9; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px;">👤</div>
-        <div style="flex:1; min-width:0;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
-                <b style="font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${
-                  c.userName
-                }</b>
-                <span style="font-size:11px; color:#94a3b8;">${new Date(
-                  c.lastUpdate || Date.now()
-                ).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}</span>
-            </div>
-            <div style="font-size:13px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${
-              c.lastMessage
-            }</div>
-        </div>
-      </div>`
+      <div class="chat-entry" onclick="openChat('${c.id}', '${
+            c.userName
+          }')"><div style="width:40px; height:40px; background:#f1f5f9; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px;">👤</div><div style="flex:1; min-width:0;"><div style="display:flex; justify-content:space-between; margin-bottom:2px;"><b style="font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${
+            c.userName
+          }</b><span style="font-size:11px; color:#94a3b8;">${new Date(
+            c.lastUpdate || Date.now()
+          ).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}</span></div><div style="font-size:13px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${
+            c.lastMessage
+          }</div></div></div>`
         )
         .join("") ||
       '<div style="text-align:center; padding:40px; color:#94a3b8;"><div style="font-size:40px; margin-bottom:10px;">💬</div>Belum ada chat.</div>';
@@ -485,13 +629,11 @@ window.openChat = (chatId, userName) => {
   $("#chatRoom").classList.add("active");
   $("#chattingWith").textContent = userName;
   $$(".chat-entry").forEach((el) => el.classList.remove("active"));
-
   if (state.unsubMsg) state.unsubMsg();
   const q = query(
     collection(db, "chats", chatId, "messages"),
     orderBy("ts", "asc")
   );
-
   state.unsubMsg = onSnapshot(q, (snap) => {
     $("#msgBox").innerHTML = snap.docs
       .map((d) => {
@@ -542,13 +684,15 @@ window.triggerImage = () => {
   $("#attachMenu").classList.remove("visible");
   $("#imageInput").click();
 };
-window.handleImageUpload = (input) => {
+window.handleImageUpload = async (input) => {
   if (input.files && input.files[0]) {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      await sendMessage(e.target.result, "image");
-    };
-    reader.readAsDataURL(input.files[0]);
+    try {
+      const compressed = await compressImage(input.files[0], 500, 0.7);
+      await sendMessage(compressed, "image");
+    } catch (e) {
+      alert("Gagal kirim gambar: " + e.message);
+    }
+    input.value = "";
   }
 };
 window.sendLocation = async () => {
@@ -710,47 +854,6 @@ function calculateStats() {
   $("#bestSellerName").textContent = bestName;
   $("#bestSellerCount").textContent = `${bestQty} Terjual`;
 }
-$("#addMenuBtn").addEventListener("click", () => {
-  state.editingMenuIndex = null;
-  $("#menuModalTitle").textContent = "Tambah Menu";
-  $("#mName").value = "";
-  $("#mPrice").value = "";
-  $("#menuModal").classList.remove("hidden");
-});
-window.openEditMenu = (idx) => {
-  state.editingMenuIndex = idx;
-  const item = state.vendor.menu[idx];
-  $("#menuModalTitle").textContent = "Edit Menu";
-  $("#mName").value = item.name;
-  $("#mPrice").value = item.price;
-  $("#menuModal").classList.remove("hidden");
-};
-window.closeModal = () => $("#menuModal").classList.add("hidden");
-$$("[data-close]").forEach((b) =>
-  b.addEventListener("click", window.closeModal)
-);
-$("#menuForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const name = $("#mName").value,
-    price = parseInt($("#mPrice").value);
-  let updMenu = [...(state.vendor.menu || [])];
-  if (state.editingMenuIndex !== null)
-    updMenu[state.editingMenuIndex] = {
-      ...updMenu[state.editingMenuIndex],
-      name,
-      price,
-    };
-  else updMenu.push({ id: "m" + Date.now(), name, price });
-  await updateDoc(doc(db, "vendors", state.vendor.id), { menu: updMenu });
-  closeModal();
-});
-window.deleteMenu = async (idx) => {
-  if (confirm("Hapus?")) {
-    const upd = [...state.vendor.menu];
-    upd.splice(idx, 1);
-    await updateDoc(doc(db, "vendors", state.vendor.id), { menu: upd });
-  }
-};
 function initMap() {
   if (state.map) return;
   state.map = L.map("sellerMap").setView(

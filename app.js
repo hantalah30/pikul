@@ -287,6 +287,7 @@ function renderVendors() {
       (cat === "semua" || v.type.includes(cat))
   );
   if (state.you.ok) list.sort((a, b) => getDistanceVal(a) - getDistanceVal(b));
+
   $("#vendorList").innerHTML =
     list
       .map((v) => {
@@ -295,15 +296,21 @@ function renderVendors() {
           ? `<span class="chip closed">🔴 Tutup</span>`
           : `<span class="chip">📍 ${distText(v)}</span>`;
         const cardClass = isClosed ? "vendorCard closed" : "vendorCard";
-        return `<div class="${cardClass}" onclick="openVendor('${
-          v.id
-        }')"><div class="vIco">${v.ico}</div><div class="vMeta"><b>${
-          v.name
-        }</b><div class="muted">⭐ ${
-          v.rating ? v.rating.toFixed(1) : "New"
-        } • ${
+
+        // LOGIC TAMPILAN LOGO
+        const logoDisplay = v.logo ? `<img src="${v.logo}" />` : v.ico; // Fallback ke emoji jika belum ada logo
+
+        return `<div class="${cardClass}" onclick="openVendor('${v.id}')">
+        <div class="vIco">${logoDisplay}</div>
+        <div class="vMeta">
+          <b>${v.name}</b>
+          <div class="muted">⭐ ${v.rating ? v.rating.toFixed(1) : "New"} • ${
           v.busy
-        }</div><div class="chips"><span class="chip">${v.type.toUpperCase()}</span>${statusBadge}</div></div><b style="color:var(--primary)">Lihat</b></div>`;
+        }</div>
+          <div class="chips"><span class="chip">${v.type.toUpperCase()}</span>${statusBadge}</div>
+        </div>
+        <b style="color:var(--primary)">Lihat</b>
+      </div>`;
       })
       .join("") || `<div class="card muted">Tidak ada pedagang aktif.</div>`;
 }
@@ -751,6 +758,7 @@ window.openVendor = (id) => {
   }
   let menuData =
     v.menu && v.menu.length > 0 ? v.menu : MENU_DEFAULTS[v.type] || [];
+
   $("#menuList").innerHTML =
     banner +
     menuData
@@ -758,13 +766,20 @@ window.openVendor = (id) => {
         const btnState = isClosed ? "disabled" : "";
         const btnText = isClosed ? "Tutup" : "+ Tambah";
         const btnClass = isClosed ? "btn small" : "btn small primary";
-        return `<div class="listItem"><div style="flex:1"><b>${
-          m.name
-        }</b><div class="muted">${rupiah(
+
+        // LOGIC TAMPILAN GAMBAR MENU
+        const imgHtml = m.image ? `<img src="${m.image}" />` : ""; // Tidak tampilkan apa-apa jika tidak ada gambar
+
+        return `
+      <div class="listItem" style="display:flex; align-items:center;">
+        ${imgHtml}
+        <div style="flex:1"><b>${m.name}</b><div class="muted">${rupiah(
           m.price
-        )}</div></div><button class="${btnClass}" ${btnState} onclick="addToCart('${id}', '${
+        )}</div></div>
+        <button class="${btnClass}" ${btnState} onclick="addToCart('${id}', '${
           m.id
-        }', '${m.name}', ${m.price})">${btnText}</button></div>`;
+        }', '${m.name}', ${m.price})">${btnText}</button>
+      </div>`;
       })
       .join("");
   openModal("vendorModal");
