@@ -55,7 +55,37 @@ let state = {
   tempPaymentProof: null,
 };
 
-// --- HELPERS ---
+// --- HELPER: IMAGE COMPRESSOR (SOLUSI GAMBAR BESAR) ---
+function compressImage(file, maxWidth = 600, quality = 0.6) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        // Resize logic
+        if (width > maxWidth) {
+          height = Math.round((height *= maxWidth / width));
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Return base64 yang lebih kecil (JPEG quality 0.6)
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+    };
+  });
+}
+
 function generatePin() {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
@@ -287,7 +317,6 @@ function renderVendors() {
       (cat === "semua" || v.type.includes(cat))
   );
   if (state.you.ok) list.sort((a, b) => getDistanceVal(a) - getDistanceVal(b));
-
   $("#vendorList").innerHTML =
     list
       .map((v) => {
@@ -297,8 +326,8 @@ function renderVendors() {
           : `<span class="chip">📍 ${distText(v)}</span>`;
         const cardClass = isClosed ? "vendorCard closed" : "vendorCard";
 
-        // LOGIC TAMPILAN LOGO
-        const logoDisplay = v.logo ? `<img src="${v.logo}" />` : v.ico; // Fallback ke emoji jika belum ada logo
+        // Render Logo
+        const logoDisplay = v.logo ? `<img src="${v.logo}" />` : v.ico;
 
         return `<div class="${cardClass}" onclick="openVendor('${v.id}')">
         <div class="vIco">${logoDisplay}</div>
@@ -550,14 +579,16 @@ window.triggerImage = () => {
   $("#attachMenu").classList.remove("visible");
   $("#imageInput").click();
 };
-window.handleImageUpload = (input) => {
+window.handleImageUpload = async (input) => {
   if (input.files && input.files[0]) {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      await sendMessage(e.target.result, "image");
+    try {
+      const compressed = await compressImage(input.files[0], 500, 0.7);
+      await sendMessage(compressed, "image");
       showToast("Foto terkirim!");
-    };
-    reader.readAsDataURL(input.files[0]);
+    } catch (e) {
+      alert("Gagal kirim: " + e.message);
+    }
+    input.value = "";
   }
 };
 window.sendLocation = async () => {
@@ -758,7 +789,6 @@ window.openVendor = (id) => {
   }
   let menuData =
     v.menu && v.menu.length > 0 ? v.menu : MENU_DEFAULTS[v.type] || [];
-
   $("#menuList").innerHTML =
     banner +
     menuData
@@ -766,20 +796,22 @@ window.openVendor = (id) => {
         const btnState = isClosed ? "disabled" : "";
         const btnText = isClosed ? "Tutup" : "+ Tambah";
         const btnClass = isClosed ? "btn small" : "btn small primary";
-
-        // LOGIC TAMPILAN GAMBAR MENU
-        const imgHtml = m.image ? `<img src="${m.image}" />` : ""; // Tidak tampilkan apa-apa jika tidak ada gambar
-
+        const imgDisplay = m.image
+          ? `<img src="${m.image}" class="menu-img" loading="lazy" />`
+          : `<div class="menu-img">🍲</div>`;
         return `
-      <div class="listItem" style="display:flex; align-items:center;">
-        ${imgHtml}
-        <div style="flex:1"><b>${m.name}</b><div class="muted">${rupiah(
-          m.price
-        )}</div></div>
+    <div class="menu-item-card">
+      ${imgDisplay}
+      <div class="menu-info">
+        <b>${m.name}</b>
+        <div class="muted">${rupiah(m.price)}</div>
+      </div>
+      <div class="menu-btn-container">
         <button class="${btnClass}" ${btnState} onclick="addToCart('${id}', '${
           m.id
         }', '${m.name}', ${m.price})">${btnText}</button>
-      </div>`;
+      </div>
+    </div>`;
       })
       .join("");
   openModal("vendorModal");
@@ -827,16 +859,22 @@ window.openGlobalCart = () => {
 };
 window.triggerProofUpload = () => {
   $("#paymentProofInput").click();
-}; // Attach Global Helper
-window.handleProofUpload = (input) => {
+};
+window.handleProofUpload = async (input) => {
   if (input.files && input.files[0]) {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      state.tempPaymentProof = e.target.result;
-      $("#proofText").textContent = "✅ Bukti Terupload";
+    // Efek Loading
+    $("#proofText").textContent = "⏳ Mengompres...";
+    try {
+      const compressed = await compressImage(input.files[0], 600, 0.6); // Kompres!
+      state.tempPaymentProof = compressed;
+      $("#proofText").textContent = "✅ Bukti Siap (Klik Ganti)";
       $(".proof-upload").style.borderColor = "#22c55e";
-    };
-    reader.readAsDataURL(input.files[0]);
+      $(".proof-upload").style.background = "#f0fdf4";
+    } catch (e) {
+      alert("Gagal proses gambar. Coba lagi.");
+      $("#proofText").textContent = "📷 Klik untuk upload bukti";
+    }
+    input.value = "";
   }
 };
 function renderCartModal() {
@@ -878,6 +916,8 @@ function renderCartModal() {
       qrisCont.classList.remove("hidden");
       state.tempPaymentProof = null;
       $("#proofText").textContent = "📷 Klik untuk upload bukti";
+      $(".proof-upload").style.borderColor = "#cbd5e1";
+      $(".proof-upload").style.background = "#f8fafc";
     } else {
       qrisCont.classList.add("hidden");
       state.tempPaymentProof = null;

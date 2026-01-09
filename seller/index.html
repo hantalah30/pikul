@@ -43,12 +43,222 @@
         display: flex;
         height: 100vh;
       }
+      /* --- NAVIGATION SYSTEM (PREMIUM SELLER) --- */
+
+      /* 1. DESKTOP SIDEBAR (Professional Dashboard) */
       .sidebar {
-        width: 260px;
-        background: white;
+        width: 280px;
+        background: #ffffff;
         border-right: 1px solid var(--border);
-        display: none;
+        display: none; /* Hidden on mobile */
         flex-direction: column;
+        padding: 24px;
+        height: 100vh;
+        position: relative;
+        z-index: 50;
+      }
+
+      .sidebar-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 40px;
+        padding-left: 12px;
+      }
+      .sidebar-header .logo-box {
+        width: 40px;
+        height: 40px;
+        background: var(--primary);
+        color: white;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 20px;
+        box-shadow: 0 4px 12px rgba(255, 122, 0, 0.3);
+      }
+      .sidebar-header h3 {
+        margin: 0;
+        font-size: 18px;
+        color: var(--text);
+        letter-spacing: -0.5px;
+      }
+
+      .sidebar-nav {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .sb-item {
+        display: flex;
+        align-items: center;
+        padding: 14px 16px;
+        border-radius: 12px;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        font-weight: 600;
+        font-size: 15px;
+        font-family: inherit;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+        text-align: left;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .sb-item .icon {
+        font-size: 20px;
+        margin-right: 16px;
+        width: 24px;
+        text-align: center;
+        transition: transform 0.2s;
+      }
+
+      /* Hover State Desktop */
+      .sb-item:hover {
+        background: #fff7ed;
+        color: var(--primary);
+        transform: translateX(4px);
+      }
+      .sb-item:hover .icon {
+        transform: scale(1.1);
+      }
+
+      /* Active State Desktop */
+      .sb-item.active {
+        background: var(--primary);
+        color: white;
+        box-shadow: 0 8px 20px rgba(255, 122, 0, 0.25);
+      }
+      .sb-item.active:hover {
+        background: var(--primary);
+        transform: none;
+        color: white;
+      }
+
+      .sb-logout {
+        margin-top: auto;
+        padding: 14px 16px;
+        border-radius: 12px;
+        background: #fef2f2;
+        color: #ef4444;
+        border: 1px solid #fee2e2;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      .sb-logout:hover {
+        background: #fee2e2;
+      }
+
+      /* 2. MOBILE BOTTOM NAV (Floating Island) */
+      .bottom-nav {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 90%;
+        max-width: 400px;
+        height: 70px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-radius: 24px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        padding: 0 10px;
+        z-index: 1000;
+      }
+
+      .nav-item {
+        background: transparent;
+        border: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #94a3b8;
+        font-family: inherit;
+        font-size: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        width: 50px;
+        height: 50px;
+        border-radius: 16px;
+        position: relative;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+
+      .nav-icon {
+        font-size: 22px;
+        margin-bottom: 2px;
+        transition: transform 0.3s;
+        filter: grayscale(100%);
+        opacity: 0.7;
+      }
+
+      .nav-item span {
+        opacity: 0;
+        transform: translateY(10px);
+        transition: all 0.3s;
+        position: absolute;
+        bottom: 8px;
+      }
+
+      /* Active State Mobile */
+      .nav-item.active {
+        color: var(--primary);
+        background: rgba(255, 122, 0, 0.1);
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(255, 122, 0, 0.15);
+      }
+
+      .nav-item.active .nav-icon {
+        transform: translateY(-8px) scale(1.1);
+        filter: grayscale(0);
+        opacity: 1;
+      }
+
+      .nav-item.active span {
+        opacity: 1;
+        transform: translateY(14px); /* Text muncul di bawah icon */
+        font-size: 9px;
+      }
+
+      /* Active Dot Indicator */
+      .nav-item.active::after {
+        content: "";
+        position: absolute;
+        bottom: 6px;
+        width: 4px;
+        height: 4px;
+        background: var(--primary);
+        border-radius: 50%;
+      }
+
+      @media (min-width: 768px) {
+        .sidebar {
+          display: flex;
+        }
+        .bottom-nav {
+          display: none !important;
+        }
+        /* Adjust layout untuk sidebar desktop */
+        .main-wrapper {
+          height: 100vh;
+          overflow: hidden;
+        }
       }
       .main-wrapper {
         flex: 1;
@@ -565,13 +775,15 @@
             <span class="icon">🏠</span> Dashboard
           </button>
           <button class="sb-item" onclick="goSeller('Orders')">
-            <span class="icon">📦</span> Pesanan
+            <span class="icon">📦</span> Pesanan Masuk
           </button>
           <button class="sb-item" onclick="goSeller('Chat')">
             <span class="icon">💬</span> Chat Pelanggan
           </button>
         </nav>
-        <button onclick="logout()" class="sb-logout">⎋ Keluar</button>
+        <button onclick="logout()" class="sb-logout">
+          <span style="font-size: 18px">⎋</span> Keluar
+        </button>
       </aside>
       <div class="main-wrapper">
         <header class="topbar">

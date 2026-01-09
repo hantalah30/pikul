@@ -613,6 +613,104 @@
         object-fit: cover;
         margin-right: 12px;
       }
+
+      /* --- MENU LAYOUT SYSTEM (Mobile List vs Desktop Grid) --- */
+
+      /* 1. Mobile (Default List View) */
+      .menu-item-card {
+        display: flex;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border);
+        transition: 0.2s;
+      }
+      .menu-img {
+        width: 64px;
+        height: 64px;
+        border-radius: 12px;
+        object-fit: cover;
+        margin-right: 12px;
+        background: #f1f5f9;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px; /* Fallback icon */
+      }
+      .menu-info {
+        flex: 1;
+        min-width: 0; /* Prevent text overflow */
+      }
+      .menu-info b {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 14px;
+      }
+      .menu-btn-container {
+        margin-left: 10px;
+      }
+
+      /* 2. Desktop (Grid Card View) */
+      @media (min-width: 768px) {
+        /* Container Menu jadi Grid */
+        #menuList {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+          gap: 20px;
+          padding-top: 10px;
+        }
+
+        /* Kartu Menu */
+        .menu-item-card {
+          flex-direction: column;
+          align-items: flex-start;
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          padding: 0;
+          overflow: hidden;
+          background: white;
+          height: 100%; /* Uniform height */
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+        }
+
+        .menu-item-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+          border-color: var(--primary);
+        }
+
+        /* Gambar Besar di Atas */
+        .menu-img {
+          width: 100%;
+          height: 160px;
+          margin: 0;
+          border-radius: 0;
+        }
+
+        /* Info di Tengah */
+        .menu-info {
+          padding: 16px;
+          width: 100%;
+          box-sizing: border-box;
+        }
+        .menu-info b {
+          font-size: 16px;
+          margin-bottom: 6px;
+        }
+
+        /* Tombol Full Width di Bawah */
+        .menu-btn-container {
+          width: 100%;
+          padding: 0 16px 16px;
+          margin: 0;
+          box-sizing: border-box;
+          margin-top: auto; /* Dorong ke bawah */
+        }
+        .menu-btn-container button {
+          width: 100%;
+          justify-content: center;
+        }
+      }
     </style>
   </head>
   <body>
