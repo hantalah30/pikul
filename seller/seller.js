@@ -35,10 +35,25 @@ let state = {
   unsubMsg: null,
   orders: [],
   editingMenuIndex: null,
-  tempMenuImage: null, // Menyimpan base64 gambar menu sementara
+  tempMenuImage: null,
+  tempPayProof: null, // Bukti bayar premium
+  pendingSub: null,
+  approvedSub: null,
 };
 
-// --- HELPER: IMAGE COMPRESSOR (PENTING AGAR TIDAK GAGAL UPLOAD) ---
+// --- GLOBAL EXPORTS (FIX TOMBOL TIDAK BERFUNGSI) ---
+window.triggerPayProofUpload = () => {
+  $("#payProofInput").click();
+};
+window.closePayModal = () => {
+  $("#payModal").classList.add("hidden");
+};
+window.triggerMenuImageUpload = () => {
+  $("#mImageInput").click();
+};
+window.closeModal = () => $("#menuModal").classList.add("hidden");
+
+// --- HELPER ---
 function compressImage(file, maxWidth = 500, quality = 0.7) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -50,25 +65,19 @@ function compressImage(file, maxWidth = 500, quality = 0.7) {
         const canvas = document.createElement("canvas");
         let width = img.width;
         let height = img.height;
-
         if (width > maxWidth) {
           height = Math.round((height *= maxWidth / width));
           width = maxWidth;
         }
-
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, width, height);
-
-        // Hasil konversi ke string base64 yang lebih kecil
         resolve(canvas.toDataURL("image/jpeg", quality));
       };
     };
   });
 }
-
-// --- HELPER: FORMAT WA ---
 function formatWA(phone) {
   if (!phone) return "";
   let p = phone.replace(/[^0-9]/g, "");
@@ -77,7 +86,7 @@ function formatWA(phone) {
   return p;
 }
 
-// --- AUTH LOGIC ---
+// --- AUTH ---
 window.switchAuthMode = (mode) => {
   const tabs = $$(".auth-tab");
   const forms = $$(".auth-form");
@@ -93,7 +102,6 @@ window.switchAuthMode = (mode) => {
     forms[0].classList.add("hidden");
   }
 };
-
 $("#loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const email = $("#email").value.trim(),
@@ -126,7 +134,6 @@ $("#loginForm").addEventListener("submit", async (e) => {
   btn.disabled = false;
   btn.textContent = "Masuk Dashboard";
 });
-
 $("#registerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = $("#regName").value.trim(),
@@ -157,7 +164,7 @@ $("#registerForm").addEventListener("submit", async (e) => {
       lat: -6.2,
       lon: 106.8,
       menu: [],
-      subscriptionExpiry: Date.now() + 2592000000,
+      subscriptionExpiry: 0,
       isLive: false,
       locationMode: "gps",
       paymentMethods: ["cash"],
@@ -195,7 +202,6 @@ async function initApp() {
     $("#auth").classList.add("hidden");
     $(".app-layout").classList.remove("hidden");
 
-    // Listen Self (Profile & Settings)
     onSnapshot(doc(db, "vendors", state.vendor.id), (doc) => {
       if (doc.exists()) {
         state.vendor = { id: doc.id, ...doc.data() };
@@ -204,7 +210,36 @@ async function initApp() {
       }
     });
 
-    // Listen Orders
+    // Check Pending Subs
+    onSnapshot(
+      query(
+        collection(db, "subscriptions"),
+        where("vendorId", "==", state.vendor.id),
+        where("status", "==", "pending")
+      ),
+      (snap) => {
+        state.pendingSub = !snap.empty;
+        renderUI();
+      }
+    );
+
+    // Check Approved Subs (Waiting for Code Input)
+    onSnapshot(
+      query(
+        collection(db, "subscriptions"),
+        where("vendorId", "==", state.vendor.id),
+        where("status", "==", "approved")
+      ),
+      (snap) => {
+        if (!snap.empty) {
+          state.approvedSub = { id: snap.docs[0].id, ...snap.docs[0].data() };
+        } else {
+          state.approvedSub = null;
+        }
+        renderUI();
+      }
+    );
+
     const qOrd = query(
       collection(db, "orders"),
       where("vendorId", "==", state.vendor.id)
@@ -224,46 +259,44 @@ function renderUI() {
   if (!state.vendor) return;
   $("#vName").textContent = state.vendor.name;
   $("#vNameDisplay").textContent = state.vendor.name;
-
-  // Render Logo dengan timestamp biar refresh
   if (state.vendor.logo) {
     $("#shopLogoPreview").src = state.vendor.logo;
     $("#shopLogoPreview").classList.remove("hidden");
     $("#shopLogoPlaceholder").classList.add("hidden");
   }
 
+  // --- LOGIC STATUS ---
   const isExpired = state.vendor.subscriptionExpiry < Date.now();
-  if (isExpired) {
+
+  // Reset all Alerts
+  $("#subAlert").classList.add("hidden");
+  $("#subPending").classList.add("hidden");
+  $("#subActivation").classList.add("hidden");
+  $("#subActive").classList.add("hidden");
+
+  if (state.pendingSub) {
+    // 1. Pending (Menunggu Admin)
+    $("#subPending").classList.remove("hidden");
+    disableShop();
+  } else if (
+    isExpired &&
+    state.approvedSub &&
+    state.approvedSub.method === "cash"
+  ) {
+    // 2. Approved Cash (Butuh Kode)
+    $("#subActivation").classList.remove("hidden");
+    disableShop();
+  } else if (isExpired) {
+    // 3. Expired (Belum Bayar)
     $("#subAlert").classList.remove("hidden");
-    $("#subActive").classList.add("hidden");
-    $("#statusToggle").disabled = true;
-    $("#statusToggle").checked = false;
-    $("#locationControls").classList.add("hidden");
-    $("#statusText").textContent = "Bayar dulu";
-    $("#statusText").className = "status-indicator offline";
-    stopGPS();
+    disableShop();
   } else {
-    $("#subAlert").classList.add("hidden");
+    // 4. Active
     $("#subActive").classList.remove("hidden");
     $("#expDate").textContent = new Date(
       state.vendor.subscriptionExpiry
     ).toLocaleDateString();
-    $("#statusToggle").disabled = false;
-    $("#statusToggle").checked = state.vendor.isLive;
-    if (state.vendor.isLive) {
-      $("#statusText").textContent = "Toko Buka (Online)";
-      $("#statusText").className = "status-indicator online";
-      $("#locationControls").classList.remove("hidden");
-      if (!state.map) initMap();
-      state.locMode = state.vendor.locationMode || "gps";
-      updateModeButtons();
-      handleLocationLogic();
-    } else {
-      $("#statusText").textContent = "Toko Tutup (Offline)";
-      $("#statusText").className = "status-indicator offline";
-      $("#locationControls").classList.add("hidden");
-      stopGPS();
-    }
+    enableShop();
   }
 
   $("#menuList").innerHTML =
@@ -292,54 +325,138 @@ function renderUI() {
       .join("") || `<div class="empty-state-box">Belum ada menu.</div>`;
 }
 
-// --- LOGO UPLOAD (FIXED WITH COMPRESSION) ---
+function disableShop() {
+  $("#statusToggle").disabled = true;
+  $("#statusToggle").checked = false;
+  $("#locationControls").classList.add("hidden");
+  $("#statusText").textContent = "Tidak Aktif";
+  $("#statusText").className = "status-indicator offline";
+  stopGPS();
+}
+
+function enableShop() {
+  $("#statusToggle").disabled = false;
+  $("#statusToggle").checked = state.vendor.isLive;
+  if (state.vendor.isLive) {
+    $("#statusText").textContent = "Toko Buka (Online)";
+    $("#statusText").className = "status-indicator online";
+    $("#locationControls").classList.remove("hidden");
+    if (!state.map) initMap();
+    state.locMode = state.vendor.locationMode || "gps";
+    updateModeButtons();
+    handleLocationLogic();
+  } else {
+    $("#statusText").textContent = "Toko Tutup (Offline)";
+    $("#statusText").className = "status-indicator offline";
+    $("#locationControls").classList.add("hidden");
+    stopGPS();
+  }
+}
+
+// --- REDEEM CODE ---
+window.redeemCode = async () => {
+  const inputCode = parseInt($("#activationCode").value);
+
+  if (!state.approvedSub || !state.approvedSub.activationCode) {
+    alert("Data kode tidak ditemukan. Hubungi admin.");
+    return;
+  }
+
+  if (inputCode === state.approvedSub.activationCode) {
+    const now = Date.now();
+    // 1. Activate Vendor
+    await updateDoc(doc(db, "vendors", state.vendor.id), {
+      subscriptionExpiry: now + 30 * 24 * 60 * 60 * 1000,
+    });
+    // 2. Mark Redeemed
+    await updateDoc(doc(db, "subscriptions", state.approvedSub.id), {
+      status: "redeemed",
+    });
+    alert("Kode Benar! Akun Anda aktif.");
+  } else {
+    alert("Kode Salah!");
+  }
+};
+
+// --- PAY MODAL ---
+$("#payBtn").addEventListener("click", () => {
+  $("#payModal").classList.remove("hidden");
+});
+window.selectPayMethod = (method) => {
+  if (method === "cash") {
+    $("#payCash").classList.remove("hidden");
+    $("#payQris").classList.add("hidden");
+  } else {
+    $("#payCash").classList.add("hidden");
+    $("#payQris").classList.remove("hidden");
+  }
+};
+window.handlePayProof = async (input) => {
+  if (input.files && input.files[0]) {
+    try {
+      state.tempPayProof = await compressImage(input.files[0], 500, 0.6);
+      $("#payProofText").textContent = "✅ Bukti Siap";
+    } catch (e) {
+      alert("Gagal proses gambar");
+    }
+  }
+};
+window.submitSubscription = async (method) => {
+  if (method === "qris" && !state.tempPayProof) {
+    alert("Mohon upload bukti transfer dulu.");
+    return;
+  }
+
+  await addDoc(collection(db, "subscriptions"), {
+    vendorId: state.vendor.id,
+    vendorName: state.vendor.name,
+    amount: 5000,
+    timestamp: Date.now(),
+    type: "Premium Bulanan",
+    method: method,
+    proof: state.tempPayProof || null,
+    status: "pending",
+  });
+
+  $("#payModal").classList.add("hidden");
+  alert("Permintaan dikirim! Tunggu validasi Admin.");
+};
+
+// ... (Rest of functions) ...
 window.triggerLogoUpload = () => {
   $("#shopLogoInput").click();
 };
 window.handleLogoUpload = async (input) => {
   if (input.files && input.files[0]) {
     try {
-      // 1. Kompres gambar dulu
-      const compressedBase64 = await compressImage(input.files[0], 300, 0.7); // Max width 300px
-
-      // 2. Upload ke Firestore
+      const compressed = await compressImage(input.files[0], 300, 0.7);
       await updateDoc(doc(db, "vendors", state.vendor.id), {
-        logo: compressedBase64,
+        logo: compressed,
       });
-
-      // 3. Update State Lokal Langsung (Biar kerasa cepet)
-      state.vendor.logo = compressedBase64;
-      renderUI();
-      alert("Logo berhasil diganti!");
+      alert("Logo Updated!");
     } catch (e) {
-      alert("Gagal upload logo: " + e.message);
+      alert("Error: " + e.message);
     }
-    input.value = ""; // Reset input agar bisa pilih file yang sama lagi
+    input.value = "";
   }
 };
-
-// --- MENU ACTIONS (FIXED WITH COMPRESSION) ---
 $("#addMenuBtn").addEventListener("click", () => {
   state.editingMenuIndex = null;
   state.tempMenuImage = null;
   $("#menuModalTitle").textContent = "Tambah Menu";
   $("#mName").value = "";
   $("#mPrice").value = "";
-
   $("#mImagePreview").classList.add("hidden");
   $("#mImagePlaceholder").classList.remove("hidden");
   $("#menuModal").classList.remove("hidden");
 });
-
 window.openEditMenu = (idx) => {
   state.editingMenuIndex = idx;
   const item = state.vendor.menu[idx];
   state.tempMenuImage = item.image || null;
-
   $("#menuModalTitle").textContent = "Edit Menu";
   $("#mName").value = item.name;
   $("#mPrice").value = item.price;
-
   if (state.tempMenuImage) {
     $("#mImagePreview").src = state.tempMenuImage;
     $("#mImagePreview").classList.remove("hidden");
@@ -348,70 +465,44 @@ window.openEditMenu = (idx) => {
     $("#mImagePreview").classList.add("hidden");
     $("#mImagePlaceholder").classList.remove("hidden");
   }
-
   $("#menuModal").classList.remove("hidden");
-};
-
-window.triggerMenuImageUpload = () => {
-  $("#mImageInput").click();
 };
 window.handleMenuImageUpload = async (input) => {
   if (input.files && input.files[0]) {
     try {
-      // Kompres gambar menu (Max width 500px)
-      const compressedBase64 = await compressImage(input.files[0], 500, 0.8);
-
-      // Update Preview & State Sementara
-      state.tempMenuImage = compressedBase64;
-      $("#mImagePreview").src = state.tempMenuImage;
+      const c = await compressImage(input.files[0], 500, 0.8);
+      state.tempMenuImage = c;
+      $("#mImagePreview").src = c;
       $("#mImagePreview").classList.remove("hidden");
       $("#mImagePlaceholder").classList.add("hidden");
     } catch (e) {
-      alert("Gagal memproses gambar: " + e.message);
+      alert(e.message);
     }
-    input.value = ""; // Reset input
+    input.value = "";
   }
 };
-
 $("#menuForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-
-  const btn = e.target.querySelector("button");
-  btn.textContent = "Menyimpan...";
-  btn.disabled = true;
-
-  try {
-    const name = $("#mName").value;
-    const price = parseInt($("#mPrice").value);
-
-    let updMenu = [...(state.vendor.menu || [])];
-    const newItem = {
-      id:
-        state.editingMenuIndex !== null
-          ? updMenu[state.editingMenuIndex].id
-          : "m" + Date.now(),
-      name,
-      price,
-      image: state.tempMenuImage, // Gunakan gambar yang ada di state
-    };
-
-    if (state.editingMenuIndex !== null) {
-      updMenu[state.editingMenuIndex] = newItem;
-    } else {
-      updMenu.push(newItem);
-    }
-
-    await updateDoc(doc(db, "vendors", state.vendor.id), { menu: updMenu });
-    window.closeModal();
-  } catch (err) {
-    alert("Gagal simpan menu: " + err.message);
+  const name = $("#mName").value,
+    price = parseInt($("#mPrice").value);
+  let updMenu = [...(state.vendor.menu || [])];
+  const newItem = {
+    id:
+      state.editingMenuIndex !== null
+        ? updMenu[state.editingMenuIndex].id
+        : "m" + Date.now(),
+    name,
+    price,
+    image: state.tempMenuImage,
+  };
+  if (state.editingMenuIndex !== null) {
+    updMenu[state.editingMenuIndex] = newItem;
+  } else {
+    updMenu.push(newItem);
   }
-
-  btn.textContent = "Simpan Menu";
-  btn.disabled = false;
+  await updateDoc(doc(db, "vendors", state.vendor.id), { menu: updMenu });
+  window.closeModal();
 });
-
-window.closeModal = () => $("#menuModal").classList.add("hidden");
 window.deleteMenu = async (idx) => {
   if (confirm("Hapus?")) {
     const upd = [...state.vendor.menu];
@@ -419,19 +510,15 @@ window.deleteMenu = async (idx) => {
     await updateDoc(doc(db, "vendors", state.vendor.id), { menu: upd });
   }
 };
-
-// --- PAYMENT SETTINGS ---
 function renderPaymentSettings() {
   const methods = state.vendor.paymentMethods || ["cash"];
   const hasQris = methods.includes("qris");
   $("#chkCash").checked = methods.includes("cash");
   $("#chkQris").checked = hasQris;
-
   const qrisConfig = $("#qrisConfig");
   const qrisStatus = $("#qrisStatus");
   const qrisImg = $("#qrisImg");
   const qrisPh = $("#qrisPlaceholder");
-
   if (hasQris) {
     qrisConfig.classList.remove("hidden");
     if (state.vendor.qrisImage) {
@@ -454,16 +541,14 @@ function renderPaymentSettings() {
     qrisStatus.style.color = "#94a3b8";
   }
 }
-
 window.updatePaymentMethod = async () => {
   const cash = $("#chkCash").checked;
   const qris = $("#chkQris").checked;
   let newMethods = [];
   if (cash) newMethods.push("cash");
   if (qris) newMethods.push("qris");
-
   if (newMethods.length === 0) {
-    alert("Minimal satu metode pembayaran aktif.");
+    alert("Minimal satu metode aktif.");
     $("#chkCash").checked = true;
     return;
   }
@@ -471,26 +556,21 @@ window.updatePaymentMethod = async () => {
     paymentMethods: newMethods,
   });
 };
-
 window.triggerQrisUpload = () => {
   $("#qrisInput").click();
 };
 window.handleQrisUpload = async (input) => {
   if (input.files && input.files[0]) {
     try {
-      const compressedBase64 = await compressImage(input.files[0], 500, 0.7);
-      await updateDoc(doc(db, "vendors", state.vendor.id), {
-        qrisImage: compressedBase64,
-      });
-      alert("QRIS berhasil diupload!");
+      const c = await compressImage(input.files[0], 500, 0.7);
+      await updateDoc(doc(db, "vendors", state.vendor.id), { qrisImage: c });
+      alert("QRIS Uploaded!");
     } catch (e) {
-      alert("Gagal upload QRIS: " + e.message);
+      alert(e.message);
     }
     input.value = "";
   }
 };
-
-// --- RENDER ORDERS LIST (SMART WA & SECURITY) ---
 function renderOrdersList() {
   const list = state.orders.sort(
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
@@ -502,14 +582,10 @@ function renderOrdersList() {
     (o) => o.status === "Selesai" || o.status.includes("Dibatalkan")
   );
   $("#incomingCount").textContent = activeOrders.length;
-
   const renderItem = (o, active) => {
     const itemsUI = (o.items || [])
       .map((i) => `${i.qty}x ${i.name}`)
       .join(", ");
-    const itemsWA = (o.items || [])
-      .map((i) => `- ${i.qty}x ${i.name}`)
-      .join("\n");
     let stCls =
       o.status === "Diproses"
         ? "status-process"
@@ -517,7 +593,6 @@ function renderOrdersList() {
         ? "status-deliv"
         : "status-done";
     if (o.status.includes("Dibatalkan")) stCls = "status-cancel";
-
     let btn = "";
     if (active) {
       if (o.status === "Menunggu Konfirmasi Bayar") {
@@ -528,33 +603,22 @@ function renderOrdersList() {
         btn = `<div style="display:flex; gap:8px;"><input id="pin-${o.id}" placeholder="PIN (4 digit)" style="width:100px; padding:8px; border:1px solid #ccc; border-radius:8px; font-size:14px;" maxlength="4" /><button class="btn full" style="background:#10b981; color:white;" onclick="verifyPin('${o.id}', '${o.securePin}')">Verifikasi</button></div>`;
       }
     }
-
     const waNum = formatWA(o.userPhone);
-    const waMessage = `Halo Kak ${o.userName}, ini dari ${
-      state.vendor.name
-    }. 👋\n\nKonfirmasi pesanan:\n${itemsWA}\n\nTotal: ${rupiah(
-      o.total
-    )}\nStatus: ${o.status}\n\nMohon ditunggu ya! 🙏`;
-    const waLink = waNum
-      ? `https://wa.me/${waNum}?text=${encodeURIComponent(waMessage)}`
-      : "#";
+    const waLink = waNum ? `https://wa.me/${waNum}?text=Halo` : "#";
     const waBtn = waNum
       ? `<a href="${waLink}" target="_blank" style="font-size:12px; color:#22c55e; text-decoration:none; font-weight:600; background:#f0fdf4; padding:4px 8px; border-radius:6px; border:1px solid #22c55e;">📞 WhatsApp</a>`
       : `<span class="muted" style="font-size:12px">No WA Tidak Ada</span>`;
     const deleteBtn = `<button onclick="deleteOrder('${o.id}')" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:12px; text-decoration:underline; margin-left:auto;">🗑️ Hapus Pesanan</button>`;
-
-    return `<div class="order-item">
-        <div class="ord-head"><div><b>${
-          o.userName
-        }</b> <span style="color:#94a3b8; font-size:12px;">• ${new Date(
+    return `<div class="order-item"><div class="ord-head"><div><b>${
+      o.userName
+    }</b> <span style="color:#94a3b8; font-size:12px;">• ${new Date(
       o.createdAt
     ).toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
     })}</span><div style="margin-top:6px;">${waBtn}</div></div><span class="ord-status ${stCls}">${
       o.status
-    }</span></div>
-        <div class="ord-body"><p style="margin:0 0 10px 0; font-size:14px; line-height:1.5;">${itemsUI}</p>${
+    }</span></div><div class="ord-body"><p style="margin:0 0 10px 0; font-size:14px; line-height:1.5;">${itemsUI}</p>${
       o.note
         ? `<div style="background:#fff1f2; color:#be123c; padding:8px; border-radius:8px; font-size:12px; margin-bottom:10px;">📝 ${o.note}</div>`
         : ""
@@ -573,7 +637,6 @@ function renderOrdersList() {
     .map((o) => renderItem(o, false))
     .join("");
 }
-
 window.updStat = async (oid, st) => {
   if (confirm("Update status pesanan?"))
     await updateDoc(doc(db, "orders", oid), { status: st });
@@ -588,12 +651,20 @@ window.verifyPin = async (oid, correctPin) => {
   }
 };
 window.deleteOrder = async (oid) => {
-  if (confirm("HAPUS PERMANEN? Data akan hilang dari customer juga.")) {
+  if (confirm("HAPUS PERMANEN?")) {
     await deleteDoc(doc(db, "orders", oid));
   }
 };
-
-// --- CHAT SYSTEM ---
+$("#statusToggle").addEventListener("change", async (e) => {
+  if (state.vendor.subscriptionExpiry < Date.now()) {
+    e.target.checked = false;
+    alert("Masa aktif habis.");
+    return;
+  }
+  await updateDoc(doc(db, "vendors", state.vendor.id), {
+    isLive: e.target.checked,
+  });
+});
 function loadChatList() {
   const q = query(
     collection(db, "chats"),
@@ -605,25 +676,24 @@ function loadChatList() {
     $("#chatList").innerHTML =
       list
         .map(
-          (c) => `
-      <div class="chat-entry" onclick="openChat('${c.id}', '${
-            c.userName
-          }')"><div style="width:40px; height:40px; background:#f1f5f9; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px;">👤</div><div style="flex:1; min-width:0;"><div style="display:flex; justify-content:space-between; margin-bottom:2px;"><b style="font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${
-            c.userName
-          }</b><span style="font-size:11px; color:#94a3b8;">${new Date(
-            c.lastUpdate || Date.now()
-          ).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}</span></div><div style="font-size:13px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${
-            c.lastMessage
-          }</div></div></div>`
+          (c) =>
+            `<div class="chat-entry" onclick="openChat('${c.id}', '${
+              c.userName
+            }')"><div style="width:40px; height:40px; background:#f1f5f9; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px;">👤</div><div style="flex:1; min-width:0;"><div style="display:flex; justify-content:space-between; margin-bottom:2px;"><b style="font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${
+              c.userName
+            }</b><span style="font-size:11px; color:#94a3b8;">${new Date(
+              c.lastUpdate || Date.now()
+            ).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}</span></div><div style="font-size:13px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${
+              c.lastMessage
+            }</div></div></div>`
         )
         .join("") ||
       '<div style="text-align:center; padding:40px; color:#94a3b8;"><div style="font-size:40px; margin-bottom:10px;">💬</div>Belum ada chat.</div>';
   });
 }
-
 window.openChat = (chatId, userName) => {
   state.activeChatId = chatId;
   $("#chatRoom").classList.add("active");
@@ -666,7 +736,6 @@ window.openChat = (chatId, userName) => {
     $("#msgBox").scrollTop = $("#msgBox").scrollHeight;
   });
 };
-
 window.closeChat = () => {
   state.activeChatId = null;
   $("#chatRoom").classList.remove("active");
@@ -689,8 +758,9 @@ window.handleImageUpload = async (input) => {
     try {
       const compressed = await compressImage(input.files[0], 500, 0.7);
       await sendMessage(compressed, "image");
+      showToast("Foto terkirim!");
     } catch (e) {
-      alert("Gagal kirim gambar: " + e.message);
+      alert("Gagal kirim: " + e.message);
     }
     input.value = "";
   }
@@ -780,8 +850,6 @@ $("#sendReplyBtn").addEventListener("click", () => {
     $("#replyInput").value = "";
   }
 });
-
-// --- NAVIGATION & UTILS ---
 window.goSeller = (screen) => {
   $$(".nav-item").forEach((n) => n.classList.remove("active"));
   $$(".sb-item").forEach((n) => n.classList.remove("active"));
@@ -925,16 +993,8 @@ function stopGPS() {
   if (state.watchId) navigator.geolocation.clearWatch(state.watchId);
   state.watchId = null;
 }
-$("#statusToggle").addEventListener("change", async (e) => {
-  await updateDoc(doc(db, "vendors", state.vendor.id), {
-    isLive: e.target.checked,
-  });
-});
-$("#payBtn").addEventListener("click", async () => {
-  if (confirm("Bayar 5rb?"))
-    await updateDoc(doc(db, "vendors", state.vendor.id), {
-      subscriptionExpiry: Date.now() + 2592000000,
-    });
-});
+$$("[data-close]").forEach((b) =>
+  b.addEventListener("click", window.closeModal)
+);
 
 initApp();

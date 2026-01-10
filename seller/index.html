@@ -6,8 +6,8 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"
     />
-    <title>PIKUL Mitra Dashboard</title>
-    <link rel="icon" type="image/jpeg" href="../pikul.jpeg" />
+    <title>PIKUL Mitra - Kelola Usahamu</title>
+    <link rel="icon" type="image/jpeg" href="../Mitra-Pikul.png" />
     <link rel="stylesheet" href="styles.css" />
     <link
       href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
@@ -25,6 +25,7 @@
     <style>
       :root {
         --primary: #ff7a00;
+        --primary-dark: #c2410c;
         --bg: #f8fafc;
         --border: #e2e8f0;
         --text: #1e293b;
@@ -39,226 +40,211 @@
         overflow: hidden;
         color: var(--text);
       }
-      .app-layout {
-        display: flex;
-        height: 100vh;
-      }
-      /* --- NAVIGATION SYSTEM (PREMIUM SELLER) --- */
 
-      /* 1. DESKTOP SIDEBAR (Professional Dashboard) */
-      .sidebar {
-        width: 280px;
-        background: #ffffff;
-        border-right: 1px solid var(--border);
-        display: none; /* Hidden on mobile */
-        flex-direction: column;
-        padding: 24px;
+      /* --- NEW AUTH LAYOUT --- */
+      .auth-page {
+        width: 100%;
         height: 100vh;
-        position: relative;
-        z-index: 50;
-      }
-
-      .sidebar-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 40px;
-        padding-left: 12px;
-      }
-      .sidebar-header .logo-box {
-        width: 40px;
-        height: 40px;
-        background: var(--primary);
-        color: white;
-        border-radius: 10px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-weight: 800;
-        font-size: 20px;
-        box-shadow: 0 4px 12px rgba(255, 122, 0, 0.3);
+        background: #fff;
       }
-      .sidebar-header h3 {
-        margin: 0;
+
+      .auth-split {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        overflow: hidden;
+      }
+
+      /* Left Side (Visual) */
+      .auth-visual {
+        flex: 1;
+        background: linear-gradient(135deg, #ff7a00, #ff9a3d);
+        position: relative;
+        display: none; /* Hidden on mobile */
+        flex-direction: column;
+        justify-content: center;
+        padding: 60px;
+        color: white;
+        overflow: hidden;
+      }
+      .auth-visual::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: url("https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1000&auto=format&fit=crop");
+        background-size: cover;
+        background-position: center;
+        opacity: 0.15;
+        mix-blend-mode: multiply;
+      }
+      .visual-content {
+        position: relative;
+        z-index: 2;
+        max-width: 480px;
+      }
+      .visual-content h1 {
+        font-size: 48px;
+        line-height: 1.1;
+        margin-bottom: 24px;
+        font-weight: 800;
+        letter-spacing: -1px;
+      }
+      .visual-content p {
         font-size: 18px;
+        line-height: 1.6;
+        opacity: 0.9;
+      }
+
+      /* Right Side (Form) */
+      .auth-form-side {
+        flex: 1;
+        max-width: 600px;
+        width: 100%;
+        background: white;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 40px;
+        overflow-y: auto;
+      }
+
+      .auth-card {
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+      }
+      .brand-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 32px;
+      }
+      .brand-logo {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+      }
+      .brand-text {
+        font-size: 24px;
+        font-weight: 800;
         color: var(--text);
         letter-spacing: -0.5px;
       }
 
-      .sidebar-nav {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
+      .auth-title {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 8px;
+        color: #0f172a;
       }
-
-      .sb-item {
-        display: flex;
-        align-items: center;
-        padding: 14px 16px;
-        border-radius: 12px;
-        background: transparent;
-        border: none;
+      .auth-subtitle {
         color: var(--text-muted);
-        font-weight: 600;
+        margin-bottom: 32px;
         font-size: 15px;
-        font-family: inherit;
-        cursor: pointer;
-        transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
-        text-align: left;
-        position: relative;
-        overflow: hidden;
       }
 
-      .sb-item .icon {
-        font-size: 20px;
-        margin-right: 16px;
-        width: 24px;
-        text-align: center;
-        transition: transform 0.2s;
+      /* Form Elements */
+      .form-group {
+        margin-bottom: 20px;
       }
-
-      /* Hover State Desktop */
-      .sb-item:hover {
-        background: #fff7ed;
-        color: var(--primary);
-        transform: translateX(4px);
-      }
-      .sb-item:hover .icon {
-        transform: scale(1.1);
-      }
-
-      /* Active State Desktop */
-      .sb-item.active {
-        background: var(--primary);
-        color: white;
-        box-shadow: 0 8px 20px rgba(255, 122, 0, 0.25);
-      }
-      .sb-item.active:hover {
-        background: var(--primary);
-        transform: none;
-        color: white;
-      }
-
-      .sb-logout {
-        margin-top: auto;
-        padding: 14px 16px;
-        border-radius: 12px;
-        background: #fef2f2;
-        color: #ef4444;
-        border: 1px solid #fee2e2;
+      .form-label {
+        display: block;
+        font-size: 13px;
         font-weight: 600;
+        color: #475569;
+        margin-bottom: 8px;
+      }
+      .form-input,
+      .form-select {
+        width: 100%;
+        padding: 14px 16px;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        font-size: 15px;
+        outline: none;
+        transition: 0.2s;
+        background: #f8fafc;
+        color: #334155;
+        box-sizing: border-box;
+      }
+      .form-input:focus,
+      .form-select:focus {
+        border-color: var(--primary);
+        background: white;
+        box-shadow: 0 0 0 4px rgba(255, 122, 0, 0.1);
+      }
+
+      .btn-auth {
+        width: 100%;
+        padding: 16px;
+        border: none;
+        border-radius: 12px;
+        background: var(--primary);
+        color: white;
+        font-size: 16px;
+        font-weight: 700;
         cursor: pointer;
         transition: 0.2s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
+        margin-top: 10px;
       }
-      .sb-logout:hover {
-        background: #fee2e2;
+      .btn-auth:hover {
+        background: var(--primary-dark);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(255, 122, 0, 0.25);
       }
-
-      /* 2. MOBILE BOTTOM NAV (Floating Island) */
-      .bottom-nav {
-        position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 90%;
-        max-width: 400px;
-        height: 70px;
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border-radius: 24px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.5);
-        display: flex;
-        justify-content: space-around;
-        align-items: center;
-        padding: 0 10px;
-        z-index: 1000;
+      .btn-auth:active {
+        transform: translateY(0);
       }
 
-      .nav-item {
-        background: transparent;
-        border: none;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        color: #94a3b8;
-        font-family: inherit;
-        font-size: 10px;
-        font-weight: 600;
-        cursor: pointer;
-        width: 50px;
-        height: 50px;
-        border-radius: 16px;
-        position: relative;
-        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      .auth-switch {
+        text-align: center;
+        margin-top: 24px;
+        font-size: 14px;
+        color: #64748b;
       }
-
-      .nav-icon {
-        font-size: 22px;
-        margin-bottom: 2px;
-        transition: transform 0.3s;
-        filter: grayscale(100%);
-        opacity: 0.7;
-      }
-
-      .nav-item span {
-        opacity: 0;
-        transform: translateY(10px);
-        transition: all 0.3s;
-        position: absolute;
-        bottom: 8px;
-      }
-
-      /* Active State Mobile */
-      .nav-item.active {
+      .auth-link {
         color: var(--primary);
-        background: rgba(255, 122, 0, 0.1);
-        transform: translateY(-5px);
-        box-shadow: 0 5px 15px rgba(255, 122, 0, 0.15);
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .auth-link:hover {
+        text-decoration: underline;
       }
 
-      .nav-item.active .nav-icon {
-        transform: translateY(-8px) scale(1.1);
-        filter: grayscale(0);
-        opacity: 1;
-      }
-
-      .nav-item.active span {
-        opacity: 1;
-        transform: translateY(14px); /* Text muncul di bawah icon */
-        font-size: 9px;
-      }
-
-      /* Active Dot Indicator */
-      .nav-item.active::after {
-        content: "";
+      .back-link {
         position: absolute;
-        bottom: 6px;
-        width: 4px;
-        height: 4px;
-        background: var(--primary);
-        border-radius: 50%;
+        top: 20px;
+        right: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .back-link:hover {
+        color: var(--primary);
       }
 
-      @media (min-width: 768px) {
-        .sidebar {
-          display: flex;
-        }
-        .bottom-nav {
-          display: none !important;
-        }
-        /* Adjust layout untuk sidebar desktop */
-        .main-wrapper {
-          height: 100vh;
-          overflow: hidden;
-        }
+      /* App Layout Styles (Existing) */
+      .app-layout {
+        display: flex;
+        height: 100vh;
+      }
+      .sidebar {
+        width: 260px;
+        background: white;
+        border-right: 1px solid var(--border);
+        display: none;
+        flex-direction: column;
       }
       .main-wrapper {
         flex: 1;
@@ -274,7 +260,7 @@
         position: relative;
       }
 
-      /* --- CHAT STYLES --- */
+      /* --- CHAT & OTHER STYLES (Keep Existing) --- */
       .chat-layout {
         display: flex;
         height: calc(100vh - 140px);
@@ -559,24 +545,11 @@
         cursor: pointer;
         overflow: hidden;
         margin: 0 auto 10px;
-        position: relative;
       }
       .shop-logo-upload img {
         width: 100%;
         height: 100%;
         object-fit: cover;
-      }
-      .shop-logo-upload:hover::after {
-        content: "Ubah";
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: rgba(0, 0, 0, 0.5);
-        color: white;
-        font-size: 10px;
-        text-align: center;
-        padding: 2px 0;
       }
 
       .payment-card {
@@ -624,7 +597,110 @@
         background: white;
       }
 
+      /* Modals */
+      .modal {
+        position: fixed;
+        inset: 0;
+        z-index: 2000;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+      }
+      .modal-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(2px);
+      }
+      .modal-sheet {
+        position: relative;
+        width: min(600px, 100%);
+        background: #fff;
+        border-radius: 24px 24px 0 0;
+        padding: 20px;
+        max-height: 90vh;
+        overflow-y: auto;
+        animation: slideUp 0.3s;
+        z-index: 2001;
+      }
+      @keyframes slideUp {
+        from {
+          transform: translateY(100%);
+        }
+        to {
+          transform: translateY(0);
+        }
+      }
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        align-items: center;
+      }
+      .icon-btn-close {
+        border: none;
+        background: transparent;
+        font-size: 20px;
+        cursor: pointer;
+      }
+      .btn {
+        border: none;
+        cursor: pointer;
+        border-radius: 12px;
+        padding: 12px;
+        font-weight: 700;
+        transition: 0.2s;
+        font-size: 14px;
+      }
+      .btn.primary {
+        background: var(--primary);
+        color: #fff;
+        box-shadow: 0 4px 10px rgba(255, 122, 0, 0.2);
+      }
+      .btn.small {
+        padding: 8px 14px;
+        font-size: 12px;
+        border-radius: 8px;
+      }
+      .btn.full {
+        width: 100%;
+      }
+      .hidden {
+        display: none !important;
+      }
+
+      .alert-card {
+        padding: 12px 16px;
+        border-radius: 12px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 12px;
+        font-size: 14px;
+      }
+      .alert-card.warn {
+        background: #fff7ed;
+        border: 1px solid #ffedd5;
+        color: #9a3412;
+      }
+      .alert-card.info {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #1e40af;
+      }
+      .alert-card.success {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #166534;
+      }
+      .alert-icon {
+        font-size: 18px;
+      }
+
       @media (min-width: 768px) {
+        .auth-visual {
+          display: flex;
+        }
         .sidebar {
           display: flex;
         }
@@ -633,6 +709,13 @@
         }
         .content {
           padding: 24px;
+        }
+        .modal {
+          align-items: center;
+        }
+        .modal-sheet {
+          border-radius: 24px;
+          max-width: 500px;
         }
         .chat-layout {
           height: calc(100vh - 120px);
@@ -652,114 +735,119 @@
         .btn-back {
           display: none;
         }
-        .chat-room:not(.active) .chat-room-header,
-        .chat-room:not(.active) .chat-messages,
-        .chat-room:not(.active) .chat-input-bar {
-          display: none;
-        }
-        .chat-room:not(.active)::after {
-          content: "Pilih percakapan untuk mulai chat";
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 100%;
-          color: var(--text-muted);
-          font-weight: 500;
-          background: #f8fafc;
-        }
       }
     </style>
   </head>
   <body>
-    <main id="auth" class="auth">
-      <div class="auth-container">
-        <div class="auth-header">
-          <div class="logo-box">M</div>
-          <h1>Mitra PIKUL</h1>
-          <p>Dashboard manajemen untuk penjual.</p>
-        </div>
-        <div class="auth-tabs">
-          <div class="auth-tab active" onclick="switchAuthMode('login')">
-            Masuk
-          </div>
-          <div class="auth-tab" onclick="switchAuthMode('register')">
-            Daftar Mitra
+    <main id="auth" class="auth-page">
+      <div class="auth-split">
+        <div class="auth-visual">
+          <div class="visual-content">
+            <h1>Jualan Lebih Laris dengan PIKUL</h1>
+            <p>
+              Gabung dengan ribuan mitra lainnya. Kelola pesanan, menu, dan
+              pelanggan dalam satu aplikasi.
+            </p>
           </div>
         </div>
-        <form id="loginForm" class="auth-form">
-          <div class="input-group">
-            <label>Email Toko</label
-            ><input
-              id="email"
-              type="email"
-              placeholder="contoh: bakso@pikul.id"
-              required
-            />
+
+        <div class="auth-form-side">
+          <a href="../index.html" class="back-link">← Buka Aplikasi Customer</a>
+
+          <div class="auth-card">
+            <div class="brand-header">
+              <img src="../Mitra-Pikul.png" class="brand-logo" />
+              <span class="brand-text">Mitra PIKUL</span>
+            </div>
+
+            <form id="loginForm">
+              <h2 class="auth-title">Selamat Datang 👋</h2>
+              <p class="auth-subtitle">Masuk untuk mengelola toko Anda.</p>
+
+              <div class="form-group">
+                <label class="form-label">Email Toko</label>
+                <input
+                  id="email"
+                  type="email"
+                  class="form-input"
+                  placeholder="contoh: bakso@pikul.id"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Password</label>
+                <input
+                  id="password"
+                  type="password"
+                  class="form-input"
+                  placeholder="••••••"
+                  required
+                />
+              </div>
+
+              <button class="btn-auth" type="submit">Masuk Dashboard</button>
+              <div class="auth-switch">
+                Belum jadi mitra?
+                <span class="auth-link" onclick="switchAuthMode('register')"
+                  >Daftar Sekarang</span
+                >
+              </div>
+            </form>
+
+            <form id="registerForm" class="hidden">
+              <h2 class="auth-title">Daftar Mitra 🚀</h2>
+              <p class="auth-subtitle">
+                Mulai usaha kuliner digitalmu sekarang.
+              </p>
+
+              <div class="form-group">
+                <label class="form-label">Nama Usaha</label>
+                <input
+                  id="regName"
+                  class="form-input"
+                  placeholder="Contoh: Bakso Pak Kumis"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Kategori</label>
+                <select id="regType" class="form-select">
+                  <option value="bakso">Bakso / Mie Ayam</option>
+                  <option value="kopi">Kopi / Minuman</option>
+                  <option value="nasi">Nasi / Lauk</option>
+                  <option value="cemilan">Cemilan</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email</label>
+                <input
+                  id="regEmail"
+                  type="email"
+                  class="form-input"
+                  placeholder="Email aktif"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Password</label>
+                <input
+                  id="regPass"
+                  type="password"
+                  class="form-input"
+                  placeholder="Buat password"
+                  required
+                />
+              </div>
+
+              <button class="btn-auth" type="submit">Daftar Sekarang</button>
+              <div class="auth-switch">
+                Sudah punya akun?
+                <span class="auth-link" onclick="switchAuthMode('login')"
+                  >Masuk disini</span
+                >
+              </div>
+            </form>
           </div>
-          <div class="input-group">
-            <label>Password</label
-            ><input
-              id="password"
-              type="password"
-              placeholder="••••••"
-              required
-            />
-          </div>
-          <button class="btn primary full" type="submit">
-            Masuk Dashboard
-          </button>
-        </form>
-        <form id="registerForm" class="auth-form hidden">
-          <div class="input-group">
-            <label>Nama Usaha</label
-            ><input
-              id="regName"
-              placeholder="Contoh: Bakso Pak Kumis"
-              required
-            />
-          </div>
-          <div class="input-group">
-            <label>Tipe Jualan</label
-            ><select
-              id="regType"
-              style="
-                width: 100%;
-                padding: 14px;
-                border: 1px solid var(--border);
-                border-radius: 12px;
-                background: white;
-              "
-            >
-              <option value="bakso">Bakso / Mie Ayam</option>
-              <option value="kopi">Kopi / Minuman</option>
-              <option value="nasi">Nasi / Lauk</option>
-              <option value="cemilan">Cemilan</option>
-            </select>
-          </div>
-          <div class="input-group">
-            <label>Email</label
-            ><input
-              id="regEmail"
-              type="email"
-              placeholder="Email aktif"
-              required
-            />
-          </div>
-          <div class="input-group">
-            <label>Password</label
-            ><input
-              id="regPass"
-              type="password"
-              placeholder="Buat password"
-              required
-            />
-          </div>
-          <button class="btn primary full" type="submit">
-            Daftar Sekarang
-          </button>
-        </form>
-        <div class="auth-footer">
-          <a href="../index.html" class="link-btn">📱 Buka Aplikasi Pembeli</a>
         </div>
       </div>
     </main>
@@ -775,15 +863,13 @@
             <span class="icon">🏠</span> Dashboard
           </button>
           <button class="sb-item" onclick="goSeller('Orders')">
-            <span class="icon">📦</span> Pesanan Masuk
+            <span class="icon">📦</span> Pesanan
           </button>
           <button class="sb-item" onclick="goSeller('Chat')">
             <span class="icon">💬</span> Chat Pelanggan
           </button>
         </nav>
-        <button onclick="logout()" class="sb-logout">
-          <span style="font-size: 18px">⎋</span> Keluar
-        </button>
+        <button onclick="logout()" class="sb-logout">⎋ Keluar</button>
       </aside>
       <div class="main-wrapper">
         <header class="topbar">
@@ -830,14 +916,12 @@
                 accept="image/*"
                 onchange="handleLogoUpload(this)"
               />
-
               <h2 id="vNameDisplay" style="margin: 0; font-size: 20px">
                 Nama Toko
               </h2>
               <p class="muted" style="margin: 5px 0 20px; font-size: 12px">
-                Klik foto di atas untuk ganti logo
+                Klik ikon kamera untuk ganti logo
               </p>
-
               <hr
                 style="border: none; border-top: 1px solid #eee; margin: 16px 0"
               />
@@ -989,6 +1073,69 @@
                   </div>
                   <button id="payBtn" class="btn small dark">Bayar</button>
                 </div>
+                <div
+                  id="subPending"
+                  class="alert-card info hidden"
+                  style="
+                    margin-top: 16px;
+                    background: #eff6ff;
+                    border-color: #bfdbfe;
+                  "
+                >
+                  <div class="alert-icon">⏳</div>
+                  <div class="alert-content">
+                    <b>Menunggu Verifikasi</b>
+                    <p>Pembayaran Anda sedang dicek Admin.</p>
+                  </div>
+                </div>
+
+                <div
+                  id="subActivation"
+                  class="alert-card info hidden"
+                  style="
+                    margin-top: 16px;
+                    background: #f0fdf4;
+                    border-color: #22c55e;
+                  "
+                >
+                  <div style="text-align: center; width: 100%">
+                    <div style="font-size: 24px; margin-bottom: 5px">🔐</div>
+                    <b style="color: #166534">Aktivasi Akun</b>
+                    <p style="font-size: 12px; margin: 5px 0">
+                      Masukkan kode 4 digit dari Admin:
+                    </p>
+                    <div
+                      style="
+                        display: flex;
+                        gap: 8px;
+                        justify-content: center;
+                        margin-top: 10px;
+                      "
+                    >
+                      <input
+                        id="activationCode"
+                        type="number"
+                        placeholder="0000"
+                        style="
+                          width: 100px;
+                          text-align: center;
+                          padding: 10px;
+                          font-weight: 800;
+                          border-radius: 8px;
+                          border: 1px solid #ccc;
+                        "
+                      />
+                      <button
+                        onclick="redeemCode()"
+                        class="btn primary"
+                        style="background: #166534"
+                      >
+                        OK
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <div
                   id="subActive"
                   class="alert-card success hidden"
@@ -1200,7 +1347,6 @@
               onchange="handleMenuImageUpload(this)"
             />
           </div>
-
           <div class="input-group">
             <label>Nama Makanan</label
             ><input
@@ -1217,6 +1363,135 @@
             Simpan Menu
           </button>
         </form>
+      </div>
+    </div>
+
+    <div id="payModal" class="modal hidden">
+      <div class="modal-overlay" onclick="closePayModal()"></div>
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <h3>Perpanjang Masa Aktif</h3>
+          <button class="icon-btn-close" onclick="closePayModal()">✕</button>
+        </div>
+        <div
+          class="card"
+          style="
+            margin-bottom: 16px;
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+          "
+        >
+          <div style="font-size: 14px; font-weight: bold; color: #0284c7">
+            Paket Premium 30 Hari
+          </div>
+          <div style="font-size: 18px; font-weight: 800; color: #0369a1">
+            Rp 5.000
+          </div>
+        </div>
+
+        <label style="font-weight: 600; font-size: 14px"
+          >Metode Pembayaran</label
+        >
+        <div style="display: flex; gap: 10px; margin-top: 10px">
+          <button
+            class="btn small"
+            style="
+              flex: 1;
+              border: 1px solid var(--primary);
+              color: var(--primary);
+              background: white;
+            "
+            onclick="selectPayMethod('cash')"
+          >
+            💵 Tunai
+          </button>
+          <button
+            class="btn small"
+            style="
+              flex: 1;
+              border: 1px solid var(--primary);
+              color: var(--primary);
+              background: white;
+            "
+            onclick="selectPayMethod('qris')"
+          >
+            📱 QRIS
+          </button>
+        </div>
+
+        <div
+          id="payCash"
+          class="hidden"
+          style="
+            margin-top: 15px;
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 12px;
+          "
+        >
+          <p style="margin: 0; font-size: 13px">
+            Silakan bayar <b>Rp 5.000</b> ke Admin secara tunai. Admin akan
+            memberi kode aktivasi setelah pembayaran diterima.
+          </p>
+          <button
+            class="btn primary full"
+            style="margin-top: 15px"
+            onclick="submitSubscription('cash')"
+          >
+            Ajukan Pembayaran Tunai
+          </button>
+        </div>
+
+        <div
+          id="payQris"
+          class="hidden"
+          style="
+            margin-top: 15px;
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 12px;
+          "
+        >
+          <div style="text-align: center">
+            <img
+              src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg"
+              style="width: 150px; mix-blend-mode: multiply"
+            />
+            <p style="font-size: 12px; margin-top: 5px">Scan QRIS Admin</p>
+          </div>
+          <label
+            style="
+              margin-top: 10px;
+              display: block;
+              font-size: 12px;
+              font-weight: 600;
+            "
+            >Bukti Transfer</label
+          >
+          <div
+            class="image-upload-box"
+            style="height: 100px; background: white"
+            onclick="triggerPayProofUpload()"
+          >
+            <span id="payProofText" style="font-size: 12px; color: #94a3b8"
+              >Upload Bukti</span
+            >
+          </div>
+          <input
+            type="file"
+            id="payProofInput"
+            accept="image/*"
+            class="hidden"
+            onchange="handlePayProof(this)"
+          />
+          <button
+            class="btn primary full"
+            style="margin-top: 15px"
+            onclick="submitSubscription('qris')"
+          >
+            Kirim Bukti & Ajukan
+          </button>
+        </div>
       </div>
     </div>
 

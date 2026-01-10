@@ -25,6 +25,7 @@
     <style>
       :root {
         --primary: #ff7a00;
+        --primary-dark: #c2410c;
         --bg: #f8fafc;
         --border: #e2e8f0;
         --text: #1e293b;
@@ -36,23 +37,202 @@
         font-family: "Plus Jakarta Sans", sans-serif;
         background: var(--bg);
         height: 100vh;
-        overflow: hidden;
+        overflow: hidden; /* Body tidak scroll, tapi elemen di dalamnya */
         color: var(--text);
       }
 
-      /* --- NAVIGATION SYSTEM --- */
+      /* --- AUTH PAGE --- */
+      .auth-page {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        background: white;
+        z-index: 2000;
+        position: relative;
+      }
+      .auth-visual {
+        flex: 1.2;
+        background: linear-gradient(135deg, #ff7a00, #ff9a3d);
+        position: relative;
+        display: none;
+        flex-direction: column;
+        justify-content: center;
+        padding: 60px;
+        color: white;
+        overflow: hidden;
+      }
+      .auth-visual::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: url("https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1000&auto=format&fit=crop");
+        background-size: cover;
+        background-position: center;
+        opacity: 0.2;
+        mix-blend-mode: multiply;
+      }
+      .visual-content {
+        position: relative;
+        z-index: 2;
+        max-width: 500px;
+      }
+      .visual-content h1 {
+        font-size: 52px;
+        font-weight: 800;
+        line-height: 1.1;
+        margin-bottom: 20px;
+        letter-spacing: -1px;
+      }
+      .visual-content p {
+        font-size: 18px;
+        line-height: 1.6;
+        opacity: 0.95;
+        font-weight: 500;
+      }
+      .auth-form-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 40px 20px;
+        background: white;
+      }
+      .auth-card {
+        width: 100%;
+        max-width: 420px;
+      }
+      .brand-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 40px;
+      }
+      .brand-logo {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        object-fit: cover;
+      }
+      .brand-text {
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--text);
+        letter-spacing: -0.5px;
+      }
+      .auth-title {
+        font-size: 32px;
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 8px;
+        letter-spacing: -0.5px;
+      }
+      .auth-subtitle {
+        color: var(--text-muted);
+        margin-bottom: 32px;
+        font-size: 16px;
+      }
+      .input-group {
+        margin-bottom: 20px;
+      }
+      .input-label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: #475569;
+        margin-bottom: 8px;
+      }
+      .input-field {
+        width: 100%;
+        padding: 16px;
+        border: 2px solid #e2e8f0;
+        border-radius: 14px;
+        font-size: 15px;
+        outline: none;
+        transition: 0.2s;
+        background: #f8fafc;
+        color: #334155;
+        box-sizing: border-box;
+        font-family: inherit;
+      }
+      .input-field:focus {
+        border-color: var(--primary);
+        background: white;
+        box-shadow: 0 0 0 4px rgba(255, 122, 0, 0.1);
+      }
+      .btn-auth {
+        width: 100%;
+        padding: 16px;
+        border: none;
+        border-radius: 14px;
+        background: var(--primary);
+        color: white;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: 0.2s;
+        margin-top: 10px;
+      }
+      .btn-auth:hover {
+        background: var(--primary-dark);
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(255, 122, 0, 0.2);
+      }
+      .switch-text {
+        text-align: center;
+        margin-top: 24px;
+        color: #64748b;
+        font-size: 14px;
+      }
+      .switch-link {
+        color: var(--primary);
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+        margin-left: 4px;
+      }
+      .seller-link {
+        position: absolute;
+        bottom: 30px;
+        color: #94a3b8;
+        font-size: 13px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: 0.2s;
+      }
+      .seller-link:hover {
+        color: var(--primary);
+      }
+
+      /* --- APP LAYOUT --- */
+      .app {
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Navigation (Floating Logic) */
       .bottomNav {
         position: fixed;
         z-index: 1000;
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
-        transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        transition: transform 0.3s ease-in-out; /* Animasi Hilang/Muncul */
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         border: 1px solid rgba(255, 255, 255, 0.5);
       }
 
-      /* MOBILE NAV (Floating Island) */
+      /* Class tambahan saat scroll ke bawah (JS akan menambahkan ini) */
+      .nav-hidden {
+        transform: translate(-50%, 150%) !important; /* Turun ke bawah layar */
+      }
+
+      /* MOBILE NAV */
       @media (max-width: 767px) {
         .bottomNav {
           bottom: 20px;
@@ -113,13 +293,42 @@
           transform: translateY(14px);
           font-size: 9px;
         }
-        .desktop-brand {
+        .desktop-brand,
+        .auth-visual {
           display: none;
+        }
+
+        /* Layout Mobile: Header Fixed di atas, Content Scroll di tengah */
+        #mainHeader {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 60px;
+          z-index: 900;
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(10px);
+          border-bottom: 1px solid var(--border);
+          transition: transform 0.3s;
+        }
+        /* Jika Nav hilang, Header juga bisa hilang (Opsional, di sini header tetap) */
+
+        .content {
+          margin-top: 60px; /* Space for Header */
+          height: calc(100vh - 60px); /* Sisa tinggi layar */
+          overflow-y: auto; /* Scrollable Area */
+          padding: 20px;
+          padding-bottom: 100px; /* Extra space bawah supaya konten paling bawah ga ketutupan nav */
+          box-sizing: border-box;
+          -webkit-overflow-scrolling: touch; /* Smooth scroll iOS */
         }
       }
 
-      /* DESKTOP NAV (Sidebar) */
+      /* DESKTOP NAV */
       @media (min-width: 768px) {
+        .auth-visual {
+          display: flex;
+        }
         .bottomNav {
           top: 0;
           left: 0;
@@ -133,7 +342,7 @@
           padding: 32px 20px;
           background: #ffffff;
           border-right: 1px solid var(--border);
-          box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02);
+          transform: none !important; /* Reset transform untuk desktop agar sidebar tidak hilang */
         }
         .desktop-brand {
           display: flex;
@@ -202,26 +411,33 @@
           background: var(--primary);
           border-radius: 0 4px 4px 0;
         }
+
         #app {
           padding-left: 260px;
           box-sizing: border-box;
         }
         .topbar {
+          position: absolute;
+          top: 0;
           left: 260px;
           width: calc(100% - 260px);
           padding: 16px 32px;
           background: rgba(255, 255, 255, 0.8);
           backdrop-filter: blur(12px);
+          z-index: 10;
         }
         .topbar .rowBetween > div:first-child {
           opacity: 0;
           pointer-events: none;
         }
+
         .content {
-          padding: 32px 40px;
+          padding: 80px 40px 40px; /* Top padding lebih besar untuk header */
           max-width: 1280px;
           margin: 0 auto;
           width: 100%;
+          height: 100vh;
+          overflow-y: auto;
         }
         #map-container {
           height: 600px !important;
@@ -230,7 +446,7 @@
         }
       }
 
-      /* --- MAP STYLES --- */
+      /* MAP, CHAT, & UTILS */
       #map-container {
         position: relative;
         height: 60vh;
@@ -342,8 +558,6 @@
         border-radius: 10px;
         font-weight: bold;
       }
-
-      /* --- CHAT STYLES --- */
       .chat-input-area {
         gap: 8px;
         padding: 10px;
@@ -459,8 +673,6 @@
         cursor: pointer;
         text-decoration: none;
       }
-
-      /* --- OTHER STYLES --- */
       .vendorCard.closed {
         opacity: 0.7;
         background: #f9fafb;
@@ -573,50 +785,6 @@
         border-top: 8px solid white;
         margin: -2px auto 0;
       }
-      .auth-tabs {
-        display: flex;
-        margin-bottom: 20px;
-        background: #e2e8f0;
-        padding: 4px;
-        border-radius: 12px;
-      }
-      .auth-tab {
-        flex: 1;
-        text-align: center;
-        padding: 10px;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        color: var(--text-muted);
-        transition: 0.2s;
-      }
-      .auth-tab.active {
-        background: white;
-        color: var(--text);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-      }
-
-      /* --- VENDOR CARD IMAGE --- */
-      .vendorCard .vIco img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        border-radius: 8px;
-      }
-
-      /* --- MENU LIST IMAGE --- */
-      .listItem img {
-        width: 50px;
-        height: 50px;
-        border-radius: 8px;
-        object-fit: cover;
-        margin-right: 12px;
-      }
-
-      /* --- MENU LAYOUT SYSTEM (Mobile List vs Desktop Grid) --- */
-
-      /* 1. Mobile (Default List View) */
       .menu-item-card {
         display: flex;
         align-items: center;
@@ -635,11 +803,11 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 24px; /* Fallback icon */
+        font-size: 24px;
       }
       .menu-info {
         flex: 1;
-        min-width: 0; /* Prevent text overflow */
+        min-width: 0;
       }
       .menu-info b {
         display: block;
@@ -649,18 +817,95 @@
       .menu-btn-container {
         margin-left: 10px;
       }
+      .vendorCard .vIco img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 8px;
+      }
 
-      /* 2. Desktop (Grid Card View) */
+      /* Modals */
+      .modal {
+        position: fixed;
+        inset: 0;
+        z-index: 2000;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+      }
+      .overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(2px);
+      }
+      .sheet {
+        position: relative;
+        width: min(600px, 100%);
+        background: #fff;
+        border-radius: 24px 24px 0 0;
+        padding: 20px;
+        max-height: 90vh;
+        overflow-y: auto;
+        animation: slideUp 0.3s;
+        z-index: 2001;
+      }
+      @keyframes slideUp {
+        from {
+          transform: translateY(100%);
+        }
+        to {
+          transform: translateY(0);
+        }
+      }
+      .hidden {
+        display: none !important;
+      }
+      .btn {
+        border: none;
+        cursor: pointer;
+        border-radius: 12px;
+        padding: 12px;
+        font-weight: 700;
+        transition: 0.2s;
+        font-size: 14px;
+      }
+      .btn.primary {
+        background: var(--primary);
+        color: #fff;
+        box-shadow: 0 4px 10px rgba(255, 122, 0, 0.2);
+      }
+      .btn.small {
+        padding: 8px 14px;
+        font-size: 12px;
+        border-radius: 8px;
+      }
+      .btn.ghost {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+      .iconBtn {
+        border: none;
+        background: transparent;
+        font-size: 20px;
+        cursor: pointer;
+      }
+
       @media (min-width: 768px) {
-        /* Container Menu jadi Grid */
+        .modal {
+          align-items: center;
+        }
+        .sheet {
+          border-radius: 24px;
+          max-width: 500px;
+        }
         #menuList {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
           gap: 20px;
           padding-top: 10px;
         }
-
-        /* Kartu Menu */
         .menu-item-card {
           flex-direction: column;
           align-items: flex-start;
@@ -669,25 +914,20 @@
           padding: 0;
           overflow: hidden;
           background: white;
-          height: 100%; /* Uniform height */
+          height: 100%;
           box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
         }
-
         .menu-item-card:hover {
           transform: translateY(-4px);
           box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
           border-color: var(--primary);
         }
-
-        /* Gambar Besar di Atas */
         .menu-img {
           width: 100%;
           height: 160px;
           margin: 0;
           border-radius: 0;
         }
-
-        /* Info di Tengah */
         .menu-info {
           padding: 16px;
           width: 100%;
@@ -697,14 +937,12 @@
           font-size: 16px;
           margin-bottom: 6px;
         }
-
-        /* Tombol Full Width di Bawah */
         .menu-btn-container {
           width: 100%;
           padding: 0 16px 16px;
           margin: 0;
           box-sizing: border-box;
-          margin-top: auto; /* Dorong ke bawah */
+          margin-top: auto;
         }
         .menu-btn-container button {
           width: 100%;
@@ -737,150 +975,120 @@
       </div>
     </div>
 
-    <main id="auth" class="auth hidden">
-      <div class="authCard" style="position: relative">
-        <button
-          class="iconBtn"
-          onclick="closeAuth()"
-          style="
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            border: none;
-            background: transparent;
-            font-size: 18px;
-          "
-        >
-          ✕
-        </button>
-        <div style="text-align: center; margin-bottom: 20px">
-          <img
-            src="pikul.jpeg"
-            class="brand-img"
-            style="width: 60px; height: 60px; border-radius: 16px"
-          />
-        </div>
-        <div class="auth-tabs">
-          <div class="auth-tab active" onclick="switchAuthMode('login')">
-            Masuk
-          </div>
-          <div class="auth-tab" onclick="switchAuthMode('register')">
-            Daftar
-          </div>
-        </div>
-
-        <form id="loginForm" class="auth-form">
-          <h3 style="margin: 0 0 8px">Selamat Datang</h3>
-          <p class="muted" style="margin-bottom: 20px; font-size: 13px">
-            Login untuk keamanan transaksi.
+    <main id="auth" class="auth-page hidden">
+      <div class="auth-visual">
+        <div class="visual-content">
+          <h1>Jajan Enak, <br />Gak Pake Ribet.</h1>
+          <p>
+            Temukan kuliner kaki lima terbaik di sekitarmu dengan mudah. Pesan,
+            bayar, dan nikmati!
           </p>
-          <input
-            id="loginEmail"
-            type="email"
-            placeholder="Email"
-            required
-            style="margin-bottom: 10px"
-          />
-          <input
-            id="loginPass"
-            type="password"
-            placeholder="Password"
-            required
-            style="margin-bottom: 20px"
-          />
-          <button class="btn primary" style="width: 100%" type="submit">
-            Masuk
-          </button>
-        </form>
+        </div>
+      </div>
 
-        <form id="registerForm" class="auth-form hidden">
-          <h3 style="margin: 0 0 8px">Buat Akun Baru</h3>
-          <p class="muted" style="margin-bottom: 20px; font-size: 13px">
-            Data asli untuk keamanan bersama.
-          </p>
-          <input
-            id="regName"
-            type="text"
-            placeholder="Nama Lengkap"
-            required
-            style="margin-bottom: 10px"
-          />
-          <input
-            id="regEmail"
-            type="email"
-            placeholder="Email"
-            required
-            style="margin-bottom: 10px"
-          />
-          <input
-            id="regPhone"
-            type="tel"
-            placeholder="Nomor WhatsApp (Wajib)"
-            required
-            style="margin-bottom: 10px"
-          />
-          <input
-            id="regPass"
-            type="password"
-            placeholder="Password"
-            required
-            style="margin-bottom: 20px"
-          />
-          <button class="btn primary" style="width: 100%" type="submit">
-            Daftar Sekarang
-          </button>
-        </form>
+      <div class="auth-form-container">
+        <div class="auth-card">
+          <div class="brand-header">
+            <img src="pikul.jpeg" class="brand-logo" />
+            <span class="brand-text">PIKUL</span>
+          </div>
 
-        <div
-          style="
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px dashed var(--border);
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-          "
-        >
-          <a
-            href="seller/index.html"
-            class="btn ghost"
-            style="
-              width: 100%;
-              display: block;
-              text-align: center;
-              text-decoration: none;
-              font-size: 13px;
-            "
-            >🏪 Masuk sebagai Penjual</a
+          <form id="loginForm">
+            <h2 class="auth-title">Masuk 👋</h2>
+            <p class="auth-subtitle">Lanjutkan petualangan kulinermu.</p>
+
+            <div class="input-group">
+              <label class="input-label">Email</label>
+              <input
+                id="loginEmail"
+                type="email"
+                class="input-field"
+                placeholder="nama@email.com"
+                required
+              />
+            </div>
+            <div class="input-group">
+              <label class="input-label">Password</label>
+              <input
+                id="loginPass"
+                type="password"
+                class="input-field"
+                placeholder="••••••"
+                required
+              />
+            </div>
+
+            <button class="btn-auth" type="submit">Masuk</button>
+            <div class="switch-text">
+              Pengguna baru?
+              <span class="switch-link" onclick="switchAuthMode('register')"
+                >Daftar Akun</span
+              >
+            </div>
+          </form>
+
+          <form id="registerForm" class="hidden">
+            <h2 class="auth-title">Daftar Akun 🚀</h2>
+            <p class="auth-subtitle">Gabung dan mulai jajan sekarang.</p>
+
+            <div class="input-group">
+              <label class="input-label">Nama Lengkap</label>
+              <input
+                id="regName"
+                type="text"
+                class="input-field"
+                placeholder="Jhon Doe"
+                required
+              />
+            </div>
+            <div class="input-group">
+              <label class="input-label">Email</label>
+              <input
+                id="regEmail"
+                type="email"
+                class="input-field"
+                placeholder="nama@email.com"
+                required
+              />
+            </div>
+            <div class="input-group">
+              <label class="input-label">No. WhatsApp</label>
+              <input
+                id="regPhone"
+                type="tel"
+                class="input-field"
+                placeholder="0812..."
+                required
+              />
+            </div>
+            <div class="input-group">
+              <label class="input-label">Password</label>
+              <input
+                id="regPass"
+                type="password"
+                class="input-field"
+                placeholder="Buat password"
+                required
+              />
+            </div>
+
+            <button class="btn-auth" type="submit">Daftar</button>
+            <div class="switch-text">
+              Sudah punya akun?
+              <span class="switch-link" onclick="switchAuthMode('login')"
+                >Masuk disini</span
+              >
+            </div>
+          </form>
+
+          <a href="seller/index.html" class="seller-link"
+            >Ingin berjualan di PIKUL?</a
           >
         </div>
       </div>
     </main>
 
     <div id="app" class="app hidden">
-      <nav class="bottomNav">
-        <div class="desktop-brand">
-          <img src="pikul.jpeg" class="brand-img" />
-          <div>PIKUL</div>
-        </div>
-
-        <button class="nav active" data-go="Home">
-          <span>🏠</span><span>Home</span>
-        </button>
-        <button class="nav" data-go="Map">
-          <span>🗺️</span><span>Peta</span>
-        </button>
-        <button class="nav" data-go="Orders">
-          <span>🧾</span><span>Order</span>
-        </button>
-        <button class="nav" data-go="Messages">
-          <span>💬</span><span>Chat</span>
-        </button>
-        <button class="nav" data-go="Profile">
-          <span>👤</span><span>Akun</span>
-        </button>
-      </nav>
-
       <header id="mainHeader" class="topbar">
         <div class="rowBetween">
           <div style="display: flex; align-items: center; gap: 8px">
@@ -895,7 +1103,8 @@
         <div class="rowBetween">
           <span id="gpsStatus" class="pill warn" style="font-size: 10px"
             >GPS Off</span
-          ><button
+          >
+          <button
             id="logoutBtn"
             class="iconBtn"
             style="width: 32px; height: 32px"
@@ -1031,8 +1240,7 @@
                 <div>
                   <b id="chatWith" style="display: block; font-size: 14px"
                     >Pilih Pedagang</b
-                  >
-                  <span class="muted" style="font-size: 11px; display: block"
+                  ><span class="muted" style="font-size: 11px; display: block"
                     >Status: Online</span
                   >
                 </div>
@@ -1040,7 +1248,6 @@
               <button id="pickChatBtn" class="btn small ghost">Ganti</button>
             </div>
             <div id="chatBox"></div>
-
             <div id="attachMenu" class="attach-menu">
               <div class="attach-item" onclick="triggerImage()">
                 <div class="attach-icon" style="background: #3b82f6">📷</div>
@@ -1055,7 +1262,6 @@
                 <span style="font-size: 10px">Stiker</span>
               </div>
             </div>
-
             <div class="chat-input-area">
               <button class="btn-attach" onclick="toggleAttachMenu()">+</button>
               <input
@@ -1084,7 +1290,6 @@
                 ➤
               </button>
             </div>
-
             <div id="stickerSheet" class="sticker-sheet">
               <div class="rowBetween" style="margin-bottom: 10px">
                 <b>Pilih Stiker</b
@@ -1143,6 +1348,29 @@
           </button>
         </section>
       </main>
+
+      <nav class="bottomNav">
+        <div class="desktop-brand">
+          <img src="pikul.jpeg" class="brand-img" />
+          <div>PIKUL</div>
+        </div>
+        <button class="nav active" data-go="Home">
+          <span>🏠</span><span>Home</span>
+        </button>
+        <button class="nav" data-go="Map">
+          <span>🗺️</span><span>Peta</span>
+        </button>
+        <button class="nav" data-go="Orders">
+          <span>🧾</span><span>Order</span>
+        </button>
+        <button class="nav" data-go="Messages">
+          <span>💬</span><span>Chat</span>
+        </button>
+        <button class="nav" data-go="Profile">
+          <span>👤</span><span>Akun</span>
+        </button>
+      </nav>
+
       <button id="fabCart" class="fab-cart hidden" onclick="openGlobalCart()">
         🛒
         <div id="cartBadge" class="cart-badge">0</div>
@@ -1220,9 +1448,8 @@
             <option value="cash">💵 Tunai</option>
           </select>
           <div id="qrisContainer" class="qris-display hidden">
-            <small>Scan untuk membayar</small>
-            <img id="qrisImageDisplay" src="" alt="QRIS" />
-            <label
+            <small>Scan untuk membayar</small
+            ><img id="qrisImageDisplay" src="" alt="QRIS" /><label
               style="
                 display: block;
                 text-align: left;

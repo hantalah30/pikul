@@ -55,7 +55,7 @@ let state = {
   tempPaymentProof: null,
 };
 
-// --- HELPER: IMAGE COMPRESSOR (SOLUSI GAMBAR BESAR) ---
+// --- HELPER: IMAGE COMPRESSOR ---
 function compressImage(file, maxWidth = 600, quality = 0.6) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -67,25 +67,19 @@ function compressImage(file, maxWidth = 600, quality = 0.6) {
         const canvas = document.createElement("canvas");
         let width = img.width;
         let height = img.height;
-
-        // Resize logic
         if (width > maxWidth) {
           height = Math.round((height *= maxWidth / width));
           width = maxWidth;
         }
-
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, width, height);
-
-        // Return base64 yang lebih kecil (JPEG quality 0.6)
         resolve(canvas.toDataURL("image/jpeg", quality));
       };
     };
   });
 }
-
 function generatePin() {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
@@ -96,20 +90,14 @@ function getDistanceVal(v) {
   );
 }
 
-// --- AUTH LOGIC ---
+// --- AUTH LOGIC (UPDATED) ---
 window.switchAuthMode = (mode) => {
-  const tabs = $$(".auth-tab");
-  const forms = $$(".auth-form");
   if (mode === "login") {
-    tabs[0].classList.add("active");
-    tabs[1].classList.remove("active");
-    forms[0].classList.remove("hidden");
-    forms[1].classList.add("hidden");
+    $("#loginForm").classList.remove("hidden");
+    $("#registerForm").classList.add("hidden");
   } else {
-    tabs[1].classList.add("active");
-    tabs[0].classList.remove("active");
-    forms[1].classList.remove("hidden");
-    forms[0].classList.add("hidden");
+    $("#loginForm").classList.add("hidden");
+    $("#registerForm").classList.remove("hidden");
   }
 };
 window.requireLogin = () => {
@@ -210,10 +198,32 @@ async function initAuth() {
   bootApp();
 }
 
-// --- BOOT ---
+// --- BOOT & AUTO HIDE NAV ---
+function initAutoHideNav() {
+  let lastScroll = 0;
+  const content = document.querySelector(".content"); // Scroll container
+  const nav = document.querySelector(".bottomNav");
+
+  if (content) {
+    content.addEventListener("scroll", () => {
+      const currentScroll = content.scrollTop;
+      if (currentScroll > lastScroll && currentScroll > 50) {
+        // Scroll Down -> Hide
+        nav.classList.add("nav-hidden");
+      } else {
+        // Scroll Up -> Show
+        nav.classList.remove("nav-hidden");
+      }
+      lastScroll = currentScroll;
+    });
+  }
+}
+
 async function bootApp() {
   $("#userName").textContent = state.user ? state.user.name : "Tamu";
   initTheme();
+  initAutoHideNav(); // Initialize here
+
   onSnapshot(collection(db, "vendors"), (s) => {
     state.vendors = s.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderMapChips();
@@ -325,27 +335,23 @@ function renderVendors() {
           ? `<span class="chip closed">🔴 Tutup</span>`
           : `<span class="chip">📍 ${distText(v)}</span>`;
         const cardClass = isClosed ? "vendorCard closed" : "vendorCard";
-
-        // Render Logo
         const logoDisplay = v.logo ? `<img src="${v.logo}" />` : v.ico;
-
-        return `<div class="${cardClass}" onclick="openVendor('${v.id}')">
-        <div class="vIco">${logoDisplay}</div>
-        <div class="vMeta">
-          <b>${v.name}</b>
-          <div class="muted">⭐ ${v.rating ? v.rating.toFixed(1) : "New"} • ${
+        return `<div class="${cardClass}" onclick="openVendor('${
+          v.id
+        }')"><div class="vIco">${logoDisplay}</div><div class="vMeta"><b>${
+          v.name
+        }</b><div class="muted">⭐ ${
+          v.rating ? v.rating.toFixed(1) : "New"
+        } • ${
           v.busy
-        }</div>
-          <div class="chips"><span class="chip">${v.type.toUpperCase()}</span>${statusBadge}</div>
-        </div>
-        <b style="color:var(--primary)">Lihat</b>
-      </div>`;
+        }</div><div class="chips"><span class="chip">${v.type.toUpperCase()}</span>${statusBadge}</div></div><b style="color:var(--primary)">Lihat</b></div>`;
       })
       .join("") || `<div class="card muted">Tidak ada pedagang aktif.</div>`;
 }
 $("#search").addEventListener("input", renderVendors);
 
-// --- MAP ENGINE ---
+// --- MAP & CHAT & MENU (SAMA SEPERTI SEBELUMNYA) ---
+// (Saya persingkat agar muat, fungsinya tidak berubah)
 function initMap() {
   if (state.map) return;
   if (!$("#map")) return;
@@ -413,7 +419,6 @@ function updateMapMarkers(fitBounds = false) {
   );
   if (state.you.ok)
     filtered.sort((a, b) => getDistanceVal(a) - getDistanceVal(b));
-
   if (filtered.length > 0 && state.you.ok) {
     const nearest = filtered[0];
     if (state.lastNearestId !== nearest.id && !state.activeMapVendorId) {
@@ -424,7 +429,6 @@ function updateMapMarkers(fitBounds = false) {
       );
     }
   }
-
   $("#realtimeList").innerHTML = filtered
     .map((v, idx) => {
       const isClosed = !v.isLive;
@@ -446,7 +450,6 @@ function updateMapMarkers(fitBounds = false) {
       )})</div></div><div class="pill small">${statusText}</div></div></div>`;
     })
     .join("");
-
   const bounds = L.latLngBounds();
   if (state.you.ok) bounds.extend([state.you.lat, state.you.lon]);
   Object.keys(state.markers).forEach((id) => {
@@ -565,8 +568,6 @@ window.trackOrder = (vid) => {
   renderMapChips();
   window.go("Map");
 };
-
-// --- CHAT SYSTEM ---
 window.toggleAttachMenu = () => {
   $("#attachMenu").classList.toggle("visible");
 };
@@ -769,8 +770,6 @@ window.selectChat = (id) => {
   closeModal("pickChatModal");
   renderChat();
 };
-
-// --- MENU & CART ---
 const MENU_DEFAULTS = {
   bakso: [{ id: "m1", name: "Bakso Urat", price: 15000 }],
   kopi: [{ id: "k1", name: "Kopi Susu", price: 12000 }],
@@ -862,10 +861,9 @@ window.triggerProofUpload = () => {
 };
 window.handleProofUpload = async (input) => {
   if (input.files && input.files[0]) {
-    // Efek Loading
     $("#proofText").textContent = "⏳ Mengompres...";
     try {
-      const compressed = await compressImage(input.files[0], 600, 0.6); // Kompres!
+      const compressed = await compressImage(input.files[0], 600, 0.6);
       state.tempPaymentProof = compressed;
       $("#proofText").textContent = "✅ Bukti Siap (Klik Ganti)";
       $(".proof-upload").style.borderColor = "#22c55e";
@@ -924,16 +922,12 @@ function renderCartModal() {
     }
   };
 }
-
-// --- SECURE ORDER (WAJIB WA & PIN) ---
 $("#placeOrderBtn").addEventListener("click", async () => {
   if (!state.user) return requireLogin();
   const btn = $("#placeOrderBtn");
   btn.disabled = true;
   btn.textContent = "Memproses...";
-
   try {
-    // 1. Wajib Punya Nomor WA
     let phone = state.user.phone;
     if (!phone || phone.length < 9) {
       phone = prompt(
@@ -945,11 +939,9 @@ $("#placeOrderBtn").addEventListener("click", async () => {
         btn.textContent = "Pesan & Verifikasi";
         return;
       }
-      // Update user profile permanently
       await updateDoc(doc(db, "users", state.user.id), { phone: phone });
       state.user.phone = phone;
     }
-
     const total = state.cart.reduce((a, b) => a + b.price * b.qty, 0);
     const vName = state.cart[0].vendorName;
     const vId = state.cart[0].vendorId;
@@ -960,7 +952,6 @@ $("#placeOrderBtn").addEventListener("click", async () => {
       btn.textContent = "Pesan & Verifikasi";
       return;
     }
-
     const securePin = generatePin();
     await addDoc(collection(db, "orders"), {
       userId: state.user.id,
@@ -990,7 +981,6 @@ $("#placeOrderBtn").addEventListener("click", async () => {
   btn.disabled = false;
   btn.textContent = "Pesan & Verifikasi";
 });
-
 window.updateCartQty = (idx, change) => {
   const item = state.cart[idx];
   item.qty += change;
@@ -1073,7 +1063,6 @@ function renderOrders() {
         statusIcon = "❌";
         statusDesc = o.status;
       }
-
       return `<div class="order-card"><div class="oc-header"><div><b style="font-size:15px">${
         o.vendorName
       }</b><div class="muted" style="font-size:11px">${new Date(

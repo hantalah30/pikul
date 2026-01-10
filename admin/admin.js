@@ -9,6 +9,7 @@ import {
   orderBy,
   query,
   deleteDoc,
+  getDoc,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { firebaseConfig } from "../firebase-config.js";
 
@@ -24,11 +25,12 @@ function rupiah(n) {
 let state = {
   orders: [],
   vendors: [],
-  replies: [],
   banners: [],
+  subscriptions: [],
+  vendorStats: {},
   selectedOrderId: null,
   selectedVendorId: null,
-  firstLoad: true,
+  selectedSubId: null, // Untuk Edit Subscription
 };
 
 // --- AUTH ---
@@ -55,9 +57,12 @@ $$(".sbItem").forEach((b) =>
     $$(".tab").forEach((t) => t.classList.add("hidden"));
     $("#tab" + b.dataset.tab).classList.remove("hidden");
     const title = $("#pageTitle");
-    if (title) title.textContent = b.dataset.tab;
+    if (title) title.textContent = b.querySelector(".label").textContent;
   })
 );
+window.goToRevenue = () => {
+  $$(".sbItem")[1].click();
+};
 
 // --- BOOT ---
 function boot() {
@@ -65,48 +70,281 @@ function boot() {
     query(collection(db, "orders"), orderBy("createdAt", "desc")),
     (snap) => {
       state.orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      calculateStats();
       renderDashboard();
       renderOrdersTable();
+      renderVendors();
     }
   );
   onSnapshot(collection(db, "vendors"), (snap) => {
     state.vendors = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderVendors();
-    renderVendorDropdown(); // Update dropdown di modal banner
+    renderVendorDropdown();
+    renderDashboard();
   });
-  onSnapshot(collection(db, "auto_replies"), (snap) => {
-    state.replies = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    renderReplies();
-  });
-  // Listen Banners
+  onSnapshot(
+    query(collection(db, "subscriptions"), orderBy("timestamp", "desc")),
+    (snap) => {
+      state.subscriptions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      renderDashboard();
+      renderRevenueTable();
+    }
+  );
   onSnapshot(collection(db, "banners"), (snap) => {
     state.banners = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderBanners();
   });
 }
 
-// --- DASHBOARD & ORDERS ---
+function calculateStats() {
+  state.vendorStats = {};
+  state.orders.forEach((o) => {
+    const vid = o.vendorId;
+    if (!state.vendorStats[vid])
+      state.vendorStats[vid] = { totalOrders: 0, revenue: 0 };
+    state.vendorStats[vid].totalOrders += 1;
+    if (o.status === "Selesai") state.vendorStats[vid].revenue += o.total || 0;
+  });
+}
+
+// --- DASHBOARD ---
 function renderDashboard() {
+  const gtv = state.orders
+    .filter((o) => o.status === "Selesai")
+    .reduce((a, b) => a + (b.total || 0), 0);
+  $("#kpiGTV").textContent = rupiah(gtv);
   $("#kpiOrders").textContent = state.orders.length;
-  $("#kpiRevenue").textContent = rupiah(
-    state.orders.reduce((a, b) => a + (b.total || 0), 0)
-  );
+  $("#kpiVendors").textContent = state.vendors.length;
+  const adminRev = state.subscriptions
+    .filter(
+      (s) =>
+        s.status === "redeemed" ||
+        (s.status === "approved" && s.method === "qris")
+    )
+    .reduce((a, b) => a + (b.amount || 0), 0);
+  $("#kpiAdminRevenue").textContent = rupiah(adminRev);
+  $("#revTotalDisplay").textContent = rupiah(adminRev);
+
+  $("#latestSubs").innerHTML =
+    state.subscriptions
+      .slice(0, 4)
+      .map(
+        (s) => `
+    <div class="trx-item">
+        <div>
+            <div style="font-weight:600; font-size:13px;">${s.vendorName}</div>
+            <div class="muted" style="font-size:11px;">${new Date(
+              s.timestamp
+            ).toLocaleDateString()} • ${
+          s.method === "qris" ? "QRIS" : "Tunai"
+        }</div>
+        </div>
+        <div class="trx-amount" style="background:${
+          s.status === "pending" ? "#fef3c7" : "#dcfce7"
+        }; color:${s.status === "pending" ? "#b45309" : "#166534"}">${
+          s.status === "pending" ? "⏳ Wait" : "+" + rupiah(s.amount)
+        }</div>
+    </div>
+  `
+      )
+      .join("") ||
+    '<div class="muted" style="text-align:center; padding:10px;">Belum ada pemasukan.</div>';
+
   $("#latestOrders").innerHTML = state.orders
     .slice(0, 5)
     .map(
-      (o) =>
-        `<div class="item"><div><div style="font-weight:700">${
-          o.vendorName
-        }</div><div class="muted" style="font-size:12px">${new Date(
-          o.createdAt
-        ).toLocaleTimeString()} • ${
-          o.userName
-        }</div></div><div style="text-align:right"><div style="font-weight:700; color:var(--orange)">${rupiah(
-          o.total
-        )}</div><small class="pill">${o.status}</small></div></div>`
+      (o) => `
+    <div class="item"><div><div style="font-weight:700">${
+      o.vendorName
+    }</div><div class="muted" style="font-size:12px">${new Date(
+        o.createdAt
+      ).toLocaleTimeString()} • ${
+        o.userName
+      }</div></div><div style="text-align:right"><div style="font-weight:700; color:var(--orange)">${rupiah(
+        o.total
+      )}</div><small class="pill">${o.status}</small></div></div>
+  `
     )
     .join("");
 }
+
+// --- REVENUE TABLE (WITH EDIT & DELETE) ---
+function renderRevenueTable() {
+  const container = $("#revenueTable");
+  if (state.subscriptions.length === 0) {
+    container.innerHTML = `<div style="padding:40px; text-align:center; color:#999; border:1px dashed #ccc; border-radius:12px;">Belum ada data pembayaran masuk.</div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <table>
+        <thead><tr><th>Waktu</th><th>Vendor</th><th>Metode</th><th>Bukti</th><th>Status</th><th>Aksi</th></tr></thead>
+        <tbody>
+            ${state.subscriptions
+              .map((s) => {
+                let proofHtml =
+                  s.method === "qris" && s.proof
+                    ? `<a href="${s.proof}" target="_blank" style="color:blue; text-decoration:underline;">Lihat Foto</a>`
+                    : "-";
+
+                let statusBadge = "";
+                if (s.status === "pending")
+                  statusBadge = `<span class="pill" style="background:#fef3c7; color:#b45309">⏳ Pending</span>`;
+                else if (s.status === "approved")
+                  statusBadge = `<span class="pill" style="background:#bae6fd; color:#0369a1">🔑 Menunggu Input</span>`;
+                else if (
+                  s.status === "redeemed" ||
+                  (s.status === "approved" && s.method === "qris")
+                )
+                  statusBadge = `<span class="pill" style="background:#dcfce7; color:#166534">✅ Selesai</span>`;
+                else
+                  statusBadge = `<span class="pill" style="background:#fee2e2; color:#991b1b">❌ Ditolak</span>`;
+
+                let mainAction = "";
+                if (s.status === "pending") {
+                  if (s.method === "qris")
+                    mainAction = `<button class="btn small primary" onclick="openVerification('${s.id}', 'qris')">🔍 Cek</button>`;
+                  else
+                    mainAction = `<button class="btn small primary" onclick="openVerification('${s.id}', 'cash')">💵 Terima</button>`;
+                } else if (s.status === "approved" && s.method === "cash") {
+                  mainAction = `<span style="font-size:11px; font-weight:bold; color:#0369a1;">Kode: ${s.activationCode}</span>`;
+                } else {
+                  mainAction = `<span class="muted" style="font-size:12px;">-</span>`;
+                }
+
+                // Action Buttons Row (Edit & Delete)
+                const buttons = `
+                    <div class="action-row">
+                        ${mainAction}
+                        <button class="btn small ghost" title="Edit" onclick="openEditSub('${s.id}')">✏️</button>
+                        <button class="btn small" title="Hapus" style="color:red; border-color:#fee2e2; background:#fff1f2;" onclick="deleteSub('${s.id}')">🗑</button>
+                    </div>
+                `;
+
+                return `
+                <tr>
+                    <td>${new Date(s.timestamp).toLocaleString()}</td>
+                    <td><b>${s.vendorName}</b></td>
+                    <td>${s.method ? s.method.toUpperCase() : "TUNAI"}</td>
+                    <td>${proofHtml}</td>
+                    <td>${statusBadge}</td>
+                    <td>${buttons}</td>
+                </tr>`;
+              })
+              .join("")}
+        </tbody>
+    </table>`;
+}
+
+// --- VERIFICATION LOGIC ---
+window.openVerification = (subId, type) => {
+  const sub = state.subscriptions.find((s) => s.id === subId);
+  if (!sub) return;
+  const content = $("#verifContent");
+  const title = $("#verifTitle");
+  $("#verificationModal").classList.remove("hidden");
+
+  if (type === "qris") {
+    title.textContent = "Validasi QRIS";
+    content.innerHTML = `
+            <div style="text-align:center;">
+                <p>Mitra: <b>${sub.vendorName}</b></p>
+                <img src="${sub.proof}" class="proof-img-large" style="display:block; margin:10px auto; max-width:100%; border-radius:8px; border:1px solid #ddd;" />
+                <p class="muted">Pastikan dana Rp 5.000 sudah masuk.</p>
+                <div style="display:flex; gap:10px; margin-top:15px;">
+                    <button class="btn full" style="background:#fee2e2; color:#ef4444;" onclick="rejectSub('${sub.id}')">Tolak</button>
+                    <button class="btn primary full" onclick="approveSub('${sub.id}', '${sub.vendorId}', 'qris')">Valid (Aktifkan)</button>
+                </div>
+            </div>`;
+  } else {
+    title.textContent = "Terima Pembayaran Tunai";
+    content.innerHTML = `
+            <div style="text-align:center; padding:20px 0;">
+                <div style="font-size:40px; margin-bottom:10px;">💵</div>
+                <h3>Rp 5.000</h3>
+                <p>Apakah Anda sudah menerima uang dari <b>${sub.vendorName}</b>?</p>
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button class="btn full" style="background:#f1f5f9; color:#64748b;" onclick="$('#verificationModal').classList.add('hidden')">Batal</button>
+                    <button class="btn primary full" onclick="approveSub('${sub.id}', '${sub.vendorId}', 'cash')">Ya, Terima Uang</button>
+                </div>
+            </div>`;
+  }
+};
+
+window.approveSub = async (subId, vendorId, type) => {
+  const now = Date.now();
+  const activationCode = Math.floor(1000 + Math.random() * 9000);
+
+  if (type === "cash") {
+    await updateDoc(doc(db, "subscriptions", subId), {
+      status: "approved",
+      activationCode: activationCode,
+    });
+    $("#verifContent").innerHTML = `
+            <div style="text-align:center;">
+                <div style="font-size:40px; margin-bottom:10px;">✅</div>
+                <h3>Uang Diterima!</h3>
+                <p>Berikan kode ini ke Seller:</p>
+                <div class="activation-code-box">${activationCode}</div>
+                <p class="muted" style="font-size:12px;">Akun seller BELUM AKTIF sampai kode ini dimasukkan.</p>
+                <button class="btn primary full" onclick="$('#verificationModal').classList.add('hidden')">Tutup</button>
+            </div>`;
+  } else {
+    if (!confirm("Yakin bukti ini valid?")) return;
+    await updateDoc(doc(db, "subscriptions", subId), {
+      status: "approved",
+      activationCode: activationCode,
+    });
+    await updateDoc(doc(db, "vendors", vendorId), {
+      subscriptionExpiry: now + 30 * 24 * 60 * 60 * 1000,
+      isLive: true,
+    });
+    $("#verificationModal").classList.add("hidden");
+    showToast("Bukti valid. Vendor telah diaktifkan!", "success");
+  }
+};
+
+window.rejectSub = async (subId) => {
+  if (!confirm("Tolak pembayaran ini?")) return;
+  await updateDoc(doc(db, "subscriptions", subId), { status: "rejected" });
+  $("#verificationModal").classList.add("hidden");
+  showToast("Pembayaran ditolak.", "error");
+};
+
+// --- EDIT & DELETE SUBSCRIPTION LOGIC (NEW) ---
+window.deleteSub = async (id) => {
+  if (confirm("Yakin hapus data transaksi ini selamanya?")) {
+    await deleteDoc(doc(db, "subscriptions", id));
+    showToast("Data transaksi dihapus.", "success");
+  }
+};
+
+window.openEditSub = (id) => {
+  state.selectedSubId = id;
+  const sub = state.subscriptions.find((s) => s.id === id);
+  if (!sub) return;
+
+  $("#esName").value = sub.vendorName;
+  $("#esMethod").value = (sub.method || "cash").toUpperCase();
+  $("#esStatus").value = sub.status; // Set current status
+  $("#editSubModal").classList.remove("hidden");
+};
+
+$("#editSubForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!state.selectedSubId) return;
+
+  const newStatus = $("#esStatus").value;
+
+  await updateDoc(doc(db, "subscriptions", state.selectedSubId), {
+    status: newStatus,
+  });
+
+  $("#editSubModal").classList.add("hidden");
+  showToast("Data transaksi diperbarui!", "success");
+});
+
+// ... (ORDERS, VENDORS, BANNERS SAMA SEPERTI SEBELUMNYA) ...
 function renderOrdersTable() {
   $(
     "#ordersTable"
@@ -156,22 +394,34 @@ $("#saveStatusBtn").addEventListener("click", async () => {
 window.deleteOrd = async (id) => {
   if (confirm("Hapus?")) await deleteDoc(doc(db, "orders", id));
 };
-
-// --- VENDORS ---
 function renderVendors() {
   $("#vendorAdminList").innerHTML = state.vendors
-    .map(
-      (v) =>
-        `<div class="item"><div><div style="font-weight:700">${
-          v.name
-        }</div><div class="muted" style="font-size:12px">${v.type.toUpperCase()} • Rating ${
-          v.rating || 0
-        }</div></div><div style="display:flex; gap:6px;"><button class="btn small ghost" onclick="openEditVendor('${
-          v.id
-        }')">Edit</button><button class="btn small" style="color:red; border:1px solid #fee" onclick="deleteVendor('${
-          v.id
-        }')">Hapus</button></div></div>`
-    )
+    .map((v) => {
+      const stats = state.vendorStats[v.id] || { totalOrders: 0, revenue: 0 };
+      return `
+        <div class="item" style="display:flex; flex-direction:column; align-items:stretch; gap:10px;">
+            <div class="rowBetween">
+                <div><div style="font-weight:700; font-size:16px;">${
+                  v.name
+                }</div><div class="muted" style="font-size:12px">${v.type.toUpperCase()} • Rating ${
+        v.rating || 0
+      }</div></div>
+                <div style="display:flex; gap:6px;"><button class="btn small ghost" onclick="openEditVendor('${
+                  v.id
+                }')">Edit</button><button class="btn small" style="color:red; border:1px solid #fee" onclick="deleteVendor('${
+        v.id
+      }')">Hapus</button></div>
+            </div>
+            <div style="display:flex; gap:10px; background:#f8fafc; padding:8px; border-radius:8px;">
+                <div style="flex:1; text-align:center; border-right:1px solid #e2e8f0;"><div style="font-size:10px; color:#64748b; font-weight:600;">ORDER</div><div style="font-weight:800; font-size:16px;">${
+                  stats.totalOrders
+                }</div></div>
+                <div style="flex:1; text-align:center;"><div style="font-size:10px; color:#64748b; font-weight:600;">OMZET</div><div style="font-weight:800; font-size:16px; color:#10b981;">${rupiah(
+                  stats.revenue
+                )}</div></div>
+            </div>
+        </div>`;
+    })
     .join("");
 }
 $("#addVendorBtn").addEventListener("click", async () => {
@@ -209,8 +459,6 @@ $("#editVendorForm").addEventListener("submit", async (e) => {
 window.deleteVendor = async (id) => {
   if (confirm("Yakin hapus vendor?")) await deleteDoc(doc(db, "vendors", id));
 };
-
-// --- BANNERS (BARU) ---
 function renderVendorDropdown() {
   $("#bnVendor").innerHTML =
     `<option value="">-- Info Umum (Tanpa Link) --</option>` +
@@ -218,52 +466,38 @@ function renderVendorDropdown() {
       .map((v) => `<option value="${v.id}">${v.name}</option>`)
       .join("");
 }
-
 function renderBanners() {
   $("#bannerList").innerHTML = state.banners
     .map(
-      (b) => `
-    <div style="border-radius:16px; overflow:hidden; border:1px solid #eee; position:relative; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
-      <div style="background:${
-        b.c
-      }; padding:16px; color:white; height:120px; display:flex; flex-direction:column; justify-content:center;">
-        <span style="font-size:10px; background:rgba(0,0,0,0.2); width:fit-content; padding:2px 8px; border-radius:10px; margin-bottom:4px;">
-          ${b.vName || "Info Umum"}
-        </span>
-        <h3 style="margin:0; font-size:18px;">${b.t}</h3>
-        <p style="margin:4px 0 0; font-size:12px; opacity:0.9">${b.d}</p>
-      </div>
-      <button onclick="deleteBanner('${
-        b.id
-      }')" style="position:absolute; top:10px; right:10px; background:white; color:red; border:none; width:28px; height:28px; border-radius:50%; cursor:pointer; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.2);">✕</button>
-    </div>
-  `
+      (b) =>
+        `<div style="border-radius:16px; overflow:hidden; border:1px solid #eee; position:relative; box-shadow:0 4px 12px rgba(0,0,0,0.05);"><div style="background:${
+          b.c
+        }; padding:16px; color:white; height:120px; display:flex; flex-direction:column; justify-content:center;"><span style="font-size:10px; background:rgba(0,0,0,0.2); width:fit-content; padding:2px 8px; border-radius:10px; margin-bottom:4px;">${
+          b.vName || "Info Umum"
+        }</span><h3 style="margin:0; font-size:18px;">${
+          b.t
+        }</h3><p style="margin:4px 0 0; font-size:12px; opacity:0.9">${
+          b.d
+        }</p></div><button onclick="deleteBanner('${
+          b.id
+        }')" style="position:absolute; top:10px; right:10px; background:white; color:red; border:none; width:28px; height:28px; border-radius:50%; cursor:pointer; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.2);">✕</button></div>`
     )
     .join("");
 }
-
-// 3. Open Modal
 $("#addBannerBtn").addEventListener("click", () => {
   renderVendorDropdown();
   $("#bannerModal").classList.remove("hidden");
-  // Reset Preview ke default
   $("#bnTitle").value = "";
   $("#bnDesc").value = "";
   $("#bnVendor").value = "";
-  updatePreviewText();
+  window.updatePreviewText();
 });
-
-// --- INTERACTIVE PREVIEW LOGIC ---
-
-// Update Teks Preview saat mengetik
 window.updatePreviewText = () => {
   const t = $("#bnTitle").value || "Judul Promo";
   const d = $("#bnDesc").value || "Keterangan singkat...";
   const vId = $("#bnVendor").value;
-
   $("#prevTitle").textContent = t;
   $("#prevDesc").textContent = d;
-
   if (vId) {
     const v = state.vendors.find((x) => x.id === vId);
     $("#prevVendor").textContent = "Promosi: " + (v ? v.name : "Vendor");
@@ -271,8 +505,6 @@ window.updatePreviewText = () => {
     $("#prevVendor").textContent = "Info Promo";
   }
 };
-
-// Switch Tab (Template vs Custom)
 window.switchColorTab = (mode) => {
   const tabs = $$(".tab-btn");
   if (mode === "template") {
@@ -285,70 +517,40 @@ window.switchColorTab = (mode) => {
     tabs[0].classList.remove("active");
     $("#tabColorTemplate").classList.add("hidden");
     $("#tabColorCustom").classList.remove("hidden");
-    // Apply current custom colors
-    updateCustomGradient();
+    window.updateCustomGradient();
   }
 };
-
-// Handle Preset Click
 window.selectPreset = (el) => {
   const bg = el.style.background;
   $("#bannerPreview").style.background = bg;
-  $("#finalColor").value = bg; // Simpan ke hidden input
-
-  // Visual feedback border
+  $("#finalColor").value = bg;
   $$(".preset-item").forEach((i) => (i.style.border = "2px solid transparent"));
   el.style.border = "2px solid #333";
 };
-
-// Handle Custom Color Input
 window.updateCustomGradient = () => {
   const c1 = $("#color1").value;
   const c2 = $("#color2").value;
   const grad = `linear-gradient(135deg, ${c1}, ${c2})`;
-
   $("#bannerPreview").style.background = grad;
   $("#finalColor").value = grad;
 };
-
-// 4. Submit Form
 $("#bannerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const vid = $("#bnVendor").value;
   const v = state.vendors.find((x) => x.id === vid);
-
   await addDoc(collection(db, "banners"), {
     t: $("#bnTitle").value,
     d: $("#bnDesc").value,
-    c: $("#finalColor").value, // Ambil dari hidden input yg diupdate preview
+    c: $("#finalColor").value,
     vid: vid || null,
     vName: v ? v.name : null,
     createdAt: Date.now(),
   });
-
   $("#bannerModal").classList.add("hidden");
   showToast("Banner aktif!", "success");
 });
-
 window.deleteBanner = async (id) => {
   if (confirm("Hapus iklan ini?")) await deleteDoc(doc(db, "banners", id));
-};
-
-// --- REPLIES & UTILS ---
-function renderReplies() {
-  $("#replyList").innerHTML = state.replies
-    .map(
-      (r) =>
-        `<div class="item"><div style="flex:1">"${r.text}"</div><button class="btn small" onclick="deleteReply('${r.id}')" style="color:red; border-color:#fee">Hapus</button></div>`
-    )
-    .join("");
-}
-$("#addReplyBtn").addEventListener("click", async () => {
-  const t = prompt("Kata-kata:");
-  if (t) await addDoc(collection(db, "auto_replies"), { text: t });
-});
-window.deleteReply = async (id) => {
-  if (confirm("Hapus?")) await deleteDoc(doc(db, "auto_replies", id));
 };
 function showToast(msg, type = "info") {
   let c = $(".toast-container");
