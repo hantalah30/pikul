@@ -31,17 +31,20 @@
         --text: #1e293b;
         --text-muted: #64748b;
         --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --chat-bg: #e5ddd5;
+        --bubble-me: #d9fdd3;
+        --bubble-them: #ffffff;
       }
       body {
         margin: 0;
         font-family: "Plus Jakarta Sans", sans-serif;
         background: var(--bg);
         height: 100vh;
-        overflow: hidden; /* Body tidak scroll, tapi elemen di dalamnya */
+        overflow: hidden;
         color: var(--text);
       }
 
-      /* --- AUTH PAGE --- */
+      /* --- AUTH PAGE STYLES --- */
       .auth-page {
         width: 100%;
         height: 100vh;
@@ -181,6 +184,9 @@
         transform: translateY(-2px);
         box-shadow: 0 10px 20px rgba(255, 122, 0, 0.2);
       }
+      .btn-auth:active {
+        transform: translateY(0);
+      }
       .switch-text {
         text-align: center;
         margin-top: 24px;
@@ -214,22 +220,18 @@
         display: flex;
         flex-direction: column;
       }
-
-      /* Navigation (Floating Logic) */
       .bottomNav {
         position: fixed;
         z-index: 1000;
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
-        transition: transform 0.3s ease-in-out; /* Animasi Hilang/Muncul */
+        transition: transform 0.3s ease-in-out;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         border: 1px solid rgba(255, 255, 255, 0.5);
       }
-
-      /* Class tambahan saat scroll ke bawah (JS akan menambahkan ini) */
       .nav-hidden {
-        transform: translate(-50%, 150%) !important; /* Turun ke bawah layar */
+        transform: translate(-50%, 150%) !important;
       }
 
       /* MOBILE NAV */
@@ -297,8 +299,6 @@
         .auth-visual {
           display: none;
         }
-
-        /* Layout Mobile: Header Fixed di atas, Content Scroll di tengah */
         #mainHeader {
           position: fixed;
           top: 0;
@@ -311,16 +311,14 @@
           border-bottom: 1px solid var(--border);
           transition: transform 0.3s;
         }
-        /* Jika Nav hilang, Header juga bisa hilang (Opsional, di sini header tetap) */
-
         .content {
-          margin-top: 60px; /* Space for Header */
-          height: calc(100vh - 60px); /* Sisa tinggi layar */
-          overflow-y: auto; /* Scrollable Area */
+          margin-top: 60px;
+          height: calc(100vh - 60px);
+          overflow-y: auto;
           padding: 20px;
-          padding-bottom: 100px; /* Extra space bawah supaya konten paling bawah ga ketutupan nav */
+          padding-bottom: 100px;
           box-sizing: border-box;
-          -webkit-overflow-scrolling: touch; /* Smooth scroll iOS */
+          -webkit-overflow-scrolling: touch;
         }
       }
 
@@ -342,7 +340,7 @@
           padding: 32px 20px;
           background: #ffffff;
           border-right: 1px solid var(--border);
-          transform: none !important; /* Reset transform untuk desktop agar sidebar tidak hilang */
+          transform: none !important;
         }
         .desktop-brand {
           display: flex;
@@ -411,7 +409,6 @@
           background: var(--primary);
           border-radius: 0 4px 4px 0;
         }
-
         #app {
           padding-left: 260px;
           box-sizing: border-box;
@@ -430,9 +427,8 @@
           opacity: 0;
           pointer-events: none;
         }
-
         .content {
-          padding: 80px 40px 40px; /* Top padding lebih besar untuk header */
+          padding: 80px 40px 40px;
           max-width: 1280px;
           margin: 0 auto;
           width: 100%;
@@ -446,7 +442,7 @@
         }
       }
 
-      /* MAP, CHAT, & UTILS */
+      /* MAP, UTILS */
       #map-container {
         position: relative;
         height: 60vh;
@@ -558,39 +554,201 @@
         border-radius: 10px;
         font-weight: bold;
       }
-      .chat-input-area {
-        gap: 8px;
-        padding: 10px;
-        background: white;
-        border-top: 1px solid var(--border);
+
+      /* --- ENHANCED CHAT STYLES --- */
+      .chat-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        background: #e5ddd5;
+        position: relative;
       }
-      .btn-attach {
+      .chat-bg-pattern {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        opacity: 0.06;
+        background-image: url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png");
+        pointer-events: none;
+        z-index: 0;
+      }
+      .chat-header {
+        background: #ffffff;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #e2e8f0;
+        z-index: 2;
+        height: 60px;
+        box-sizing: border-box;
+      }
+      #chatBox {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 1;
+        scroll-behavior: smooth;
+      }
+
+      /* Bubble Styles */
+      .chat-date-separator {
+        align-self: center;
+        background: rgba(225, 232, 237, 0.8);
+        color: #555;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 11px;
+        margin: 10px 0;
+        font-weight: 600;
+        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+      }
+
+      .bubble {
+        max-width: 75%;
+        padding: 8px 12px;
+        border-radius: 12px;
+        font-size: 14px;
+        line-height: 1.4;
+        position: relative;
+        box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+        word-wrap: break-word;
+      }
+      .bubble.me {
+        align-self: flex-end;
+        background: #d9fdd3;
+        border-top-right-radius: 0;
+        margin-right: 4px;
+      }
+      .bubble.them {
+        align-self: flex-start;
+        background: #ffffff;
+        border-top-left-radius: 0;
+        margin-left: 4px;
+      }
+
+      .bubble-content {
+        display: flex;
+        flex-direction: column;
+      }
+      .bubble-meta {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 4px;
+        margin-top: 2px;
+        margin-left: 8px;
+        float: right;
+      }
+      .bubble-time {
+        font-size: 10px;
+        color: rgba(0, 0, 0, 0.45);
+      }
+      .bubble-status {
+        font-size: 14px;
+        color: #53bdeb;
+      } /* Blue tick */
+
+      /* Media in Chat */
+      .bubble.image {
+        padding: 4px;
+        background: white;
+      }
+      .bubble.image img {
+        border-radius: 8px;
+        width: 100%;
+        max-width: 240px;
+        display: block;
+      }
+      .bubble.sticker {
+        background: transparent !important;
+        box-shadow: none;
+        font-size: 60px;
+        padding: 0;
+        align-self: center;
+      }
+      .bubble.location {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        padding: 10px;
+      }
+
+      /* Input Area */
+      .chat-input-area {
+        background: #f0f2f5;
+        padding: 8px 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        z-index: 2;
+        position: relative;
+        border-top: 1px solid #e2e8f0;
+      }
+      #chatInput {
+        flex: 1;
+        border: none;
+        padding: 10px 16px;
+        border-radius: 20px;
+        font-size: 15px;
+        outline: none;
+        background: white;
+        height: 40px;
+        box-sizing: border-box;
+      }
+      .btn-attach,
+      #sendChatBtn {
         width: 40px;
         height: 40px;
         border-radius: 50%;
         border: none;
-        background: #f1f5f9;
-        color: #64748b;
-        font-size: 20px;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
+        transition: 0.2s;
       }
+      .btn-attach {
+        background: transparent;
+        color: #54656f;
+        font-size: 24px;
+      }
+      .btn-attach:hover {
+        background: rgba(0, 0, 0, 0.05);
+      }
+      #sendChatBtn {
+        background: #00a884;
+        color: white;
+        font-size: 18px;
+        padding-left: 4px;
+      }
+      #sendChatBtn:hover {
+        background: #008f6f;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      }
+
+      /* Attach Menu & Stickers */
       .attach-menu {
         position: absolute;
         bottom: 70px;
         left: 10px;
         background: white;
         border-radius: 16px;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-        padding: 10px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        padding: 16px;
         display: flex;
-        gap: 10px;
+        gap: 20px;
         z-index: 100;
         transform: scale(0);
         transform-origin: bottom left;
-        transition: 0.2s;
+        transition: 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       }
       .attach-menu.visible {
         transform: scale(1);
@@ -599,38 +757,38 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 4px;
-        padding: 8px;
+        gap: 6px;
         cursor: pointer;
-        border-radius: 8px;
-        min-width: 60px;
-      }
-      .attach-item:active {
-        background: #f8fafc;
       }
       .attach-icon {
-        width: 40px;
-        height: 40px;
+        width: 50px;
+        height: 50px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 20px;
+        font-size: 24px;
         color: white;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        transition: transform 0.1s;
       }
+      .attach-item:active .attach-icon {
+        transform: scale(0.95);
+      }
+
       .sticker-sheet {
         position: absolute;
         bottom: 0;
         left: 0;
         right: 0;
         background: white;
-        border-radius: 20px 20px 0 0;
+        border-radius: 16px 16px 0 0;
         padding: 16px;
         box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.1);
         z-index: 200;
         transform: translateY(100%);
-        transition: 0.3s;
-        height: 300px;
+        transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        height: 280px;
         display: flex;
         flex-direction: column;
       }
@@ -640,39 +798,21 @@
       .sticker-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 10px;
+        gap: 12px;
         overflow-y: auto;
         padding-top: 10px;
       }
       .sticker-item {
-        font-size: 40px;
+        font-size: 42px;
         text-align: center;
         cursor: pointer;
-        transition: 0.2s;
+        transition: 0.1s;
       }
-      .bubble.image {
-        padding: 4px;
-        background: white !important;
-        border: 1px solid #eee;
+      .sticker-item:active {
+        transform: scale(1.2);
       }
-      .bubble.image img {
-        width: 100%;
-        max-width: 200px;
-        border-radius: 8px;
-        display: block;
-      }
-      .bubble.sticker {
-        background: transparent !important;
-        font-size: 50px;
-        padding: 0;
-      }
-      .bubble.location {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-        text-decoration: none;
-      }
+
+      /* Other Styles */
       .vendorCard.closed {
         opacity: 0.7;
         background: #f9fafb;
@@ -891,7 +1031,6 @@
         font-size: 20px;
         cursor: pointer;
       }
-
       @media (min-width: 768px) {
         .modal {
           align-items: center;
@@ -978,28 +1117,26 @@
     <main id="auth" class="auth-page hidden">
       <div class="auth-visual">
         <div class="visual-content">
-          <h1>Jajan Enak, <br />Gak Pake Ribet.</h1>
+          <h1>Jajan Enak,<br />Gak Pake Ribet.</h1>
           <p>
             Temukan kuliner kaki lima terbaik di sekitarmu dengan mudah. Pesan,
             bayar, dan nikmati!
           </p>
         </div>
       </div>
-
       <div class="auth-form-container">
         <div class="auth-card">
           <div class="brand-header">
-            <img src="pikul.jpeg" class="brand-logo" />
-            <span class="brand-text">PIKUL</span>
+            <img src="pikul.jpeg" class="brand-logo" /><span class="brand-text"
+              >PIKUL</span
+            >
           </div>
-
           <form id="loginForm">
             <h2 class="auth-title">Masuk 👋</h2>
             <p class="auth-subtitle">Lanjutkan petualangan kulinermu.</p>
-
             <div class="input-group">
-              <label class="input-label">Email</label>
-              <input
+              <label class="input-label">Email</label
+              ><input
                 id="loginEmail"
                 type="email"
                 class="input-field"
@@ -1008,8 +1145,8 @@
               />
             </div>
             <div class="input-group">
-              <label class="input-label">Password</label>
-              <input
+              <label class="input-label">Password</label
+              ><input
                 id="loginPass"
                 type="password"
                 class="input-field"
@@ -1017,7 +1154,6 @@
                 required
               />
             </div>
-
             <button class="btn-auth" type="submit">Masuk</button>
             <div class="switch-text">
               Pengguna baru?
@@ -1026,14 +1162,12 @@
               >
             </div>
           </form>
-
           <form id="registerForm" class="hidden">
             <h2 class="auth-title">Daftar Akun 🚀</h2>
             <p class="auth-subtitle">Gabung dan mulai jajan sekarang.</p>
-
             <div class="input-group">
-              <label class="input-label">Nama Lengkap</label>
-              <input
+              <label class="input-label">Nama Lengkap</label
+              ><input
                 id="regName"
                 type="text"
                 class="input-field"
@@ -1042,8 +1176,8 @@
               />
             </div>
             <div class="input-group">
-              <label class="input-label">Email</label>
-              <input
+              <label class="input-label">Email</label
+              ><input
                 id="regEmail"
                 type="email"
                 class="input-field"
@@ -1052,8 +1186,8 @@
               />
             </div>
             <div class="input-group">
-              <label class="input-label">No. WhatsApp</label>
-              <input
+              <label class="input-label">No. WhatsApp</label
+              ><input
                 id="regPhone"
                 type="tel"
                 class="input-field"
@@ -1062,8 +1196,8 @@
               />
             </div>
             <div class="input-group">
-              <label class="input-label">Password</label>
-              <input
+              <label class="input-label">Password</label
+              ><input
                 id="regPass"
                 type="password"
                 class="input-field"
@@ -1071,7 +1205,6 @@
                 required
               />
             </div>
-
             <button class="btn-auth" type="submit">Daftar</button>
             <div class="switch-text">
               Sudah punya akun?
@@ -1080,7 +1213,6 @@
               >
             </div>
           </form>
-
           <a href="seller/index.html" class="seller-link"
             >Ingin berjualan di PIKUL?</a
           >
@@ -1103,8 +1235,7 @@
         <div class="rowBetween">
           <span id="gpsStatus" class="pill warn" style="font-size: 10px"
             >GPS Off</span
-          >
-          <button
+          ><button
             id="logoutBtn"
             class="iconBtn"
             style="width: 32px; height: 32px"
@@ -1113,7 +1244,6 @@
           </button>
         </div>
       </header>
-
       <main class="content">
         <section id="screenHome">
           <div style="margin-bottom: 20px">
@@ -1152,7 +1282,6 @@
           </div>
           <div id="vendorList"></div>
         </section>
-
         <section id="screenMap" class="hidden">
           <div id="map-container">
             <div class="map-controls" id="mapChipsContainer"></div>
@@ -1165,8 +1294,7 @@
                   id="mvcName"
                   style="display: block; font-size: 15px; margin-bottom: 2px"
                   >-</b
-                >
-                <span
+                ><span
                   id="mvcDist"
                   class="muted"
                   style="font-size: 12px; display: block; margin-bottom: 4px"
@@ -1194,7 +1322,6 @@
             "
           ></div>
         </section>
-
         <section id="screenOrders" class="hidden">
           <h2 style="margin: 0 0 16px">Pesanan Saya</h2>
           <div class="segment-control">
@@ -1202,9 +1329,8 @@
               class="segment-btn active"
               onclick="switchOrderTab('active')"
             >
-              Dalam Proses
-            </button>
-            <button class="segment-btn" onclick="switchOrderTab('history')">
+              Dalam Proses</button
+            ><button class="segment-btn" onclick="switchOrderTab('history')">
               Riwayat
             </button>
           </div>
@@ -1217,7 +1343,6 @@
             "
           ></div>
         </section>
-
         <section id="screenMessages" class="hidden">
           <div class="chat-container">
             <div class="chat-bg-pattern"></div>
@@ -1263,29 +1388,9 @@
               </div>
             </div>
             <div class="chat-input-area">
-              <button class="btn-attach" onclick="toggleAttachMenu()">+</button>
-              <input
-                id="chatInput"
-                placeholder="Tulis pesan..."
-                style="
-                  margin: 0;
-                  flex: 1;
-                  border: 1px solid #e2e8f0;
-                  border-radius: 20px;
-                  padding: 0 16px;
-                  height: 40px;
-                "
-              />
-              <button
+              <button class="btn-attach" onclick="toggleAttachMenu()">+</button
+              ><input id="chatInput" placeholder="Tulis pesan..." /><button
                 id="sendChatBtn"
-                class="btn primary small"
-                style="
-                  width: 40px;
-                  height: 40px;
-                  border-radius: 50%;
-                  font-size: 16px;
-                  padding: 0;
-                "
               >
                 ➤
               </button>
@@ -1319,7 +1424,6 @@
             />
           </div>
         </section>
-
         <section id="screenProfile" class="hidden">
           <h2 style="margin: 0 0 16px">Akun Saya</h2>
           <div id="profileContent"></div>
@@ -1348,7 +1452,6 @@
           </button>
         </section>
       </main>
-
       <nav class="bottomNav">
         <div class="desktop-brand">
           <img src="pikul.jpeg" class="brand-img" />
@@ -1370,7 +1473,6 @@
           <span>👤</span><span>Akun</span>
         </button>
       </nav>
-
       <button id="fabCart" class="fab-cart hidden" onclick="openGlobalCart()">
         🛒
         <div id="cartBadge" class="cart-badge">0</div>
@@ -1400,7 +1502,6 @@
         <div id="menuList"></div>
       </div>
     </div>
-
     <div id="checkoutModal" class="modal hidden">
       <div class="overlay" data-close="checkoutModal"></div>
       <div class="sheet">
@@ -1426,8 +1527,7 @@
             id="orderNote"
             placeholder="Catatan..."
             style="margin-top: 10px"
-          />
-          <label
+          /><label
             style="
               display: block;
               margin-top: 10px;
@@ -1435,8 +1535,7 @@
               font-weight: 600;
             "
             >Metode Pembayaran</label
-          >
-          <select
+          ><select
             id="payMethod"
             style="
               margin-top: 5px;
@@ -1480,7 +1579,6 @@
         </button>
       </div>
     </div>
-
     <div id="pickChatModal" class="modal hidden">
       <div class="overlay" data-close="pickChatModal"></div>
       <div class="sheet">

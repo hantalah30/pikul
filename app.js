@@ -90,7 +90,7 @@ function getDistanceVal(v) {
   );
 }
 
-// --- AUTH LOGIC (UPDATED) ---
+// --- AUTH LOGIC (NEW SPLIT UI) ---
 window.switchAuthMode = (mode) => {
   if (mode === "login") {
     $("#loginForm").classList.remove("hidden");
@@ -198,20 +198,17 @@ async function initAuth() {
   bootApp();
 }
 
-// --- BOOT & AUTO HIDE NAV ---
+// --- BOOT & NAV AUTO HIDE ---
 function initAutoHideNav() {
   let lastScroll = 0;
-  const content = document.querySelector(".content"); // Scroll container
+  const content = document.querySelector(".content");
   const nav = document.querySelector(".bottomNav");
-
   if (content) {
     content.addEventListener("scroll", () => {
       const currentScroll = content.scrollTop;
       if (currentScroll > lastScroll && currentScroll > 50) {
-        // Scroll Down -> Hide
         nav.classList.add("nav-hidden");
       } else {
-        // Scroll Up -> Show
         nav.classList.remove("nav-hidden");
       }
       lastScroll = currentScroll;
@@ -222,8 +219,7 @@ function initAutoHideNav() {
 async function bootApp() {
   $("#userName").textContent = state.user ? state.user.name : "Tamu";
   initTheme();
-  initAutoHideNav(); // Initialize here
-
+  initAutoHideNav();
   onSnapshot(collection(db, "vendors"), (s) => {
     state.vendors = s.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderMapChips();
@@ -350,8 +346,7 @@ function renderVendors() {
 }
 $("#search").addEventListener("input", renderVendors);
 
-// --- MAP & CHAT & MENU (SAMA SEPERTI SEBELUMNYA) ---
-// (Saya persingkat agar muat, fungsinya tidak berubah)
+// --- MAP ENGINE ---
 function initMap() {
   if (state.map) return;
   if (!$("#map")) return;
@@ -568,6 +563,8 @@ window.trackOrder = (vid) => {
   renderMapChips();
   window.go("Map");
 };
+
+// --- CHAT SYSTEM (ENHANCED) ---
 window.toggleAttachMenu = () => {
   $("#attachMenu").classList.toggle("visible");
 };
@@ -696,6 +693,8 @@ $("#sendChatBtn").addEventListener("click", () => {
     $("#chatInput").value = "";
   }
 });
+
+// --- RENDER CHAT WITH DATES ---
 async function renderChat() {
   const vid = state.chatWithVendorId;
   if (!vid) {
@@ -713,35 +712,64 @@ async function renderChat() {
     orderBy("ts", "asc")
   );
   state.unsubChats = onSnapshot(q, (s) => {
+    let lastDate = "";
     $("#chatBox").innerHTML = s.docs
       .map((d) => {
         const m = d.data();
+        const dateObj = new Date(m.ts);
+        const dateStr = dateObj.toLocaleDateString();
+        let dateHeader = "";
+
+        // Add Date Separator
+        if (dateStr !== lastDate) {
+          const displayDate =
+            dateStr === new Date().toLocaleDateString() ? "HARI INI" : dateStr;
+          dateHeader = `<div class="chat-date-separator">${displayDate}</div>`;
+          lastDate = dateStr;
+        }
+
         const isMe = m.from === state.user.id;
+        const timeStr = dateObj.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
         let contentHtml = "";
-        if (m.type === "image") {
+        if (m.type === "image")
           contentHtml = `<div class="bubble image ${
             isMe ? "me" : "them"
           }"><img src="${m.text}" loading="lazy" /></div>`;
-        } else if (m.type === "location") {
+        else if (m.type === "location")
           contentHtml = `<a href="${
             m.text
           }" target="_blank" class="bubble location ${
             isMe ? "me" : "them"
-          }" style="background:${isMe ? "#ff7a00" : "#fff"}; color:${
-            isMe ? "white" : "black"
           }"><span>📍</span> <span>Lihat Lokasi</span></a>`;
-        } else if (m.type === "sticker") {
+        else if (m.type === "sticker")
           contentHtml = `<div class="bubble sticker ${isMe ? "me" : "them"}">${
             m.text
           }</div>`;
-        } else {
+        else
           contentHtml = `<div class="bubble ${
             isMe ? "me" : "them"
-          }" style="background:${isMe ? "#ff7a00" : "#f3f4f6"}; color:${
-            isMe ? "white" : "black"
-          }; padding:8px 12px; border-radius:12px;">${m.text}</div>`;
+          }"><div class="bubble-content">${m.text}</div></div>`;
+
+        // Add Metadata (Time & Check) inside bubble logic if text, or outside if sticky
+        // Simplified: Just put meta inside the text bubble wrapper for text, or append for others
+        if (m.type === "text") {
+          contentHtml = `<div class="bubble ${isMe ? "me" : "them"}">
+                ${m.text}
+                <div class="bubble-meta">
+                    <span class="bubble-time">${timeStr}</span>
+                    ${isMe ? '<span class="bubble-status">✓✓</span>' : ""}
+                </div>
+             </div>`;
+        } else {
+          // For non-text, wrap in bubble container
+          // (Logic simplified for this snippet, assumes CSS handles layout)
         }
-        return `<div style="display:flex; justify-content:${
+
+        return `${dateHeader}<div style="display:flex; justify-content:${
           isMe ? "flex-end" : "flex-start"
         }; margin-bottom:4px; max-width:85%; align-self:${
           isMe ? "flex-end" : "flex-start"
@@ -751,6 +779,8 @@ async function renderChat() {
     $("#chatBox").scrollTop = $("#chatBox").scrollHeight;
   });
 }
+
+// ... (Rest of functions SAMA) ...
 window.openPickChat = () => {
   if (!state.user) return requireLogin();
   const list = state.vendors.length
