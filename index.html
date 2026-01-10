@@ -18,6 +18,13 @@
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       crossorigin=""
     />
+
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#ff7a00" />
+    <link rel="apple-touch-icon" href="pikul.jpeg" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
     <script
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       crossorigin=""
@@ -1588,5 +1595,19 @@
     </div>
 
     <script type="module" src="app.js"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker
+            .register("./sw.js")
+            .then(function (registration) {
+              console.log("PWA ServiceWorker registered: ", registration.scope);
+            })
+            .catch(function (err) {
+              console.log("PWA ServiceWorker failed: ", err);
+            });
+        });
+      }
+    </script>
   </body>
 </html>
