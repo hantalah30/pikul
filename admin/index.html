@@ -14,6 +14,97 @@
       rel="stylesheet"
     />
     <style>
+      /* --- GLOBAL STYLES --- */
+      :root {
+        --primary: #ff7a00;
+        --bg: #f8fafc;
+        --text: #1e293b;
+        --muted: #64748b;
+        --border: #e2e8f0;
+      }
+
+      /* --- MOBILE BOTTOM NAV (NEW) --- */
+      .bottom-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        padding: 10px 0;
+        z-index: 1000;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+      }
+
+      .nav-item {
+        background: transparent;
+        border: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        color: var(--muted);
+        font-family: "Inter", sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        width: 60px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+      }
+
+      .nav-icon {
+        font-size: 20px;
+        margin-bottom: 2px;
+        transition: transform 0.3s;
+      }
+
+      .nav-item.active {
+        color: var(--primary);
+      }
+
+      .nav-item.active .nav-icon {
+        transform: translateY(-2px);
+      }
+
+      /* Active Indicator Dot */
+      .nav-item.active::after {
+        content: "";
+        position: absolute;
+        bottom: -5px; /* Adjust based on padding */
+        width: 4px;
+        height: 4px;
+        background: var(--primary);
+        border-radius: 50%;
+      }
+
+      /* Hide Desktop Sidebar on Mobile */
+      @media (max-width: 768px) {
+        .sidebar {
+          display: none !important;
+        }
+        .main {
+          margin-left: 0 !important;
+          padding-bottom: 80px;
+        } /* Add padding for bottom nav */
+        .header.desktop-only {
+          display: none;
+        }
+      }
+
+      /* Hide Bottom Nav on Desktop */
+      @media (min-width: 769px) {
+        .bottom-nav {
+          display: none;
+        }
+      }
+
+      /* --- EXISTING STYLES --- */
       .section-title {
         font-size: 12px;
         font-weight: 700;
@@ -70,7 +161,6 @@
         border-radius: 6px;
         font-size: 12px;
       }
-
       .proof-img-large {
         width: 100%;
         border-radius: 12px;
@@ -93,12 +183,52 @@
         font-weight: 800;
         border: 2px dashed #4ade80;
       }
-
-      /* Action Buttons in Table */
       .action-row {
         display: flex;
         gap: 6px;
         align-items: center;
+      }
+      .badge-pending {
+        background: #fef3c7;
+        color: #b45309;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .badge-success {
+        background: #dcfce7;
+        color: #166534;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .badge-fail {
+        background: #fee2e2;
+        color: #991b1b;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      /* Mobile Header */
+      .mobile-header {
+        display: none;
+        padding: 16px;
+        background: white;
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 900;
+        align-items: center;
+        justify-content: space-between;
+      }
+      @media (max-width: 768px) {
+        .mobile-header {
+          display: flex;
+        }
       }
     </style>
   </head>
@@ -148,9 +278,12 @@
           <button class="sbItem active" data-tab="Dashboard">
             <span class="icon">📊</span> <span class="label">Overview</span>
           </button>
+          <button class="sbItem" data-tab="Topups">
+            <span class="icon">💳</span> <span class="label">Topup User</span>
+          </button>
           <button class="sbItem" data-tab="Revenue">
             <span class="icon">💰</span>
-            <span class="label">Validasi Pembayaran</span>
+            <span class="label">Validasi Mitra</span>
           </button>
           <button class="sbItem" data-tab="Vendors">
             <span class="icon">🏪</span> <span class="label">Data Mitra</span>
@@ -167,6 +300,22 @@
           ⎋ Logout
         </button>
       </nav>
+
+      <header class="mobile-header">
+        <div style="display: flex; align-items: center; gap: 10px">
+          <img
+            src="../Admin-Pikul.png"
+            style="width: 32px; height: 32px; border-radius: 8px"
+          />
+          <b style="font-size: 16px">Admin Panel</b>
+        </div>
+        <button
+          onclick="location.reload()"
+          style="background: none; border: none; font-size: 20px"
+        >
+          ⎋
+        </button>
+      </header>
 
       <section class="main">
         <header class="header desktop-only">
@@ -229,6 +378,20 @@
                 class="list"
                 style="margin-top: 15px"
               ></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="tabTopups" class="tab hidden">
+          <div class="card">
+            <div class="rowBetween">
+              <h3>Permintaan Isi Saldo (User)</h3>
+              <div class="muted" style="font-size: 12px">
+                Validasi bukti transfer user di sini.
+              </div>
+            </div>
+            <div class="table-wrapper" style="margin-top: 20px">
+              <div id="topupsTable"></div>
             </div>
           </div>
         </section>
@@ -298,19 +461,72 @@
           </div>
         </section>
       </section>
+
+      <nav class="bottom-nav">
+        <button
+          class="nav-item active"
+          onclick="switchTabMobile('Dashboard', this)"
+        >
+          <div class="nav-icon">📊</div>
+          <span>Dash</span>
+        </button>
+        <button class="nav-item" onclick="switchTabMobile('Topups', this)">
+          <div class="nav-icon">💳</div>
+          <span>Topup</span>
+        </button>
+        <button class="nav-item" onclick="switchTabMobile('Revenue', this)">
+          <div class="nav-icon">💰</div>
+          <span>Mitra</span>
+        </button>
+        <button class="nav-item" onclick="switchTabMobile('Vendors', this)">
+          <div class="nav-icon">🏪</div>
+          <span>Data</span>
+        </button>
+        <button class="nav-item" onclick="switchTabMobile('Banners', this)">
+          <div class="nav-icon">📢</div>
+          <span>Iklan</span>
+        </button>
+      </nav>
     </div>
 
+    <div id="imageModal" class="modal hidden">
+      <div class="overlay" onclick="closeImageModal()"></div>
+      <div class="sheet" style="text-align: center">
+        <div class="sheetHead">
+          <h3>Bukti Transfer</h3>
+          <button class="iconBtn" onclick="closeImageModal()">✕</button>
+        </div>
+        <div class="sheetBody">
+          <img
+            id="imagePreviewFull"
+            src=""
+            style="
+              width: 100%;
+              border-radius: 12px;
+              border: 1px solid #ddd;
+              max-height: 70vh;
+              object-fit: contain;
+            "
+          /><button
+            class="btn primary full"
+            style="margin-top: 16px"
+            onclick="closeImageModal()"
+          >
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
     <div id="verificationModal" class="modal hidden">
       <div class="overlay" data-close="verificationModal"></div>
       <div class="sheet">
         <div class="sheetHead">
-          <h3 id="verifTitle">Verifikasi Pembayaran</h3>
+          <h3 id="verifTitle">Verifikasi</h3>
           <button class="iconBtn" data-close="verificationModal">✕</button>
         </div>
         <div class="sheetBody"><div id="verifContent"></div></div>
       </div>
     </div>
-
     <div id="editSubModal" class="modal hidden">
       <div class="overlay" data-close="editSubModal"></div>
       <div class="sheet">
@@ -325,15 +541,13 @@
               id="esName"
               disabled
               style="background: #f1f5f9; color: #64748b"
-            />
-            <label>Metode</label
+            /><label>Metode</label
             ><input
               id="esMethod"
               disabled
               style="background: #f1f5f9; color: #64748b"
-            />
-            <label>Status Pembayaran</label>
-            <select
+            /><label>Status Pembayaran</label
+            ><select
               id="esStatus"
               style="
                 width: 100%;
@@ -369,7 +583,6 @@
         </div>
       </div>
     </div>
-
     <div id="orderModal" class="modal hidden">
       <div class="overlay" data-close="orderModal"></div>
       <div class="sheet">

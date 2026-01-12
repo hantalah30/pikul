@@ -93,7 +93,6 @@
         font-weight: 500;
       }
 
-      /* Updated Form Container for better scrolling */
       .auth-form-container {
         flex: 1;
         display: flex;
@@ -104,7 +103,6 @@
         overflow-y: auto;
         height: 100%;
       }
-      /* Center vertically on taller screens */
       @media (min-height: 700px) {
         .auth-form-container {
           justify-content: center;
@@ -206,7 +204,6 @@
         margin-left: 4px;
       }
 
-      /* --- NEW ACTIONS AREA (Guest & Seller) --- */
       .auth-extra-actions {
         margin-top: 40px;
         padding-top: 20px;
@@ -215,7 +212,6 @@
         flex-direction: column;
         gap: 12px;
       }
-
       .btn-guest {
         width: 100%;
         padding: 14px;
@@ -237,7 +233,6 @@
         color: var(--primary);
         background: #fff7ed;
       }
-
       .seller-link-box {
         text-align: center;
         font-size: 13px;
@@ -889,21 +884,17 @@
         overflow: hidden;
         cursor: pointer;
       }
-
-      /* State: Expanded (Chat Mode) */
       .dynamic-island.expanded {
         width: 95%;
         max-width: 400px;
-        height: 80vh; /* Tinggi Chat */
+        height: 80vh;
         border-radius: 28px;
-        background: rgba(18, 18, 18, 0.96); /* Hampir solid hitam */
+        background: rgba(18, 18, 18, 0.96);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
         cursor: default;
         border: 1px solid rgba(255, 255, 255, 0.1);
       }
-
-      /* --- MINIMIZED STATE --- */
       .di-content-min {
         display: flex;
         align-items: center;
@@ -934,23 +925,18 @@
           box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
         }
       }
-
-      /* --- EXPANDED CONTENT (CHAT) --- */
       .di-chat-container {
         display: none;
         width: 100%;
         height: 100%;
         flex-direction: column;
         opacity: 0;
-        /* Delay muncul konten agar animasi island selesai dulu */
         transition: opacity 0.3s ease 0.2s;
       }
       .dynamic-island.expanded .di-chat-container {
         display: flex;
         opacity: 1;
       }
-
-      /* Header */
       .di-header {
         height: 65px;
         padding: 0 20px;
@@ -970,7 +956,6 @@
         color: #00ff88;
         letter-spacing: 0.5px;
       }
-
       .di-close-btn {
         background: rgba(255, 255, 255, 0.1);
         border: none;
@@ -988,8 +973,6 @@
         background: rgba(255, 255, 255, 0.25);
         transform: rotate(90deg);
       }
-
-      /* Message List */
       .di-messages {
         flex: 1;
         overflow-y: auto;
@@ -1006,8 +989,6 @@
         background: #444;
         border-radius: 4px;
       }
-
-      /* Bubbles */
       .bubble {
         max-width: 75%;
         padding: 10px 15px;
@@ -1016,7 +997,6 @@
         line-height: 1.4;
         position: relative;
         animation: slideUp 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-        word-wrap: break-word;
       }
       @keyframes slideUp {
         from {
@@ -1028,7 +1008,6 @@
           transform: translateY(0) scale(1);
         }
       }
-
       .bubble.me {
         align-self: flex-end;
         background: linear-gradient(135deg, #ff7a00, #ff5e00);
@@ -1048,24 +1027,12 @@
         margin-top: 5px;
         border: 1px solid rgba(255, 255, 255, 0.1);
       }
-      /* Lokasi Bubble Style Baru */
       .bubble.location {
         text-decoration: none;
         display: flex;
         align-items: center;
-        gap: 10px;
-        background: linear-gradient(135deg, #0f172a, #1e293b);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 12px;
-        border-radius: 16px;
-        min-width: 180px;
+        gap: 6px;
       }
-      .bubble.location.me {
-        background: linear-gradient(135deg, #ff7a00, #ff5e00);
-        color: white;
-      }
-
-      /* --- INPUT AREA & MENUS --- */
       .di-input-area {
         padding: 10px 15px;
         background: rgba(0, 0, 0, 0.3);
@@ -1074,7 +1041,6 @@
         align-items: center;
         position: relative;
       }
-
       .icon-btn {
         background: none;
         border: none;
@@ -1091,7 +1057,6 @@
       .icon-btn:active {
         transform: scale(0.9);
       }
-
       .chat-input {
         flex: 1;
         background: rgba(255, 255, 255, 0.1);
@@ -1119,8 +1084,6 @@
       .send-btn:active {
         transform: scale(0.85);
       }
-
-      /* Attachment Menu (Hidden by default) */
       .attach-menu {
         position: absolute;
         bottom: 70px;
@@ -1141,7 +1104,6 @@
         transform: scale(1);
         opacity: 1;
       }
-
       .attach-item {
         text-align: center;
         cursor: pointer;
@@ -1161,8 +1123,6 @@
       .attach-item:hover .attach-icon {
         transform: translateY(-3px);
       }
-
-      /* Emoji/Sticker Panel */
       .emoji-panel {
         height: 0;
         overflow: hidden;
@@ -1173,7 +1133,6 @@
         height: 180px;
         padding: 10px;
       }
-
       .panel-tabs {
         display: flex;
         gap: 10px;
@@ -1191,7 +1150,6 @@
         color: #ff7a00;
         border-bottom: 2px solid #ff7a00;
       }
-
       .emoji-grid,
       .sticker-grid {
         display: grid;
@@ -1212,6 +1170,64 @@
       }
       .sticker-item:hover {
         transform: scale(1.1);
+      }
+
+      /* TOPUP STYLES */
+      .amount-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      .amount-btn {
+        padding: 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        background: white;
+        font-weight: 700;
+        color: #64748b;
+        cursor: pointer;
+        transition: 0.2s;
+        font-size: 13px;
+      }
+      .amount-btn:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+      }
+      .amount-btn.active {
+        background: #fff7ed;
+        border: 2px solid var(--primary);
+        color: var(--primary);
+        box-shadow: 0 4px 10px rgba(255, 122, 0, 0.2);
+      }
+      .bank-info-box {
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        padding: 12px;
+        border-radius: 12px;
+        margin-bottom: 16px;
+        text-align: center;
+      }
+      .bank-number {
+        font-size: 18px;
+        font-weight: 800;
+        color: #1e293b;
+        letter-spacing: 1px;
+        margin-top: 4px;
+        display: block;
+        cursor: pointer;
+      }
+
+      /* --- RATING MODAL STYLES --- */
+      .sheetHead h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+      }
+      #starContainer {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
       }
     </style>
   </head>
@@ -1582,19 +1598,11 @@
             style="display: flex; flex-direction: column; gap: 10px"
           ></div>
         </section>
+
         <section id="screenProfile" class="hidden">
           <h2 style="margin: 0 0 16px">Akun Saya</h2>
           <div id="profileContent"></div>
-          <div class="card" style="margin-top: 12px">
-            <div class="rowBetween">
-              <span>🌙 Mode Gelap</span
-              ><input
-                type="checkbox"
-                id="themeSwitch"
-                style="width: auto; margin: 0"
-              />
-            </div>
-          </div>
+
           <button
             id="mobileProfileLogout"
             class="btn ghost"
@@ -1604,6 +1612,7 @@
               color: #ef4444;
               border-color: #fecaca;
               background: #fff5f5;
+              display: none;
             "
           >
             Keluar Akun
@@ -1735,6 +1744,73 @@
         >
           Pesan & Verifikasi
         </button>
+      </div>
+    </div>
+
+    <div id="topupModal" class="modal hidden">
+      <div class="overlay" data-close="topupModal"></div>
+      <div class="sheet">
+        <div class="rowBetween" style="margin-bottom: 16px">
+          <h3>Isi Saldo PIKUL</h3>
+          <button class="iconBtn" data-close="topupModal">✕</button>
+        </div>
+        <label class="input-label">Pilih Nominal</label>
+        <div class="amount-grid" id="topupGrid"></div>
+        <label class="input-label">Transfer Ke</label>
+        <div class="bank-info-box">
+          <div style="font-size: 12px; color: #64748b">BCA (Admin PIKUL)</div>
+          <span class="bank-number" onclick="copyToClipboard('1234567890')"
+            >1234 567 890</span
+          >
+          <div style="font-size: 10px; color: #94a3b8; margin-top: 4px">
+            Klik nomor untuk salin
+          </div>
+        </div>
+        <label class="input-label">Bukti Transfer (Wajib)</label>
+        <div class="proof-upload" onclick="triggerTopupProof()">
+          <span id="topupProofText">📷 Upload Bukti</span>
+        </div>
+        <input
+          type="file"
+          id="topupProofInput"
+          accept="image/*"
+          class="hidden"
+          onchange="handleTopupProof(this)"
+        />
+        <button
+          id="btnSubmitTopup"
+          class="btn primary full"
+          style="margin-top: 20px"
+          onclick="submitTopupRequest()"
+        >
+          Ajukan Isi Saldo
+        </button>
+      </div>
+    </div>
+
+    <div id="rateModal" class="modal hidden">
+      <div class="overlay" data-close="rateModal"></div>
+      <div class="sheet">
+        <div class="sheetHead">
+          <h3 style="margin: 0; font-size: 18px">Beri Penilaian</h3>
+          <button class="iconBtn" data-close="rateModal">✕</button>
+        </div>
+        <div class="sheetBody" style="text-align: center; padding: 20px 0">
+          <p style="margin: 0 0 15px 0; color: #64748b">
+            Bagaimana rasa makanannya?
+          </p>
+          <div
+            id="starContainer"
+            style="font-size: 36px; margin-bottom: 20px; cursor: pointer"
+          ></div>
+          <button
+            id="btnSubmitRate"
+            class="btn primary full"
+            onclick="submitRating()"
+          >
+            Kirim Penilaian
+          </button>
+        </div>
       </div>
     </div>
 

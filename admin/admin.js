@@ -27,10 +27,34 @@ let state = {
   vendors: [],
   banners: [],
   subscriptions: [],
+  topups: [], // New state for User Topups
   vendorStats: {},
   selectedOrderId: null,
   selectedVendorId: null,
-  selectedSubId: null, // Untuk Edit Subscription
+  selectedSubId: null,
+};
+
+// --- GLOBAL: IMAGE MODAL LOGIC (FIX FOR BLANK PAGE) ---
+window.closeImageModal = () => {
+  $("#imageModal").classList.add("hidden");
+  $("#imagePreviewFull").src = "";
+};
+
+window.viewProofImage = (imgSrc) => {
+  if (!imgSrc) return alert("Gambar tidak valid");
+  $("#imagePreviewFull").src = imgSrc;
+  $("#imageModal").classList.remove("hidden");
+};
+
+// Helper function to find proof URL by ID (safest way)
+window.viewTopupProof = (id) => {
+  const item = state.topups.find((t) => t.id === id);
+  if (item && item.proof) window.viewProofImage(item.proof);
+};
+
+window.viewSubscriptionProof = (id) => {
+  const item = state.subscriptions.find((s) => s.id === id);
+  if (item && item.proof) window.viewProofImage(item.proof);
 };
 
 // --- AUTH ---
@@ -49,19 +73,52 @@ $("#adminLoginForm").addEventListener("submit", (e) => {
 });
 $("#adminLogoutBtn").addEventListener("click", () => location.reload());
 
-// --- TABS ---
+// --- TABS (DESKTOP) ---
 $$(".sbItem").forEach((b) =>
   b.addEventListener("click", () => {
-    $$(".sbItem").forEach((x) => x.classList.remove("active"));
-    b.classList.add("active");
-    $$(".tab").forEach((t) => t.classList.add("hidden"));
-    $("#tab" + b.dataset.tab).classList.remove("hidden");
-    const title = $("#pageTitle");
-    if (title) title.textContent = b.querySelector(".label").textContent;
+    switchTab(b.dataset.tab);
   })
 );
+
+// --- TABS (MOBILE) ---
+window.switchTabMobile = (tabName, el) => {
+  switchTab(tabName);
+};
+
+// --- UNIVERSAL TAB SWITCHER ---
+function switchTab(tabName) {
+  // Hide all tabs
+  $$(".tab").forEach((t) => t.classList.add("hidden"));
+  // Show selected tab
+  $("#tab" + tabName).classList.remove("hidden");
+
+  // Update Desktop Sidebar Active State
+  $$(".sbItem").forEach((x) => x.classList.remove("active"));
+  const desktopBtn = document.querySelector(`.sbItem[data-tab="${tabName}"]`);
+  if (desktopBtn) desktopBtn.classList.add("active");
+
+  // Update Mobile Nav Active State
+  $$(".nav-item").forEach((x) => x.classList.remove("active"));
+  // Find mobile btn by onclick content (simple match)
+  const mobileBtns = document.querySelectorAll(".nav-item");
+  mobileBtns.forEach((btn) => {
+    if (btn.getAttribute("onclick").includes(tabName)) {
+      btn.classList.add("active");
+    }
+  });
+
+  const title = $("#pageTitle");
+  if (title)
+    title.textContent =
+      tabName === "Topups"
+        ? "Topup User"
+        : tabName === "Revenue"
+        ? "Validasi Mitra"
+        : tabName;
+}
+
 window.goToRevenue = () => {
-  $$(".sbItem")[1].click();
+  switchTab("Revenue");
 };
 
 // --- BOOT ---
@@ -82,12 +139,21 @@ function boot() {
     renderVendorDropdown();
     renderDashboard();
   });
+  // Listener for Seller Subscriptions
   onSnapshot(
     query(collection(db, "subscriptions"), orderBy("timestamp", "desc")),
     (snap) => {
       state.subscriptions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       renderDashboard();
       renderRevenueTable();
+    }
+  );
+  // NEW: Listener for User Topups
+  onSnapshot(
+    query(collection(db, "topups"), orderBy("timestamp", "desc")),
+    (snap) => {
+      state.topups = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      renderTopupsTable();
     }
   );
   onSnapshot(collection(db, "banners"), (snap) => {
@@ -168,7 +234,130 @@ function renderDashboard() {
     .join("");
 }
 
-// --- REVENUE TABLE (WITH EDIT & DELETE) ---
+// --- NEW: TOPUP USER LOGIC ---
+function renderTopupsTable() {
+  const container = $("#topupsTable");
+  if (state.topups.length === 0) {
+    container.innerHTML = `<div style="padding:40px; text-align:center; color:#999; border:1px dashed #ccc; border-radius:12px;">Belum ada request topup.</div>`;
+    return;
+  }
+
+  container.innerHTML = `
+      <table>
+          <thead><tr><th>Waktu</th><th>User</th><th>Nominal</th><th>Bukti</th><th>Status</th><th>Aksi</th></tr></thead>
+          <tbody>
+              ${state.topups
+                .map((t) => {
+                  // FIX: Use button to open modal instead of href blank
+                  let proofHtml = t.proof
+                    ? `<button onclick="viewTopupProof('${t.id}')" style="color:blue; text-decoration:underline; border:none; background:none; cursor:pointer; font-size:12px;">Lihat Bukti</button>`
+                    : "-";
+
+                  let statusBadge = "";
+                  if (t.status === "pending")
+                    statusBadge = `<span class="badge-pending">⏳ Menunggu</span>`;
+                  else if (t.status === "approved")
+                    statusBadge = `<span class="badge-success">✅ Berhasil</span>`;
+                  else
+                    statusBadge = `<span class="badge-fail">❌ Ditolak</span>`;
+
+                  let actionBtn = "";
+                  if (t.status === "pending") {
+                    actionBtn = `<button class="btn small primary" onclick="verifyTopupUser('${t.id}')">🔍 Cek & Setujui</button>`;
+                  } else {
+                    actionBtn = `<span class="muted" style="font-size:11px;">Selesai</span>`;
+                  }
+
+                  return `
+                  <tr>
+                      <td>${new Date(t.timestamp).toLocaleString()}</td>
+                      <td><b>${t.userName}</b></td>
+                      <td style="color:#166534; font-weight:bold;">${rupiah(
+                        t.amount
+                      )}</td>
+                      <td>${proofHtml}</td>
+                      <td>${statusBadge}</td>
+                      <td>${actionBtn}</td>
+                  </tr>`;
+                })
+                .join("")}
+          </tbody>
+      </table>`;
+}
+
+window.verifyTopupUser = (tid) => {
+  const t = state.topups.find((x) => x.id === tid);
+  if (!t) return;
+
+  const content = $("#verifContent");
+  const title = $("#verifTitle");
+  $("#verificationModal").classList.remove("hidden");
+
+  title.textContent = "Validasi Topup User";
+  content.innerHTML = `
+        <div style="text-align:center;">
+            <p>User: <b>${t.userName}</b> request isi saldo:</p>
+            <h2 style="color:#166534; margin:10px 0;">${rupiah(t.amount)}</h2>
+            <img src="${
+              t.proof
+            }" class="proof-img-large" style="display:block; margin:10px auto; width:100%; max-width:300px; border-radius:8px; border:1px solid #ddd;" />
+            <p class="muted" style="font-size:13px; margin-top:10px;">Cek mutasi bank Anda. Jika dana masuk, klik Setujui.</p>
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="btn full" style="background:#fee2e2; color:#ef4444;" onclick="rejectTopupUser('${
+                  t.id
+                }')">Tolak</button>
+                <button class="btn primary full" onclick="approveTopupUser('${
+                  t.id
+                }', '${t.userId}', ${
+    t.amount
+  })">✅ Setujui (Auto Add Saldo)</button>
+            </div>
+        </div>
+    `;
+};
+
+window.approveTopupUser = async (tid, uid, amount) => {
+  if (
+    !confirm(
+      `Yakin setujui topup ${rupiah(
+        amount
+      )}? Saldo user akan bertambah otomatis.`
+    )
+  )
+    return;
+
+  try {
+    // 1. Get Current User Data
+    const userRef = doc(db, "users", uid);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists()) {
+      const currentWallet = userSnap.data().wallet || 0;
+      const newWallet = currentWallet + parseInt(amount);
+
+      // 2. Update User Wallet
+      await updateDoc(userRef, { wallet: newWallet });
+
+      // 3. Update Topup Status
+      await updateDoc(doc(db, "topups", tid), { status: "approved" });
+
+      $("#verificationModal").classList.add("hidden");
+      alert("Berhasil! Saldo user telah ditambahkan.");
+    } else {
+      alert("User tidak ditemukan di database!");
+    }
+  } catch (e) {
+    alert("Error updating wallet: " + e.message);
+  }
+};
+
+window.rejectTopupUser = async (tid) => {
+  if (!confirm("Tolak permintaan ini?")) return;
+  await updateDoc(doc(db, "topups", tid), { status: "rejected" });
+  $("#verificationModal").classList.add("hidden");
+};
+
+// --- REVENUE TABLE (SELLER SUBSCRIPTIONS) ---
 function renderRevenueTable() {
   const container = $("#revenueTable");
   if (state.subscriptions.length === 0) {
@@ -182,23 +371,23 @@ function renderRevenueTable() {
         <tbody>
             ${state.subscriptions
               .map((s) => {
+                // FIX: Use button for modal
                 let proofHtml =
                   s.method === "qris" && s.proof
-                    ? `<a href="${s.proof}" target="_blank" style="color:blue; text-decoration:underline;">Lihat Foto</a>`
+                    ? `<button onclick="viewSubscriptionProof('${s.id}')" style="color:blue; text-decoration:underline; border:none; background:none; cursor:pointer; font-size:12px;">Lihat Bukti</button>`
                     : "-";
 
                 let statusBadge = "";
                 if (s.status === "pending")
-                  statusBadge = `<span class="pill" style="background:#fef3c7; color:#b45309">⏳ Pending</span>`;
+                  statusBadge = `<span class="badge-pending">⏳ Pending</span>`;
                 else if (s.status === "approved")
-                  statusBadge = `<span class="pill" style="background:#bae6fd; color:#0369a1">🔑 Menunggu Input</span>`;
+                  statusBadge = `<span class="badge-pending" style="background:#bae6fd; color:#0369a1">🔑 Wait Input</span>`;
                 else if (
                   s.status === "redeemed" ||
                   (s.status === "approved" && s.method === "qris")
                 )
-                  statusBadge = `<span class="pill" style="background:#dcfce7; color:#166534">✅ Selesai</span>`;
-                else
-                  statusBadge = `<span class="pill" style="background:#fee2e2; color:#991b1b">❌ Ditolak</span>`;
+                  statusBadge = `<span class="badge-success">✅ Selesai</span>`;
+                else statusBadge = `<span class="badge-fail">❌ Ditolak</span>`;
 
                 let mainAction = "";
                 if (s.status === "pending") {
@@ -212,7 +401,6 @@ function renderRevenueTable() {
                   mainAction = `<span class="muted" style="font-size:12px;">-</span>`;
                 }
 
-                // Action Buttons Row (Edit & Delete)
                 const buttons = `
                     <div class="action-row">
                         ${mainAction}
@@ -236,7 +424,7 @@ function renderRevenueTable() {
     </table>`;
 }
 
-// --- VERIFICATION LOGIC ---
+// --- VERIFICATION LOGIC (SELLER SUBSCRIPTION) ---
 window.openVerification = (subId, type) => {
   const sub = state.subscriptions.find((s) => s.id === subId);
   if (!sub) return;
@@ -245,7 +433,7 @@ window.openVerification = (subId, type) => {
   $("#verificationModal").classList.remove("hidden");
 
   if (type === "qris") {
-    title.textContent = "Validasi QRIS";
+    title.textContent = "Validasi QRIS Mitra";
     content.innerHTML = `
             <div style="text-align:center;">
                 <p>Mitra: <b>${sub.vendorName}</b></p>
@@ -300,7 +488,6 @@ window.approveSub = async (subId, vendorId, type) => {
       isLive: true,
     });
     $("#verificationModal").classList.add("hidden");
-    showToast("Bukti valid. Vendor telah diaktifkan!", "success");
   }
 };
 
@@ -308,14 +495,12 @@ window.rejectSub = async (subId) => {
   if (!confirm("Tolak pembayaran ini?")) return;
   await updateDoc(doc(db, "subscriptions", subId), { status: "rejected" });
   $("#verificationModal").classList.add("hidden");
-  showToast("Pembayaran ditolak.", "error");
 };
 
-// --- EDIT & DELETE SUBSCRIPTION LOGIC (NEW) ---
+// --- EDIT & DELETE SUBSCRIPTION LOGIC ---
 window.deleteSub = async (id) => {
   if (confirm("Yakin hapus data transaksi ini selamanya?")) {
     await deleteDoc(doc(db, "subscriptions", id));
-    showToast("Data transaksi dihapus.", "success");
   }
 };
 
@@ -341,10 +526,9 @@ $("#editSubForm").addEventListener("submit", async (e) => {
   });
 
   $("#editSubModal").classList.add("hidden");
-  showToast("Data transaksi diperbarui!", "success");
 });
 
-// ... (ORDERS, VENDORS, BANNERS SAMA SEPERTI SEBELUMNYA) ...
+// ... (ORDERS, VENDORS, BANNERS SAME AS BEFORE) ...
 function renderOrdersTable() {
   $(
     "#ordersTable"
@@ -454,7 +638,6 @@ $("#editVendorForm").addEventListener("submit", async (e) => {
     rating: parseFloat($("#evRating").value),
   });
   $("#editVendorModal").classList.add("hidden");
-  showToast("Vendor updated!", "success");
 });
 window.deleteVendor = async (id) => {
   if (confirm("Yakin hapus vendor?")) await deleteDoc(doc(db, "vendors", id));
@@ -547,24 +730,10 @@ $("#bannerForm").addEventListener("submit", async (e) => {
     createdAt: Date.now(),
   });
   $("#bannerModal").classList.add("hidden");
-  showToast("Banner aktif!", "success");
 });
 window.deleteBanner = async (id) => {
   if (confirm("Hapus iklan ini?")) await deleteDoc(doc(db, "banners", id));
 };
-function showToast(msg, type = "info") {
-  let c = $(".toast-container");
-  if (!c) {
-    c = document.createElement("div");
-    c.className = "toast-container";
-    document.body.appendChild(c);
-  }
-  const el = document.createElement("div");
-  el.className = `toast ${type}`;
-  el.innerHTML = `<span>${msg}</span>`;
-  c.appendChild(el);
-  setTimeout(() => el.remove(), 4000);
-}
 $$("[data-close]").forEach((b) =>
   b.addEventListener("click", () =>
     $("#" + b.dataset.close).classList.add("hidden")

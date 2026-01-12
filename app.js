@@ -53,6 +53,9 @@ let state = {
   trackingVendorId: null,
   lastNearestId: null,
   tempPaymentProof: null,
+  // NEW STATE FOR TOPUP
+  topupAmount: 0,
+  tempTopupProof: null,
 };
 
 // State Variables for Chat UI
@@ -93,6 +96,25 @@ function getDistanceVal(v) {
   );
 }
 
+// --- HELPER: LOCAL STORAGE CART (NEW) ---
+function saveCart() {
+  localStorage.setItem("pikul_cart", JSON.stringify(state.cart));
+  updateFab();
+}
+
+function loadCart() {
+  const stored = localStorage.getItem("pikul_cart");
+  if (stored) {
+    try {
+      state.cart = JSON.parse(stored);
+      updateFab();
+    } catch (e) {
+      console.error("Gagal memuat keranjang", e);
+      state.cart = [];
+    }
+  }
+}
+
 // --- AUTH LOGIC ---
 window.switchAuthMode = (mode) => {
   if (mode === "login") {
@@ -111,7 +133,7 @@ window.closeAuth = () => {
   showApp();
 };
 
-// >>> TAMBAHAN: FUNGSI MASUK SEBAGAI TAMU <<<
+// Fungsi Masuk sebagai Tamu
 window.continueGuest = () => {
   state.user = null;
   localStorage.removeItem("pikul_user_id");
@@ -230,8 +252,23 @@ function initAutoHideNav() {
 
 async function bootApp() {
   $("#userName").textContent = state.user ? state.user.name : "Tamu";
-  initTheme();
   initAutoHideNav();
+
+  // LOAD CART DARI LOCAL STORAGE SAAT BOOT
+  loadCart();
+
+  // Listen to User Changes (Realtime Wallet Update)
+  if (state.user) {
+    onSnapshot(doc(db, "users", state.user.id), (doc) => {
+      if (doc.exists()) {
+        state.user = { id: doc.id, ...doc.data() };
+        // Update Wallet UI if Profile is open
+        const walletEl = $("#wallet");
+        if (walletEl) walletEl.textContent = rupiah(state.user.wallet);
+      }
+    });
+  }
+
   onSnapshot(collection(db, "vendors"), (s) => {
     state.vendors = s.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderMapChips();
@@ -354,7 +391,6 @@ async function renderChatInsideIsland() {
         } else if (m.type === "sticker") {
           contentHtml = `<div class="bubble sticker me"><img src="${m.text}" style="width:100px; height:auto; border:none;" /></div>`;
         } else if (m.type === "location") {
-          // UPDATE: Render Link Google Maps yang Valid
           const link = m.text.startsWith("http") ? m.text : "#";
           contentHtml = `<a href="${link}" target="_blank" class="bubble location me" style="text-decoration:none; color:white; display:flex; align-items:center; gap:8px;">
                             <div style="background:rgba(255,255,255,0.2); width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px;">📍</div>
@@ -567,6 +603,97 @@ function renderInbox() {
   $("#inboxList").innerHTML =
     list || `<div class="empty-state-box">Belum ada pedagang.</div>`;
 }
+
+// --- TOPUP SYSTEM (SECURE REQUEST) ---
+// Fungsi ini menggantikan window.doTopup yang lama
+window.openTopupModal = () => {
+  state.topupAmount = 0;
+  state.tempTopupProof = null;
+  $("#topupProofText").textContent = "📷 Upload Bukti";
+  $(".proof-upload").style.background = "#f8fafc";
+  $(".proof-upload").style.borderColor = "#cbd5e1";
+
+  // Render Grid Pilihan Harga
+  const amounts = [
+    10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 100000,
+  ];
+  const grid = $("#topupGrid");
+  grid.innerHTML = amounts
+    .map(
+      (amt) =>
+        `<div class="amount-btn" onclick="selectTopupAmount(${amt}, this)">${rupiah(
+          amt
+        )}</div>`
+    )
+    .join("");
+
+  openModal("topupModal");
+};
+
+window.selectTopupAmount = (amt, el) => {
+  state.topupAmount = amt;
+  // Reset visual selection
+  $$(".amount-btn").forEach((b) => b.classList.remove("active"));
+  // Highlight selected
+  el.classList.add("active");
+};
+
+window.triggerTopupProof = () => {
+  $("#topupProofInput").click();
+};
+
+window.handleTopupProof = async (input) => {
+  if (input.files && input.files[0]) {
+    try {
+      const compressed = await compressImage(input.files[0], 500, 0.7);
+      state.tempTopupProof = compressed;
+      $("#topupProofText").textContent = "✅ Foto Tersimpan";
+      $(".proof-upload").style.background = "#f0fdf4";
+      $(".proof-upload").style.borderColor = "#22c55e";
+    } catch (e) {
+      alert("Gagal proses gambar");
+    }
+  }
+};
+
+window.copyToClipboard = (text) => {
+  navigator.clipboard.writeText(text);
+  showToast("Nomor rekening disalin!");
+};
+
+window.submitTopupRequest = async () => {
+  if (!state.user) return requireLogin();
+  if (state.topupAmount === 0) return alert("Pilih nominal topup dulu.");
+  if (!state.tempTopupProof) return alert("Wajib upload bukti transfer.");
+
+  const btn = $("#btnSubmitTopup");
+  btn.disabled = true;
+  btn.textContent = "Mengirim...";
+
+  try {
+    // Create Request in Database (Pending Status)
+    await addDoc(collection(db, "topups"), {
+      userId: state.user.id,
+      userName: state.user.name,
+      amount: state.topupAmount,
+      proof: state.tempTopupProof,
+      status: "pending", // Secure: Only admin can change this to approved
+      timestamp: Date.now(),
+      method: "transfer",
+    });
+
+    closeModal("topupModal");
+    showToast("✅ Permintaan Topup dikirim. Tunggu admin verifikasi.");
+
+    // Reset
+    state.topupAmount = 0;
+    state.tempTopupProof = null;
+  } catch (e) {
+    alert("Gagal kirim: " + e.message);
+  }
+  btn.disabled = false;
+  btn.textContent = "Ajukan Isi Saldo";
+};
 
 // --- STANDARD APP FUNCTIONS (Home, Map, etc) ---
 let bannerInterval;
@@ -945,7 +1072,10 @@ window.addToCart = (vid, mid, mName, mPrice) => {
       price: parseInt(mPrice),
       qty: 1,
     });
-  updateFab();
+
+  // SAVE TO LOCAL
+  saveCart();
+
   showToast("Masuk keranjang");
 };
 function updateFab() {
@@ -1074,9 +1204,13 @@ $("#placeOrderBtn").addEventListener("click", async () => {
       status: payment === "qris" ? "Menunggu Konfirmasi Bayar" : "Diproses",
       createdAt: new Date().toISOString(),
     });
+
+    // CLEAR CART ON SUCCESS
     state.cart = [];
     state.tempPaymentProof = null;
+    localStorage.removeItem("pikul_cart"); // Clear storage
     updateFab();
+
     closeModal("checkoutModal");
     window.go("Orders");
     showToast("Pesanan dibuat!");
@@ -1093,14 +1227,14 @@ window.updateCartQty = (idx, change) => {
     if (confirm("Hapus?")) state.cart.splice(idx, 1);
     else item.qty = 1;
   }
-  updateFab();
+  saveCart(); // Save changes
   if (!state.cart.length) closeModal("checkoutModal");
   else renderCartModal();
 };
 window.deleteCartItem = (idx) => {
   if (confirm("Hapus?")) {
     state.cart.splice(idx, 1);
-    updateFab();
+    saveCart(); // Save changes
     if (!state.cart.length) closeModal("checkoutModal");
     else renderCartModal();
   }
@@ -1160,7 +1294,7 @@ function renderOrders() {
         statusIcon = "✅";
         statusDesc = "Selesai.";
         const rateBtn = !o.rating
-          ? `<button class="btn small primary" onclick="rate('${o.id}','${o.vendorId}')" style="flex:1">⭐ Nilai</button>`
+          ? `<button class="btn small primary" onclick="rate('${o.id}')" style="flex:1">⭐ Nilai</button>`
           : `<div class="pill" style="flex:1; text-align:center">Rating: ${o.rating}⭐</div>`;
         actionButtons = `${rateBtn}<button class="btn small ghost" onclick="reorder('${o.id}')" style="flex:1">🔄 Pesan Lagi</button>`;
       } else if (o.status.includes("Dibatalkan")) {
@@ -1228,6 +1362,9 @@ $$(".nav").forEach((b) =>
 );
 function renderProfile() {
   const container = $("#profileContent");
+  const logoutBtn = $("#mobileProfileLogout");
+  const headerLogout = $("#logoutBtn");
+
   if (state.user) {
     container.innerHTML = `<div class="card"><div class="rowBetween"><div style="display: flex; gap: 12px; align-items: center"><div style="width: 50px; height: 50px; background: #eee; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px;">👤</div><div><b id="pName" style="display: block">${
       state.user.name
@@ -1235,30 +1372,27 @@ function renderProfile() {
       state.user.email
     }</span></div></div></div><hr style="border: none; border-top: 1px solid var(--border); margin: 16px 0;" /><div class="rowBetween" style="margin-bottom: 10px"><span class="muted">Saldo</span><b class="big" style="color: var(--primary)" id="wallet">${rupiah(
       state.user.wallet
-    )}</b></div><button id="topupBtn" class="btn primary" onclick="doTopup()" style="width: 100%">Isi Saldo (+50k)</button></div>`;
-    $("#mobileProfileLogout").textContent = "Keluar Akun";
-    $("#mobileProfileLogout").onclick = () => {
-      if (confirm("Keluar?")) {
-        localStorage.removeItem("pikul_user_id");
-        location.reload();
-      }
-    };
-    $("#logoutBtn").style.display = "flex";
+    )}</b></div><button class="btn primary" onclick="openTopupModal()" style="width: 100%">+ Isi Saldo</button></div>`;
+
+    // Pastikan tombol logout muncul
+    if (logoutBtn) {
+      logoutBtn.style.display = "block";
+      logoutBtn.onclick = () => {
+        if (confirm("Keluar?")) {
+          localStorage.removeItem("pikul_user_id");
+          location.reload();
+        }
+      };
+    }
+    if (headerLogout) headerLogout.style.display = "flex";
   } else {
     container.innerHTML = `<div class="card"><div style="text-align:center; padding:20px;"><div style="font-size:40px; margin-bottom:10px;">👋</div><b>Halo, Tamu!</b><p class="muted" style="margin:5px 0 20px;">Masuk untuk melihat saldo dan profil.</p><button class="btn primary full" onclick="requireLogin()">Masuk / Daftar</button></div></div>`;
-    $("#mobileProfileLogout").style.display = "none";
-    $("#logoutBtn").style.display = "none";
+    // Sembunyikan tombol logout
+    if (logoutBtn) logoutBtn.style.display = "none";
+    if (headerLogout) headerLogout.style.display = "none";
   }
 }
-window.doTopup = async () => {
-  if (!state.user) return;
-  await updateDoc(doc(db, "users", state.user.id), {
-    wallet: (state.user.wallet || 0) + 50000,
-  });
-  state.user.wallet += 50000;
-  renderProfile();
-  showToast("Saldo bertambah!");
-};
+
 function showToast(m, type = "info") {
   let c = $(".toast-container");
   if (!c) {
@@ -1275,16 +1409,7 @@ function showToast(m, type = "info") {
 function initTheme() {
   const d = localStorage.getItem("pikul_theme") === "dark";
   if (d) document.body.setAttribute("data-theme", "dark");
-  if ($("#themeSwitch")) {
-    $("#themeSwitch").checked = d;
-    $("#themeSwitch").addEventListener("change", (e) => {
-      e.target.checked
-        ? (document.body.setAttribute("data-theme", "dark"),
-          localStorage.setItem("pikul_theme", "dark"))
-        : (document.body.removeAttribute("data-theme"),
-          localStorage.setItem("pikul_theme", "light"));
-    });
-  }
+  // Theme switch listener removed as per request
 }
 function showAuth() {
   $("#auth").classList.remove("hidden");
@@ -1324,4 +1449,156 @@ function closeModal(id) {
 $$("[data-close]").forEach((el) =>
   el.addEventListener("click", () => closeModal(el.dataset.close))
 );
+
+// --- TOPUP SYSTEM (SECURE REQUEST) ---
+window.openTopupModal = () => {
+  state.topupAmount = 0;
+  state.tempTopupProof = null;
+  $("#topupProofText").textContent = "📷 Upload Bukti";
+  $(".proof-upload").style.background = "#f8fafc";
+  $(".proof-upload").style.borderColor = "#cbd5e1";
+
+  // Render Grid Pilihan Harga
+  const amounts = [
+    10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 100000,
+  ];
+  const grid = $("#topupGrid");
+  grid.innerHTML = amounts
+    .map(
+      (amt) =>
+        `<div class="amount-btn" onclick="selectTopupAmount(${amt}, this)">${rupiah(
+          amt
+        )}</div>`
+    )
+    .join("");
+
+  openModal("topupModal");
+};
+
+window.selectTopupAmount = (amt, el) => {
+  state.topupAmount = amt;
+  // Reset visual selection
+  $$(".amount-btn").forEach((b) => b.classList.remove("active"));
+  // Highlight selected
+  el.classList.add("active");
+};
+
+window.triggerTopupProof = () => {
+  $("#topupProofInput").click();
+};
+
+window.handleTopupProof = async (input) => {
+  if (input.files && input.files[0]) {
+    try {
+      const compressed = await compressImage(input.files[0], 500, 0.7);
+      state.tempTopupProof = compressed;
+      $("#topupProofText").textContent = "✅ Foto Tersimpan";
+      $(".proof-upload").style.background = "#f0fdf4";
+      $(".proof-upload").style.borderColor = "#22c55e";
+    } catch (e) {
+      alert("Gagal proses gambar");
+    }
+  }
+};
+
+window.copyToClipboard = (text) => {
+  navigator.clipboard.writeText(text);
+  showToast("Nomor rekening disalin!");
+};
+
+window.submitTopupRequest = async () => {
+  if (!state.user) return requireLogin();
+  if (state.topupAmount === 0) return alert("Pilih nominal topup dulu.");
+  if (!state.tempTopupProof) return alert("Wajib upload bukti transfer.");
+
+  const btn = $("#btnSubmitTopup");
+  btn.disabled = true;
+  btn.textContent = "Mengirim...";
+
+  try {
+    // Create Request in Database (Pending Status)
+    await addDoc(collection(db, "topups"), {
+      userId: state.user.id,
+      userName: state.user.name,
+      amount: state.topupAmount,
+      proof: state.tempTopupProof,
+      status: "pending", // Secure: Only admin can change this to approved
+      timestamp: Date.now(),
+      method: "transfer",
+    });
+
+    closeModal("topupModal");
+    showToast("✅ Permintaan Topup dikirim. Tunggu admin verifikasi.");
+
+    // Reset
+    state.topupAmount = 0;
+    state.tempTopupProof = null;
+  } catch (e) {
+    alert("Gagal kirim: " + e.message);
+  }
+  btn.disabled = false;
+  btn.textContent = "Ajukan Isi Saldo";
+};
+
+// --- REORDER & RATE LOGIC ---
+window.reorder = (oid) => {
+  const o = state.orders.find((x) => x.id === oid);
+  if (!o) return;
+  if (state.cart.length > 0 && state.cart[0].vendorId !== o.vendorId) {
+    if (
+      !confirm(
+        "Keranjang berisi menu dari toko lain. Ganti dengan pesanan ini?"
+      )
+    )
+      return;
+  }
+  state.cart = o.items.map((i) => ({ ...i }));
+  saveCart();
+  updateFab();
+  showToast("Pesanan dimasukkan ke keranjang!");
+  openGlobalCart();
+};
+
+// Variabel Global untuk Rating
+let tempRating = 0;
+let tempRatingOid = null;
+
+window.rate = (oid) => {
+  tempRatingOid = oid;
+  tempRating = 0;
+  updateStarUI(0);
+  $("#rateModal").classList.remove("hidden");
+};
+
+window.updateStarUI = (n) => {
+  tempRating = n;
+  const stars = [1, 2, 3, 4, 5]
+    .map(
+      (i) =>
+        `<span onclick="updateStarUI(${i})" style="color: ${
+          i <= n ? "#ffc107" : "#e2e8f0"
+        }; transition:0.2s; cursor:pointer;">★</span>`
+    )
+    .join("");
+  $("#starContainer").innerHTML = stars;
+};
+
+window.submitRating = async () => {
+  if (tempRating === 0) return alert("Pilih minimal 1 bintang");
+  const btn = $("#btnSubmitRate");
+  btn.textContent = "Mengirim...";
+  try {
+    await updateDoc(doc(db, "orders", tempRatingOid), { rating: tempRating });
+    showToast("Terima kasih atas penilaiannya!");
+    $("#rateModal").classList.add("hidden");
+    // Update local state agar tombol berubah jadi rating
+    const o = state.orders.find((x) => x.id === tempRatingOid);
+    if (o) o.rating = tempRating;
+    renderOrders();
+  } catch (e) {
+    alert("Gagal mengirim rating");
+  }
+  btn.textContent = "Kirim Penilaian";
+};
+
 initAuth();
