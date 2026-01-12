@@ -55,6 +55,9 @@ let state = {
   tempPaymentProof: null,
 };
 
+// State Variables for Chat UI
+let isIslandExpanded = false;
+
 // --- HELPER: IMAGE COMPRESSOR ---
 function compressImage(file, maxWidth = 600, quality = 0.6) {
   return new Promise((resolve) => {
@@ -90,7 +93,7 @@ function getDistanceVal(v) {
   );
 }
 
-// --- AUTH LOGIC (NEW SPLIT UI) ---
+// --- AUTH LOGIC ---
 window.switchAuthMode = (mode) => {
   if (mode === "login") {
     $("#loginForm").classList.remove("hidden");
@@ -106,6 +109,15 @@ window.requireLogin = () => {
 };
 window.closeAuth = () => {
   showApp();
+};
+
+// >>> TAMBAHAN: FUNGSI MASUK SEBAGAI TAMU <<<
+window.continueGuest = () => {
+  state.user = null;
+  localStorage.removeItem("pikul_user_id");
+  showApp();
+  bootApp();
+  showToast("Masuk sebagai Tamu");
 };
 
 $("#loginForm").addEventListener("submit", async (e) => {
@@ -258,7 +270,305 @@ async function bootApp() {
   updateFab();
 }
 
-// --- HOME ---
+// --- DYNAMIC ISLAND CHAT LOGIC ---
+
+// 1. Fungsi Membuka & Menutup Island
+window.expandIsland = () => {
+  if (isIslandExpanded || !state.chatWithVendorId) return;
+  const island = document.getElementById("dynamicIsland");
+
+  island.classList.remove("hidden");
+  // Small delay for CSS transition
+  requestAnimationFrame(() => {
+    island.classList.add("expanded");
+    isIslandExpanded = true;
+    scrollToBottom();
+  });
+};
+
+window.collapseIsland = (e) => {
+  if (e) e.stopPropagation();
+  const island = document.getElementById("dynamicIsland");
+  island.classList.remove("expanded");
+  isIslandExpanded = false;
+
+  // Reset Menus
+  document.getElementById("attachMenu").classList.remove("active");
+  document.getElementById("emojiPanel").classList.remove("active");
+};
+
+// 2. Select Chat (Trigger Utama)
+window.selectChat = (vid) => {
+  if (!state.user) return requireLogin();
+
+  state.chatWithVendorId = vid;
+  const vendor = state.vendors.find((v) => v.id === vid) || {
+    name: "Mitra Pikul",
+  };
+
+  // Update Nama Toko di Header
+  document.getElementById("diChatName").innerText = vendor.name;
+
+  const island = document.getElementById("dynamicIsland");
+  island.classList.remove("hidden");
+
+  // Render chat
+  renderChatInsideIsland();
+
+  // Auto expand setelah delay kecil
+  setTimeout(() => {
+    island.classList.add("expanded");
+    isIslandExpanded = true;
+  }, 100);
+
+  closeModal("vendorModal");
+};
+
+async function renderChatInsideIsland() {
+  const vid = state.chatWithVendorId;
+  const v = state.vendors.find((x) => x.id === vid);
+  const chatBox = $("#diChatBox");
+  chatBox.innerHTML = "";
+
+  if (state.unsubChats) state.unsubChats();
+  const q = query(
+    collection(db, "chats", `${state.user.id}_${vid}`, "messages"),
+    orderBy("ts", "asc")
+  );
+
+  state.unsubChats = onSnapshot(q, (s) => {
+    let lastDate = "";
+    chatBox.innerHTML = s.docs
+      .map((d) => {
+        const m = d.data();
+        const dateObj = new Date(m.ts);
+        const isMe = m.from === state.user.id;
+        const timeStr = dateObj.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
+        let contentHtml = "";
+        if (m.type === "image") {
+          contentHtml = `<div class="bubble me"><img src="${m.text}" loading="lazy" /></div>`;
+        } else if (m.type === "sticker") {
+          contentHtml = `<div class="bubble sticker me"><img src="${m.text}" style="width:100px; height:auto; border:none;" /></div>`;
+        } else if (m.type === "location") {
+          // UPDATE: Render Link Google Maps yang Valid
+          const link = m.text.startsWith("http") ? m.text : "#";
+          contentHtml = `<a href="${link}" target="_blank" class="bubble location me" style="text-decoration:none; color:white; display:flex; align-items:center; gap:8px;">
+                            <div style="background:rgba(255,255,255,0.2); width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px;">📍</div>
+                            <div style="display:flex; flex-direction:column;">
+                                <b style="font-size:13px; color:white;">Lokasi Saya</b>
+                                <span style="font-size:10px; opacity:0.8; color:rgba(255,255,255,0.7);">Klik untuk buka Maps</span>
+                            </div>
+                          </a>`;
+        } else {
+          contentHtml = `<div class="bubble ${isMe ? "me" : "them"}">${
+            m.text
+          }</div>`;
+        }
+
+        return `<div style="display:flex; justify-content:${
+          isMe ? "flex-end" : "flex-start"
+        }; margin-bottom:4px;">${contentHtml}</div>`;
+      })
+      .join("");
+    scrollToBottom();
+  });
+}
+
+function scrollToBottom() {
+  const chatBox = document.getElementById("diChatBox");
+  if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+// 3. Kirim Pesan Universal
+// (Dipanggil oleh Text, Image, dan Sticker)
+window.sendMessage = async (content = null, type = "text") => {
+  if (!state.user) return requireLogin();
+  if (!state.chatWithVendorId) return;
+
+  // Jika content null, ambil dari input text
+  if (!content) {
+    const input = document.getElementById("diChatInput");
+    content = input.value.trim();
+    input.value = "";
+    input.focus();
+  }
+
+  if (!content) return;
+
+  const cid = `${state.user.id}_${state.chatWithVendorId}`;
+  const vid = state.chatWithVendorId;
+
+  await addDoc(collection(db, "chats", cid, "messages"), {
+    text: content,
+    type: type,
+    from: state.user.id,
+    ts: Date.now(),
+  });
+
+  // Update Last Message Summary
+  let preview =
+    type === "text"
+      ? content
+      : type === "image"
+      ? "📷 Foto"
+      : type === "sticker"
+      ? "😊 Stiker"
+      : "📍 Lokasi";
+  const v = state.vendors.find((x) => x.id === vid);
+
+  await setDoc(
+    doc(db, "chats", cid),
+    {
+      userId: state.user.id,
+      userName: state.user.name,
+      vendorId: vid,
+      vendorName: v ? v.name : "Unknown",
+      lastMessage: preview,
+      lastUpdate: Date.now(),
+    },
+    { merge: true }
+  );
+
+  scrollToBottom();
+};
+
+/* --- ATTACHMENT & MEDIA LOGIC --- */
+
+// Toggle Menu Attachment (+)
+window.toggleAttachMenu = () => {
+  const menu = document.getElementById("attachMenu");
+  menu.classList.toggle("active");
+  // Tutup emoji jika terbuka agar tidak tumpang tindih
+  document.getElementById("emojiPanel").classList.remove("active");
+};
+
+// 1. Fitur KIRIM FOTO
+window.triggerImageInput = () => {
+  document.getElementById("imageInput").click();
+  toggleAttachMenu(); // Tutup menu setelah klik
+};
+
+window.handleImageUpload = async (event) => {
+  const file = event.target.files[0];
+  if (file) {
+    // Compress gambar sebelum kirim (biar ringan di firebase)
+    const base64 = await compressImage(file, 500, 0.7);
+    sendMessage(base64, "image");
+  }
+};
+
+// 2. Fitur KIRIM LOKASI (FIXED)
+window.sendLocation = () => {
+  toggleAttachMenu();
+
+  if (!state.you || !state.you.ok) {
+    return showToast("⚠️ GPS belum aktif / Lokasi belum ditemukan");
+  }
+
+  // Generate Google Maps URL
+  const mapsUrl = `https://www.google.com/maps?q=${state.you.lat},${state.you.lon}`;
+  sendMessage(mapsUrl, "location");
+};
+
+/* --- EMOJI & STICKER SYSTEM --- */
+
+// Toggle Panel Emoji
+window.toggleEmojiPanel = () => {
+  const panel = document.getElementById("emojiPanel");
+  panel.classList.toggle("active");
+  document.getElementById("attachMenu").classList.remove("active"); // Tutup attach menu
+
+  // Populate Emojis jika kosong
+  const emojiGrid = document.getElementById("tabEmoji");
+  if (emojiGrid.children.length === 0) {
+    const emojis = [
+      "😀",
+      "😁",
+      "😂",
+      "😍",
+      "😎",
+      "😭",
+      "😡",
+      "👍",
+      "👎",
+      "🙏",
+      "🔥",
+      "✨",
+      "❤️",
+      "🛒",
+      "📦",
+      "🏍️",
+    ];
+    emojis.forEach((e) => {
+      const span = document.createElement("div");
+      span.className = "emoji-item";
+      span.innerText = e;
+      span.onclick = () => {
+        document.getElementById("diChatInput").value += e;
+      };
+      emojiGrid.appendChild(span);
+    });
+  }
+};
+
+// Switch Tab (Emoji vs Sticker)
+window.showTab = (type) => {
+  document.getElementById("tabEmoji").style.display =
+    type === "emoji" ? "grid" : "none";
+  document.getElementById("tabSticker").style.display =
+    type === "sticker" ? "grid" : "none";
+
+  // Update Style Active Tab
+  const tabs = document.querySelectorAll(".panel-tab");
+  tabs[0].classList.toggle("active", type === "emoji");
+  tabs[1].classList.toggle("active", type === "sticker");
+};
+
+// Kirim Stiker
+window.sendSticker = (src) => {
+  sendMessage(src, "sticker");
+  document.getElementById("emojiPanel").classList.remove("active"); // Tutup panel
+};
+
+// Enter key untuk kirim pesan
+document
+  .getElementById("diChatInput")
+  .addEventListener("keypress", function (e) {
+    if (e.key === "Enter") sendMessage();
+  });
+
+// --- INBOX LIST (Screen Messages) ---
+function renderInbox() {
+  if (!state.user) {
+    $(
+      "#inboxList"
+    ).innerHTML = `<div class="empty-state-box">Login untuk melihat pesan.</div>`;
+    return;
+  }
+
+  // Simulasi inbox list dari daftar vendor (biar bisa mulai chat)
+  const list = state.vendors
+    .map((v) => {
+      return `<div class="listItem" onclick="selectChat('${v.id}')" style="cursor:pointer; display:flex; align-items:center; gap:12px;">
+            <div style="width:45px; height:45px; background:#f1f5f9; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px;">${v.ico}</div>
+            <div style="flex:1;">
+                <b style="font-size:15px;">${v.name}</b>
+                <div class="muted" style="font-size:13px;">Klik untuk chat</div>
+            </div>
+            <button class="btn small ghost">Chat</button>
+        </div>`;
+    })
+    .join("");
+
+  $("#inboxList").innerHTML =
+    list || `<div class="empty-state-box">Belum ada pedagang.</div>`;
+}
+
+// --- STANDARD APP FUNCTIONS (Home, Map, etc) ---
 let bannerInterval;
 function renderHome() {
   let promoData =
@@ -346,7 +656,7 @@ function renderVendors() {
 }
 $("#search").addEventListener("input", renderVendors);
 
-// --- MAP ENGINE ---
+// --- MAP ---
 function initMap() {
   if (state.map) return;
   if (!$("#map")) return;
@@ -564,242 +874,7 @@ window.trackOrder = (vid) => {
   window.go("Map");
 };
 
-// --- CHAT SYSTEM (ENHANCED) ---
-window.toggleAttachMenu = () => {
-  $("#attachMenu").classList.toggle("visible");
-};
-window.toggleSticker = () => {
-  $("#attachMenu").classList.remove("visible");
-  $("#stickerSheet").classList.toggle("visible");
-  renderStickers("emoji");
-};
-window.triggerImage = () => {
-  $("#attachMenu").classList.remove("visible");
-  $("#imageInput").click();
-};
-window.handleImageUpload = async (input) => {
-  if (input.files && input.files[0]) {
-    try {
-      const compressed = await compressImage(input.files[0], 500, 0.7);
-      await sendMessage(compressed, "image");
-      showToast("Foto terkirim!");
-    } catch (e) {
-      alert("Gagal kirim: " + e.message);
-    }
-    input.value = "";
-  }
-};
-window.sendLocation = async () => {
-  $("#attachMenu").classList.remove("visible");
-  if (!state.you.ok) return showToast("GPS belum aktif");
-  const mapsUrl = `https://www.google.com/maps?q=${state.you.lat},${state.you.lon}`;
-  await sendMessage(mapsUrl, "location");
-  showToast("Lokasi dikirim!");
-};
-window.renderStickers = (type) => {
-  const grid = $("#stickerGrid");
-  $$(".segment-btn").forEach((b) => b.classList.remove("active"));
-  if (type === "emoji") {
-    $$(".segment-btn")[0].classList.add("active");
-    const emojis = [
-      "😀",
-      "😂",
-      "😍",
-      "😭",
-      "😡",
-      "👍",
-      "👎",
-      "🙏",
-      "🔥",
-      "❤️",
-      "🎉",
-      "👋",
-      "🤔",
-      "😴",
-      "🤢",
-      "🥳",
-    ];
-    grid.innerHTML = emojis
-      .map(
-        (e) =>
-          `<div class="sticker-item" onclick="sendSticker('${e}', 'emoji')">${e}</div>`
-      )
-      .join("");
-  } else {
-    $$(".segment-btn")[1].classList.add("active");
-    const stickers = [
-      "🍔",
-      "🍕",
-      "🍜",
-      "☕",
-      "🛵",
-      "✅",
-      "❌",
-      "⏳",
-      "🏠",
-      "💵",
-      "😋",
-      "🥡",
-    ];
-    grid.innerHTML = stickers
-      .map(
-        (s) =>
-          `<div class="sticker-item" style="font-size:50px" onclick="sendSticker('${s}', 'sticker')">${s}</div>`
-      )
-      .join("");
-  }
-};
-window.sendSticker = async (content, type) => {
-  $("#stickerSheet").classList.remove("visible");
-  await sendMessage(content, type === "emoji" ? "text" : "sticker");
-};
-async function sendMessage(content, type = "text") {
-  if (!state.user) return requireLogin();
-  if (!content || !state.chatWithVendorId) return;
-  const cid = `${state.user.id}_${state.chatWithVendorId}`;
-  const vid = state.chatWithVendorId;
-  await addDoc(collection(db, "chats", cid, "messages"), {
-    text: content,
-    type: type,
-    from: state.user.id,
-    ts: Date.now(),
-  });
-  let preview =
-    type === "text"
-      ? content
-      : type === "image"
-      ? "📷 Foto"
-      : type === "location"
-      ? "📍 Lokasi"
-      : "😊 Stiker";
-  const v = state.vendors.find((x) => x.id === vid);
-  await setDoc(
-    doc(db, "chats", cid),
-    {
-      userId: state.user.id,
-      userName: state.user.name,
-      vendorId: vid,
-      vendorName: v ? v.name : "Unknown",
-      lastMessage: preview,
-      lastUpdate: Date.now(),
-    },
-    { merge: true }
-  );
-}
-$("#sendChatBtn").addEventListener("click", () => {
-  const t = $("#chatInput").value.trim();
-  if (t) {
-    sendMessage(t, "text");
-    $("#chatInput").value = "";
-  }
-});
-
-// --- RENDER CHAT WITH DATES ---
-async function renderChat() {
-  const vid = state.chatWithVendorId;
-  if (!vid) {
-    $("#chatWith").textContent = "Pilih Pedagang";
-    $("#chatBox").innerHTML =
-      "<div class='muted' style='text-align:center; padding:20px'>Pilih pedagang dulu.</div>";
-    return;
-  }
-  const v = state.vendors.find((x) => x.id === vid);
-  $("#chatWith").textContent = v ? v.name : "Unknown";
-  $("#chatBox").innerHTML = "";
-  if (state.unsubChats) state.unsubChats();
-  const q = query(
-    collection(db, "chats", `${state.user.id}_${vid}`, "messages"),
-    orderBy("ts", "asc")
-  );
-  state.unsubChats = onSnapshot(q, (s) => {
-    let lastDate = "";
-    $("#chatBox").innerHTML = s.docs
-      .map((d) => {
-        const m = d.data();
-        const dateObj = new Date(m.ts);
-        const dateStr = dateObj.toLocaleDateString();
-        let dateHeader = "";
-
-        // Add Date Separator
-        if (dateStr !== lastDate) {
-          const displayDate =
-            dateStr === new Date().toLocaleDateString() ? "HARI INI" : dateStr;
-          dateHeader = `<div class="chat-date-separator">${displayDate}</div>`;
-          lastDate = dateStr;
-        }
-
-        const isMe = m.from === state.user.id;
-        const timeStr = dateObj.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-
-        let contentHtml = "";
-        if (m.type === "image")
-          contentHtml = `<div class="bubble image ${
-            isMe ? "me" : "them"
-          }"><img src="${m.text}" loading="lazy" /></div>`;
-        else if (m.type === "location")
-          contentHtml = `<a href="${
-            m.text
-          }" target="_blank" class="bubble location ${
-            isMe ? "me" : "them"
-          }"><span>📍</span> <span>Lihat Lokasi</span></a>`;
-        else if (m.type === "sticker")
-          contentHtml = `<div class="bubble sticker ${isMe ? "me" : "them"}">${
-            m.text
-          }</div>`;
-        else
-          contentHtml = `<div class="bubble ${
-            isMe ? "me" : "them"
-          }"><div class="bubble-content">${m.text}</div></div>`;
-
-        // Add Metadata (Time & Check) inside bubble logic if text, or outside if sticky
-        // Simplified: Just put meta inside the text bubble wrapper for text, or append for others
-        if (m.type === "text") {
-          contentHtml = `<div class="bubble ${isMe ? "me" : "them"}">
-                ${m.text}
-                <div class="bubble-meta">
-                    <span class="bubble-time">${timeStr}</span>
-                    ${isMe ? '<span class="bubble-status">✓✓</span>' : ""}
-                </div>
-             </div>`;
-        } else {
-          // For non-text, wrap in bubble container
-          // (Logic simplified for this snippet, assumes CSS handles layout)
-        }
-
-        return `${dateHeader}<div style="display:flex; justify-content:${
-          isMe ? "flex-end" : "flex-start"
-        }; margin-bottom:4px; max-width:85%; align-self:${
-          isMe ? "flex-end" : "flex-start"
-        }">${contentHtml}</div>`;
-      })
-      .join("");
-    $("#chatBox").scrollTop = $("#chatBox").scrollHeight;
-  });
-}
-
-// ... (Rest of functions SAMA) ...
-window.openPickChat = () => {
-  if (!state.user) return requireLogin();
-  const list = state.vendors.length
-    ? state.vendors
-        .map(
-          (v) =>
-            `<div class="listItem" onclick="selectChat('${v.id}')" style="cursor:pointer"><div class="rowBetween"><div style="display:flex; align-items:center; gap:10px;"><div style="background:#f1f5f9; width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:10px;">${v.ico}</div><b>${v.name}</b></div><button class="btn small ghost">Chat</button></div></div>`
-        )
-        .join("")
-    : `<div class="empty-state-box">Belum ada pedagang aktif.</div>`;
-  $("#pickChatList").innerHTML = list;
-  openModal("pickChatModal");
-};
-$("#pickChatBtn").addEventListener("click", window.openPickChat);
-window.selectChat = (id) => {
-  state.chatWithVendorId = id;
-  closeModal("pickChatModal");
-  renderChat();
-};
+// --- MENU & CART ---
 const MENU_DEFAULTS = {
   bakso: [{ id: "m1", name: "Bakso Urat", price: 15000 }],
   kopi: [{ id: "k1", name: "Kopi Susu", price: 12000 }],
@@ -1123,7 +1198,7 @@ $("#chatVendorBtn").addEventListener("click", () => {
   if (state.selectedVendorId) {
     state.chatWithVendorId = state.selectedVendorId;
     closeModal("vendorModal");
-    window.go("Messages");
+    window.selectChat(state.selectedVendorId);
   } else {
     showToast("Error: ID Vendor");
   }
@@ -1146,7 +1221,7 @@ window.go = (n) => {
     initMap();
     setTimeout(() => state.map.invalidateSize(), 300);
   }
-  if (n === "Messages") renderChat();
+  if (n === "Messages") renderInbox();
 };
 $$(".nav").forEach((b) =>
   b.addEventListener("click", () => window.go(b.dataset.go))

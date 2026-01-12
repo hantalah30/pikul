@@ -41,7 +41,7 @@
         color: var(--text);
       }
 
-      /* --- NEW AUTH LAYOUT --- */
+      /* --- AUTH STYLES --- */
       .auth-page {
         width: 100%;
         height: 100vh;
@@ -50,20 +50,17 @@
         justify-content: center;
         background: #fff;
       }
-
       .auth-split {
         width: 100%;
         height: 100%;
         display: flex;
         overflow: hidden;
       }
-
-      /* Left Side (Visual) */
       .auth-visual {
         flex: 1;
         background: linear-gradient(135deg, #ff7a00, #ff9a3d);
         position: relative;
-        display: none; /* Hidden on mobile */
+        display: none;
         flex-direction: column;
         justify-content: center;
         padding: 60px;
@@ -95,13 +92,6 @@
         font-weight: 800;
         letter-spacing: -1px;
       }
-      .visual-content p {
-        font-size: 18px;
-        line-height: 1.6;
-        opacity: 0.9;
-      }
-
-      /* Right Side (Form) */
       .auth-form-side {
         flex: 1;
         max-width: 600px;
@@ -109,15 +99,21 @@
         background: white;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        padding: 40px;
+        padding: 20px;
         overflow-y: auto;
+        height: 100%;
+        box-sizing: border-box;
       }
-
+      @media (min-height: 700px) {
+        .auth-form-side {
+          justify-content: center;
+        }
+      }
       .auth-card {
         width: 100%;
         max-width: 400px;
         margin: 0 auto;
+        padding: 10px 0;
       }
       .brand-header {
         display: flex;
@@ -136,7 +132,6 @@
         color: var(--text);
         letter-spacing: -0.5px;
       }
-
       .auth-title {
         font-size: 28px;
         font-weight: 700;
@@ -148,8 +143,6 @@
         margin-bottom: 32px;
         font-size: 15px;
       }
-
-      /* Form Elements */
       .form-group {
         margin-bottom: 20px;
       }
@@ -173,13 +166,11 @@
         color: #334155;
         box-sizing: border-box;
       }
-      .form-input:focus,
-      .form-select:focus {
+      .form-input:focus {
         border-color: var(--primary);
         background: white;
         box-shadow: 0 0 0 4px rgba(255, 122, 0, 0.1);
       }
-
       .btn-auth {
         width: 100%;
         padding: 16px;
@@ -196,12 +187,7 @@
       .btn-auth:hover {
         background: var(--primary-dark);
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(255, 122, 0, 0.25);
       }
-      .btn-auth:active {
-        transform: translateY(0);
-      }
-
       .auth-switch {
         text-align: center;
         margin-top: 24px;
@@ -214,27 +200,32 @@
         text-decoration: none;
         cursor: pointer;
       }
-      .auth-link:hover {
-        text-decoration: underline;
+      .customer-link-container {
+        margin-top: 40px;
+        text-align: center;
+        padding-top: 20px;
+        border-top: 1px dashed #e2e8f0;
       }
-
-      .back-link {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--text-muted);
-        text-decoration: none;
-        display: flex;
+      .customer-link {
+        display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
+        color: #64748b;
+        font-size: 14px;
+        text-decoration: none;
+        font-weight: 600;
+        padding: 12px 24px;
+        background: #f1f5f9;
+        border-radius: 50px;
+        transition: 0.2s;
       }
-      .back-link:hover {
+      .customer-link:hover {
+        background: #e2e8f0;
         color: var(--primary);
+        transform: translateY(-2px);
       }
 
-      /* App Layout Styles (Existing) */
+      /* --- APP LAYOUT --- */
       .app-layout {
         display: flex;
         height: 100vh;
@@ -260,247 +251,305 @@
         position: relative;
       }
 
-      /* --- CHAT & OTHER STYLES (Keep Existing) --- */
-      .chat-layout {
+      /* --- FLOATING BUBBLE --- */
+      .floating-bubble {
+        position: fixed;
+        bottom: 100px;
+        right: 20px;
+        width: 60px;
+        height: 60px;
+        background: linear-gradient(135deg, #ff7a00, #ff5e00);
+        border-radius: 50%;
+        box-shadow: 0 4px 20px rgba(255, 122, 0, 0.4);
         display: flex;
-        height: calc(100vh - 140px);
-        background: white;
-        border-radius: 16px;
-        box-shadow: var(--shadow);
-        overflow: hidden;
-        position: relative;
-        border: 1px solid var(--border);
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        color: white;
+        z-index: 9999;
+        cursor: grab;
+        transition: transform 0.1s;
+        touch-action: none;
       }
-      .chat-sidebar {
-        width: 100%;
+      .floating-bubble:active {
+        cursor: grabbing;
+        transform: scale(0.95);
+      }
+      .bubble-badge {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 18px;
+        height: 18px;
+        background: red;
+        color: white;
+        font-size: 10px;
+        font-weight: bold;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid white;
+        opacity: 0;
+        transition: 0.2s;
+      }
+      .bubble-badge.visible {
+        opacity: 1;
+      }
+
+      /* --- FLOATING CHAT WINDOW --- */
+      .floating-window {
+        position: fixed;
+        bottom: 80px;
+        right: 20px;
+        width: 350px;
+        height: 500px;
+        max-width: 90%;
+        max-height: 70vh;
         background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        z-index: 9998;
         display: flex;
         flex-direction: column;
-        z-index: 10;
+        overflow: hidden;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        transform: scale(0);
+        transform-origin: bottom right;
+        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       }
-      .chat-list {
+      .floating-window.active {
+        transform: scale(1);
+      }
+
+      .view-chat-list {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        width: 100%;
+      }
+      .chat-list-header {
+        padding: 16px;
+        background: #fff;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .chat-list-content {
         flex: 1;
         overflow-y: auto;
       }
       .chat-entry {
-        padding: 16px;
-        border-bottom: 1px solid #f1f5f9;
-        cursor: pointer;
+        padding: 12px 16px;
         display: flex;
         align-items: center;
         gap: 12px;
+        cursor: pointer;
         transition: 0.2s;
+        border-bottom: 1px solid #f8fafc;
       }
-      .chat-entry:active {
-        background: #f8fafc;
-      }
-      .chat-entry.active {
+      .chat-entry:hover {
         background: #fff7ed;
-        border-left: 3px solid var(--primary);
       }
-      .chat-room {
+      .chat-avatar {
+        width: 40px;
+        height: 40px;
+        background: #f1f5f9;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        flex-shrink: 0;
+      }
+      .chat-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .chat-name {
+        font-weight: 700;
+        font-size: 14px;
+        color: #1e293b;
+        display: block;
+      }
+      .chat-last {
+        font-size: 12px;
+        color: #64748b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+      }
+
+      .view-chat-room {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        width: 100%;
+        transform: translateX(100%);
+        transition: transform 0.3s;
         position: absolute;
         top: 0;
         left: 0;
-        width: 100%;
-        height: 100%;
-        background: #fdfdfd;
-        display: flex;
-        flex-direction: column;
-        z-index: 20;
-        transform: translateX(100%);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        background: white;
       }
-      .chat-room.active {
+      .view-chat-room.active {
         transform: translateX(0);
       }
-      .chat-room-header {
-        height: 60px;
-        padding: 0 16px;
-        border-bottom: 1px solid var(--border);
+      .room-header {
+        height: 50px;
+        padding: 0 10px;
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
+        border-bottom: 1px solid #f1f5f9;
         background: white;
-        flex-shrink: 0;
       }
-      .chat-messages {
+      .btn-back-room {
+        border: none;
+        background: transparent;
+        font-size: 20px;
+        cursor: pointer;
+        color: #334155;
+      }
+      .room-messages {
         flex: 1;
         overflow-y: auto;
-        padding: 16px;
-        background-color: #f0f2f5;
-        background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-        background-size: 20px 20px;
+        padding: 15px;
         display: flex;
         flex-direction: column;
         gap: 8px;
+        background: #fafafa;
       }
       .chat-input-bar {
-        padding: 10px 16px;
+        padding: 8px 10px;
         background: white;
-        border-top: 1px solid var(--border);
+        border-top: 1px solid #f1f5f9;
         display: flex;
         align-items: center;
         gap: 8px;
-        flex-shrink: 0;
         position: relative;
       }
       .reply-input {
         flex: 1;
-        height: 40px;
-        border: 1px solid #cbd5e1;
-        padding: 0 16px;
+        background: #f1f5f9;
+        border: 1px solid transparent;
+        padding: 10px 14px;
         border-radius: 20px;
         outline: none;
-        font-size: 14px;
+        font-size: 13px;
       }
       .reply-input:focus {
+        background: white;
         border-color: var(--primary);
       }
-      .btn-circle {
-        width: 40px;
-        height: 40px;
+      .btn-send-round {
+        width: 36px;
+        height: 36px;
         border-radius: 50%;
+        background: var(--primary);
+        color: white;
         border: none;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 20px;
+        font-size: 16px;
         cursor: pointer;
-        transition: 0.2s;
-        flex-shrink: 0;
-      }
-      .btn-back {
-        background: transparent;
-        color: var(--text);
-        font-size: 24px;
-        margin-right: -8px;
-      }
-      .btn-attach {
-        background: #f1f5f9;
-        color: var(--text-muted);
-      }
-      .btn-send {
-        background: var(--primary);
-        color: white;
-        padding-left: 4px;
       }
       .bubble {
-        padding: 10px 14px;
+        max-width: 80%;
+        padding: 8px 12px;
         border-radius: 16px;
-        max-width: 75%;
-        font-size: 14px;
+        font-size: 13px;
         line-height: 1.4;
-        box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
-        position: relative;
+        word-wrap: break-word;
       }
       .bubble.me {
-        background: var(--primary);
+        align-self: flex-end;
+        background: linear-gradient(135deg, #ff7a00, #ff5e00);
         color: white;
         border-bottom-right-radius: 4px;
-        align-self: flex-end;
       }
       .bubble.them {
-        background: white;
-        color: var(--text);
-        border-bottom-left-radius: 4px;
         align-self: flex-start;
+        background: white;
+        color: #334155;
+        border: 1px solid #e2e8f0;
+        border-bottom-left-radius: 4px;
       }
-      .bubble.image {
-        padding: 4px;
-        background: white !important;
-      }
-      .bubble.image img {
-        border-radius: 12px;
-        width: 100%;
-        max-width: 240px;
-        display: block;
-      }
-      .bubble.sticker {
-        background: transparent !important;
-        box-shadow: none;
-        font-size: 50px;
-        padding: 0;
+      .bubble img {
+        max-width: 100%;
+        border-radius: 10px;
+        margin-top: 4px;
       }
       .bubble.location {
         display: flex;
-        align-items: center;
         gap: 8px;
+        align-items: center;
+        background: #1e293b;
+        color: white;
         text-decoration: none;
-        font-weight: 600;
-        background: white !important;
-        color: #0284c7 !important;
-        padding: 12px;
+        padding: 10px;
+        border-radius: 12px;
       }
+      .bubble.location.me {
+        background: linear-gradient(135deg, #ff7a00, #ff5e00);
+      }
+
       .attach-menu {
         position: absolute;
-        bottom: 70px;
+        bottom: 60px;
         left: 10px;
         background: white;
-        border-radius: 16px;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
         padding: 10px;
+        border-radius: 12px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
         display: flex;
-        gap: 12px;
+        gap: 10px;
         transform: scale(0);
         transform-origin: bottom left;
         transition: 0.2s;
-        z-index: 50;
+        z-index: 99;
       }
-      .attach-menu.visible {
+      .attach-menu.active {
         transform: scale(1);
       }
-      .attach-item {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 4px;
-        cursor: pointer;
-      }
       .attach-icon {
-        width: 44px;
-        height: 44px;
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
-        color: white;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 20px;
+        color: white;
+        font-size: 18px;
+        margin-bottom: 2px;
       }
-      .sticker-sheet {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: white;
-        border-radius: 20px 20px 0 0;
-        padding: 16px;
-        box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.1);
-        transform: translateY(100%);
-        transition: 0.3s;
-        height: 300px;
-        z-index: 100;
-        display: flex;
-        flex-direction: column;
+      .emoji-panel {
+        height: 0;
+        overflow: hidden;
+        background: #fff;
+        transition: height 0.3s;
       }
-      .sticker-sheet.visible {
-        transform: translateY(0);
-      }
-      .sticker-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 10px;
-        overflow-y: auto;
-        flex: 1;
-      }
-      .sticker-item {
-        font-size: 36px;
-        text-align: center;
+      .emoji-panel.active {
+        height: 160px;
         padding: 8px;
+      }
+      .emoji-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 5px;
+        height: 120px;
+        overflow-y: auto;
+      }
+      .emoji-item {
+        font-size: 22px;
+        text-align: center;
         cursor: pointer;
       }
 
-      /* IMAGE UPLOAD STYLES */
+      /* --- DASHBOARD STYLES (NEW) --- */
       .image-upload-box {
         width: 100%;
         height: 150px;
@@ -551,7 +600,6 @@
         height: 100%;
         object-fit: cover;
       }
-
       .payment-card {
         padding: 16px;
         border-radius: 16px;
@@ -565,9 +613,6 @@
         align-items: center;
         padding: 12px 0;
         border-bottom: 1px dashed var(--border);
-      }
-      .payment-row:last-child {
-        border-bottom: none;
       }
       .qris-preview {
         width: 100%;
@@ -584,20 +629,29 @@
         cursor: pointer;
         transition: 0.2s;
       }
-      .qris-preview:hover {
-        border-color: var(--primary);
+      .qris-preview.has-image {
+        border: 2px solid var(--primary);
+        background: white;
       }
       .qris-preview img {
         width: 100%;
         height: 100%;
         object-fit: contain;
       }
-      .qris-preview.has-image {
-        border: 2px solid var(--primary);
-        background: white;
+
+      /* --- SOLD COUNT BADGE (NEW) --- */
+      .sold-count {
+        background: #fff7ed;
+        color: #c2410c;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 8px;
+        border-radius: 12px;
+        border: 1px solid #ffedd5;
+        margin-top: 4px;
+        display: inline-block;
       }
 
-      /* Modals */
       .modal {
         position: fixed;
         inset: 0;
@@ -622,14 +676,6 @@
         overflow-y: auto;
         animation: slideUp 0.3s;
         z-index: 2001;
-      }
-      @keyframes slideUp {
-        from {
-          transform: translateY(100%);
-        }
-        to {
-          transform: translateY(0);
-        }
       }
       .modal-header {
         display: flex;
@@ -668,7 +714,6 @@
       .hidden {
         display: none !important;
       }
-
       .alert-card {
         padding: 12px 16px;
         border-radius: 12px;
@@ -693,9 +738,6 @@
         border: 1px solid #bbf7d0;
         color: #166534;
       }
-      .alert-icon {
-        font-size: 18px;
-      }
 
       @media (min-width: 768px) {
         .auth-visual {
@@ -717,24 +759,6 @@
           border-radius: 24px;
           max-width: 500px;
         }
-        .chat-layout {
-          height: calc(100vh - 120px);
-          border: 1px solid var(--border);
-        }
-        .chat-sidebar {
-          width: 320px;
-          border-right: 1px solid var(--border);
-        }
-        .chat-room {
-          position: relative;
-          width: auto;
-          flex: 1;
-          transform: none !important;
-          z-index: 0;
-        }
-        .btn-back {
-          display: none;
-        }
       }
     </style>
   </head>
@@ -744,29 +768,23 @@
         <div class="auth-visual">
           <div class="visual-content">
             <h1>Jualan Lebih Laris dengan PIKUL</h1>
-            <p>
-              Gabung dengan ribuan mitra lainnya. Kelola pesanan, menu, dan
-              pelanggan dalam satu aplikasi.
-            </p>
+            <p>Gabung dengan ribuan mitra lainnya.</p>
           </div>
         </div>
-
         <div class="auth-form-side">
-          <a href="../index.html" class="back-link">← Buka Aplikasi Customer</a>
-
           <div class="auth-card">
             <div class="brand-header">
-              <img src="../Mitra-Pikul.png" class="brand-logo" />
-              <span class="brand-text">Mitra PIKUL</span>
+              <img src="../Mitra-Pikul.png" class="brand-logo" /><span
+                class="brand-text"
+                >Mitra PIKUL</span
+              >
             </div>
-
             <form id="loginForm">
               <h2 class="auth-title">Selamat Datang 👋</h2>
               <p class="auth-subtitle">Masuk untuk mengelola toko Anda.</p>
-
               <div class="form-group">
-                <label class="form-label">Email Toko</label>
-                <input
+                <label class="form-label">Email Toko</label
+                ><input
                   id="email"
                   type="email"
                   class="form-input"
@@ -775,8 +793,8 @@
                 />
               </div>
               <div class="form-group">
-                <label class="form-label">Password</label>
-                <input
+                <label class="form-label">Password</label
+                ><input
                   id="password"
                   type="password"
                   class="form-input"
@@ -784,7 +802,6 @@
                   required
                 />
               </div>
-
               <button class="btn-auth" type="submit">Masuk Dashboard</button>
               <div class="auth-switch">
                 Belum jadi mitra?
@@ -793,16 +810,14 @@
                 >
               </div>
             </form>
-
             <form id="registerForm" class="hidden">
               <h2 class="auth-title">Daftar Mitra 🚀</h2>
               <p class="auth-subtitle">
                 Mulai usaha kuliner digitalmu sekarang.
               </p>
-
               <div class="form-group">
-                <label class="form-label">Nama Usaha</label>
-                <input
+                <label class="form-label">Nama Usaha</label
+                ><input
                   id="regName"
                   class="form-input"
                   placeholder="Contoh: Bakso Pak Kumis"
@@ -810,8 +825,8 @@
                 />
               </div>
               <div class="form-group">
-                <label class="form-label">Kategori</label>
-                <select id="regType" class="form-select">
+                <label class="form-label">Kategori</label
+                ><select id="regType" class="form-select">
                   <option value="bakso">Bakso / Mie Ayam</option>
                   <option value="kopi">Kopi / Minuman</option>
                   <option value="nasi">Nasi / Lauk</option>
@@ -819,8 +834,8 @@
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Email</label>
-                <input
+                <label class="form-label">Email</label
+                ><input
                   id="regEmail"
                   type="email"
                   class="form-input"
@@ -829,8 +844,8 @@
                 />
               </div>
               <div class="form-group">
-                <label class="form-label">Password</label>
-                <input
+                <label class="form-label">Password</label
+                ><input
                   id="regPass"
                   type="password"
                   class="form-input"
@@ -838,7 +853,6 @@
                   required
                 />
               </div>
-
               <button class="btn-auth" type="submit">Daftar Sekarang</button>
               <div class="auth-switch">
                 Sudah punya akun?
@@ -847,6 +861,11 @@
                 >
               </div>
             </form>
+            <div class="customer-link-container">
+              <a href="../index.html" class="customer-link"
+                >📱 Buka Aplikasi Customer</a
+              >
+            </div>
           </div>
         </div>
       </div>
@@ -864,9 +883,6 @@
           </button>
           <button class="sb-item" onclick="goSeller('Orders')">
             <span class="icon">📦</span> Pesanan
-          </button>
-          <button class="sb-item" onclick="goSeller('Chat')">
-            <span class="icon">💬</span> Chat Pelanggan
           </button>
         </nav>
         <button onclick="logout()" class="sb-logout">⎋ Keluar</button>
@@ -897,13 +913,11 @@
             </svg>
           </button>
         </header>
-
         <main class="content">
           <section id="sellerHome">
             <div class="dashboard-card" style="text-align: center">
               <div class="shop-logo-upload" onclick="triggerLogoUpload()">
-                <img id="shopLogoPreview" class="hidden" src="" />
-                <span
+                <img id="shopLogoPreview" class="hidden" src="" /><span
                   id="shopLogoPlaceholder"
                   style="font-size: 24px; color: #999"
                   >📷</span
@@ -947,7 +961,6 @@
                 </div>
               </div>
             </div>
-
             <div class="dashboard-grid-layout">
               <div class="dash-col">
                 <div class="section-card">
@@ -983,7 +996,6 @@
                     </div>
                   </div>
                 </div>
-
                 <div class="section-card payment-card">
                   <div class="section-header">
                     <h3>💳 Metode Pembayaran</h3>
@@ -996,14 +1008,12 @@
                         gap: 10px;
                         cursor: pointer;
                       "
-                    >
-                      <input
+                      ><input
                         type="checkbox"
                         id="chkCash"
                         onchange="updatePaymentMethod()"
-                      />
-                      <span>💵 Tunai</span>
-                    </label>
+                      /><span>💵 Tunai</span></label
+                    >
                   </div>
                   <div
                     class="payment-row"
@@ -1024,14 +1034,12 @@
                           gap: 10px;
                           cursor: pointer;
                         "
-                      >
-                        <input
+                        ><input
                           type="checkbox"
                           id="chkQris"
                           onchange="updatePaymentMethod()"
-                        />
-                        <span>📱 QRIS</span>
-                      </label>
+                        /><span>📱 QRIS</span></label
+                      >
                       <small class="muted" id="qrisStatus">Belum Aktif</small>
                     </div>
                     <div id="qrisConfig" class="hidden" style="width: 100%">
@@ -1060,7 +1068,6 @@
                     </div>
                   </div>
                 </div>
-
                 <div
                   id="subAlert"
                   class="alert-card warn hidden"
@@ -1088,7 +1095,6 @@
                     <p>Pembayaran Anda sedang dicek Admin.</p>
                   </div>
                 </div>
-
                 <div
                   id="subActivation"
                   class="alert-card info hidden"
@@ -1124,8 +1130,7 @@
                           border-radius: 8px;
                           border: 1px solid #ccc;
                         "
-                      />
-                      <button
+                      /><button
                         onclick="redeemCode()"
                         class="btn primary"
                         style="background: #166534"
@@ -1135,7 +1140,6 @@
                     </div>
                   </div>
                 </div>
-
                 <div
                   id="subActive"
                   class="alert-card success hidden"
@@ -1148,6 +1152,7 @@
                   </div>
                 </div>
               </div>
+
               <div class="dash-col full-height">
                 <div class="section-header">
                   <h3>Daftar Menu</h3>
@@ -1180,123 +1185,6 @@
               </div>
             </div>
           </section>
-
-          <section id="sellerChat" class="hidden" style="height: 100%">
-            <div class="chat-layout">
-              <div class="chat-sidebar">
-                <div
-                  style="padding: 16px; border-bottom: 1px solid var(--border)"
-                >
-                  <h3 style="margin: 0; font-size: 18px">Pesan</h3>
-                </div>
-                <div id="chatList" class="chat-list"></div>
-              </div>
-              <div id="chatRoom" class="chat-room">
-                <div class="chat-room-header">
-                  <button onclick="closeChat()" class="btn-circle btn-back">
-                    ←
-                  </button>
-                  <div
-                    style="
-                      width: 36px;
-                      height: 36px;
-                      background: #e2e8f0;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      border-radius: 50%;
-                      font-size: 18px;
-                    "
-                  >
-                    👤
-                  </div>
-                  <div>
-                    <b
-                      id="chattingWith"
-                      style="display: block; font-size: 15px; line-height: 1.2"
-                      >-</b
-                    ><span class="muted" style="font-size: 12px"
-                      >Pelanggan</span
-                    >
-                  </div>
-                </div>
-                <div id="msgBox" class="chat-messages"></div>
-                <div class="chat-input-bar">
-                  <div id="attachMenu" class="attach-menu">
-                    <div class="attach-item" onclick="triggerImage()">
-                      <div class="attach-icon" style="background: #3b82f6">
-                        📷
-                      </div>
-                      <span style="font-size: 10px">Foto</span>
-                    </div>
-                    <div class="attach-item" onclick="sendLocation()">
-                      <div class="attach-icon" style="background: #10b981">
-                        📍
-                      </div>
-                      <span style="font-size: 10px">Lokasi</span>
-                    </div>
-                    <div class="attach-item" onclick="toggleSticker()">
-                      <div class="attach-icon" style="background: #f59e0b">
-                        😊
-                      </div>
-                      <span style="font-size: 10px">Stiker</span>
-                    </div>
-                  </div>
-                  <button
-                    class="btn-circle btn-attach"
-                    onclick="toggleAttachMenu()"
-                  >
-                    +
-                  </button>
-                  <input
-                    id="replyInput"
-                    class="reply-input"
-                    placeholder="Ketik pesan..."
-                    autocomplete="off"
-                  />
-                  <button id="sendReplyBtn" class="btn-circle btn-send">
-                    ➤
-                  </button>
-                </div>
-                <div id="stickerSheet" class="sticker-sheet">
-                  <div
-                    style="
-                      display: flex;
-                      justify-content: space-between;
-                      align-items: center;
-                      margin-bottom: 10px;
-                    "
-                  >
-                    <b>Pilih Stiker</b
-                    ><button
-                      onclick="toggleSticker()"
-                      style="background: none; border: none; font-size: 20px"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div style="display: flex; gap: 10px; margin-bottom: 10px">
-                    <button class="btn small" onclick="renderStickers('emoji')">
-                      Emoji</button
-                    ><button
-                      class="btn small primary"
-                      onclick="renderStickers('sticker')"
-                    >
-                      Stiker
-                    </button>
-                  </div>
-                  <div id="stickerGrid" class="sticker-grid"></div>
-                </div>
-                <input
-                  type="file"
-                  id="imageInput"
-                  accept="image/*"
-                  style="display: none"
-                  onchange="handleImageUpload(this)"
-                />
-              </div>
-            </div>
-          </section>
         </main>
       </div>
       <nav class="bottom-nav mobile-only">
@@ -1308,12 +1196,83 @@
           <div class="nav-icon">📦</div>
           <span>Pesanan</span>
         </button>
-        <button class="nav-item" onclick="goSeller('Chat')">
-          <div class="nav-icon">💬</div>
-          <span>Chat</span>
-        </button>
       </nav>
     </div>
+
+    <div id="floatingBubble" class="floating-bubble hidden">
+      💬
+      <div id="bubbleBadge" class="bubble-badge">0</div>
+    </div>
+
+    <div id="floatingChatWindow" class="floating-window">
+      <div id="viewChatList" class="view-chat-list">
+        <div class="chat-list-header">
+          <h3 style="margin: 0; font-size: 16px">Pesan</h3>
+          <button class="icon-btn" onclick="closeChatWindow()">✕</button>
+        </div>
+        <div id="chatListContent" class="chat-list-content"></div>
+      </div>
+
+      <div id="viewChatRoom" class="view-chat-room">
+        <div class="room-header">
+          <button class="btn-back-room" onclick="backToChatList()">←</button>
+          <div
+            style="
+              width: 32px;
+              height: 32px;
+              background: #f1f5f9;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            "
+          >
+            👤
+          </div>
+          <b id="roomTitle" style="font-size: 14px">User</b>
+        </div>
+        <div id="msgBox" class="room-messages"></div>
+
+        <div id="attachMenu" class="attach-menu">
+          <div class="attach-item" onclick="triggerImage()">
+            <div class="attach-icon" style="background: #ec4899">📷</div>
+          </div>
+          <div class="attach-item" onclick="sendLocation()">
+            <div class="attach-icon" style="background: #0ea5e9">📍</div>
+          </div>
+        </div>
+
+        <div id="emojiPanel" class="emoji-panel">
+          <div class="panel-tabs">
+            <span class="panel-tab active" onclick="showTab('emoji')"
+              >EMOJI</span
+            ><span class="panel-tab" onclick="showTab('sticker')">STIKER</span>
+          </div>
+          <div id="tabEmoji" class="emoji-grid"></div>
+          <div id="tabSticker" class="sticker-grid" style="display: none"></div>
+        </div>
+
+        <div class="chat-input-bar">
+          <button class="icon-btn" onclick="toggleAttachMenu()">+</button>
+          <input
+            id="replyInput"
+            class="reply-input"
+            placeholder="Tulis pesan..."
+            autocomplete="off"
+          />
+          <button class="icon-btn" onclick="toggleEmojiPanel()">☺</button>
+          <button id="sendReplyBtn" class="btn-send-round">➤</button>
+        </div>
+      </div>
+    </div>
+
+    <input
+      type="file"
+      id="imageInput"
+      accept="image/*"
+      style="display: none"
+      onchange="handleImageUpload(event)"
+    />
 
     <div id="menuModal" class="modal hidden">
       <div class="modal-overlay" onclick="closeModal()"></div>
@@ -1365,7 +1324,6 @@
         </form>
       </div>
     </div>
-
     <div id="payModal" class="modal hidden">
       <div class="modal-overlay" onclick="closePayModal()"></div>
       <div class="modal-sheet">
@@ -1388,7 +1346,6 @@
             Rp 5.000
           </div>
         </div>
-
         <label style="font-weight: 600; font-size: 14px"
           >Metode Pembayaran</label
         >
@@ -1403,9 +1360,8 @@
             "
             onclick="selectPayMethod('cash')"
           >
-            💵 Tunai
-          </button>
-          <button
+            💵 Tunai</button
+          ><button
             class="btn small"
             style="
               flex: 1;
@@ -1418,7 +1374,6 @@
             📱 QRIS
           </button>
         </div>
-
         <div
           id="payCash"
           class="hidden"
@@ -1430,8 +1385,7 @@
           "
         >
           <p style="margin: 0; font-size: 13px">
-            Silakan bayar <b>Rp 5.000</b> ke Admin secara tunai. Admin akan
-            memberi kode aktivasi setelah pembayaran diterima.
+            Silakan bayar <b>Rp 5.000</b> ke Admin secara tunai.
           </p>
           <button
             class="btn primary full"
@@ -1441,7 +1395,6 @@
             Ajukan Pembayaran Tunai
           </button>
         </div>
-
         <div
           id="payQris"
           class="hidden"
@@ -1483,8 +1436,7 @@
             accept="image/*"
             class="hidden"
             onchange="handlePayProof(this)"
-          />
-          <button
+          /><button
             class="btn primary full"
             style="margin-top: 15px"
             onclick="submitSubscription('qris')"
