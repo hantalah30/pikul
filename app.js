@@ -754,30 +754,62 @@ window.setCategory = (c) => {
 function renderVendors() {
   const q = ($("#search").value || "").toLowerCase();
   const cat = state.activeCategory.toLowerCase();
+
+  // 1. FILTER
   let list = state.vendors.filter(
     (v) =>
       v.name.toLowerCase().includes(q) &&
       (cat === "semua" || v.type.includes(cat))
   );
-  if (state.you.ok) list.sort((a, b) => getDistanceVal(a) - getDistanceVal(b));
+
+  // 2. SORTING (PENTING: BUKA DULUAN, LALU JARAK)
+  if (state.you.ok) {
+    list.sort((a, b) => {
+      // Prioritas 1: Toko Buka (isLive = true) di atas
+      if (a.isLive && !b.isLive) return -1;
+      if (!a.isLive && b.isLive) return 1;
+
+      // Prioritas 2: Jarak Terdekat
+      return getDistanceVal(a) - getDistanceVal(b);
+    });
+  }
+
+  // 3. RENDER HTML
   $("#vendorList").innerHTML =
     list
       .map((v) => {
         const isClosed = !v.isLive;
+        // Beda status badge
         const statusBadge = isClosed
-          ? `<span class="chip closed">🔴 Tutup</span>`
-          : `<span class="chip">📍 ${distText(v)}</span>`;
-        const cardClass = isClosed ? "vendorCard closed" : "vendorCard";
+          ? `<span class="chip closed">🔴 TUTUP</span>`
+          : `<span class="chip" style="background:#dcfce7; color:#166534;"><span class="status-dot"></span> BUKA • ${distText(
+              v
+            )}</span>`;
+
+        // Beda class card (untuk grayscale & opacity)
+        const cardClass = isClosed ? "vendorCard closed" : "vendorCard open";
+
+        // Beda tombol aksi
+        const actionText = isClosed ? "Tutup" : "Lihat Menu";
+        const actionColor = isClosed ? "color:#94a3b8" : "color:var(--primary)";
+
         const logoDisplay = v.logo ? `<img src="${v.logo}" />` : v.ico;
-        return `<div class="${cardClass}" onclick="openVendor('${
-          v.id
-        }')"><div class="vIco">${logoDisplay}</div><div class="vMeta"><b>${
-          v.name
-        }</b><div class="muted">⭐ ${
-          v.rating ? v.rating.toFixed(1) : "New"
-        } • ${
-          v.busy
-        }</div><div class="chips"><span class="chip">${v.type.toUpperCase()}</span>${statusBadge}</div></div><b style="color:var(--primary)">Lihat</b></div>`;
+
+        return `
+        <div class="${cardClass}" onclick="openVendor('${v.id}')">
+            <div class="vIco">${logoDisplay}</div>
+            <div class="vMeta">
+                <b>${v.name}</b>
+                <div class="muted">⭐ ${
+                  v.rating ? v.rating.toFixed(1) : "New"
+                } • ${v.busy}</div>
+                <div class="chips">
+                    <span class="chip">${v.type.toUpperCase()}</span>
+                    ${statusBadge}
+                </div>
+            </div>
+            <b style="${actionColor}">${actionText}</b>
+        </div>`;
       })
       .join("") || `<div class="card muted">Tidak ada pedagang aktif.</div>`;
 }

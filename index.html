@@ -588,19 +588,63 @@
         border-radius: 10px;
         font-weight: bold;
       }
+
+      /* --- UPGRADED VENDOR CARDS (OPEN VS CLOSED) --- */
+      .vendorCard {
+        transition: 0.2s;
+        border: 1px solid transparent;
+        cursor: pointer;
+      }
+
+      /* Highlight Toko Buka */
+      .vendorCard.open {
+        background: #ffffff;
+        border: 1px solid var(--primary);
+        box-shadow: 0 4px 15px rgba(255, 122, 0, 0.15);
+        transform: translateY(-2px);
+      }
+      .vendorCard.open .vIco {
+        border: 2px solid var(--primary);
+        background: #fff7ed;
+      }
+      .status-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background: #22c55e;
+        border-radius: 50%;
+        margin-right: 4px;
+        box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+        animation: pulseDot 2s infinite;
+      }
+      @keyframes pulseDot {
+        0% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+
+      /* Dimmed Toko Tutup (Updated: No Pointer Events None) */
       .vendorCard.closed {
         opacity: 0.7;
-        background: #f9fafb;
-      }
-      .vendorCard.closed .vIco {
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
         filter: grayscale(100%);
-        background: #e5e7eb;
       }
-      .chip.closed {
-        background: #fecaca;
-        color: #ef4444;
-        border: 1px solid #fca5a5;
+      .vendorCard.closed .chip {
+        background: #94a3b8 !important;
+        color: white !important;
+        border: none !important;
       }
+      .vendorCard.closed .vMeta b {
+        color: #64748b;
+      }
+
       .shop-closed-banner {
         background: #fef2f2;
         border: 1px solid #fecaca;
@@ -660,18 +704,6 @@
         border-radius: 50%;
         animation: pulseRing 2s infinite;
         z-index: -1;
-      }
-      @keyframes pulseRing {
-        0% {
-          width: 0;
-          height: 0;
-          opacity: 0.8;
-        }
-        100% {
-          width: 60px;
-          height: 60px;
-          opacity: 0;
-        }
       }
       .vendor-marker-custom {
         text-align: center;
@@ -864,7 +896,7 @@
         }
       }
 
-      /* --- IMPROVED DYNAMIC ISLAND & CHAT STYLES --- */
+      /* --- DYNAMIC ISLAND STYLES --- */
       .dynamic-island {
         position: fixed;
         top: 10px;
@@ -1758,9 +1790,11 @@
         <div class="amount-grid" id="topupGrid"></div>
         <label class="input-label">Transfer Ke</label>
         <div class="bank-info-box">
-          <div style="font-size: 12px; color: #64748b">BCA (Admin PIKUL)</div>
-          <span class="bank-number" onclick="copyToClipboard('1234567890')"
-            >1234 567 890</span
+          <div style="font-size: 12px; color: #64748b">
+            Seabank (Admin PIKUL)
+          </div>
+          <span class="bank-number" onclick="copyToClipboard('901104589717')"
+            >9011 0458 9717</span
           >
           <div style="font-size: 10px; color: #94a3b8; margin-top: 4px">
             Klik nomor untuk salin
