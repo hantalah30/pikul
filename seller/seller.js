@@ -40,7 +40,7 @@ let state = {
   pendingSub: null,
   approvedSub: null,
   unreadCount: 0,
-  menuSalesCounts: {}, // NEW: Untuk menyimpan jumlah terjual
+  menuSalesCounts: {},
 };
 
 // --- GLOBAL EXPORTS ---
@@ -49,7 +49,7 @@ window.closePayModal = () => $("#payModal").classList.add("hidden");
 window.triggerMenuImageUpload = () => $("#mImageInput").click();
 window.closeModal = () => $("#menuModal").classList.add("hidden");
 
-// --- HELPER ---
+// --- HELPER: COMPRESS IMAGE ---
 function compressImage(file, maxWidth = 500, quality = 0.7) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -74,6 +74,36 @@ function compressImage(file, maxWidth = 500, quality = 0.7) {
     };
   });
 }
+
+// --- HELPER: EXTRACT QR TEXT FROM IMAGE (NEW) ---
+function extractQRFromImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        // Menggunakan library jsQR yang sudah ada di index.html
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+        if (code) {
+          resolve(code.data);
+        } else {
+          resolve(null);
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function formatWA(phone) {
   if (!phone) return "";
   let p = phone.replace(/[^0-9]/g, "");
@@ -160,6 +190,7 @@ $("#registerForm").addEventListener("submit", async (e) => {
       paymentMethods: ["cash"],
       qrisImage: null,
       logo: null,
+      qrisData: null,
     };
     const ref = await addDoc(collection(db, "vendors"), newVendor);
     state.vendor = { id: ref.id, ...newVendor };
@@ -223,12 +254,11 @@ async function initApp() {
     onSnapshot(qOrd, (snap) => {
       state.orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       renderOrdersList();
-      calculateStats(); // This now updates sales counts
+      calculateStats();
     });
 
-    // LISTEN CHATS & SHOW BUBBLE
     listenForChats();
-    initBubbleDrag(); // Init draggable bubble
+    initBubbleDrag();
   } catch (e) {
     console.error(e);
     $("#auth").classList.remove("hidden");
@@ -242,12 +272,9 @@ function listenForChats() {
   );
   onSnapshot(q, (snap) => {
     if (!snap.empty) {
-      // HANYA MUNCULKAN BUBBLE JIKA CHAT WINDOW SEDANG TIDAK AKTIF (TERTUTUP)
       if (!$("#floatingChatWindow").classList.contains("active")) {
         $("#floatingBubble").classList.remove("hidden");
       }
-
-      // Logic Badge (Simple)
       state.unreadCount = 0;
       if (state.unreadCount > 0) {
         $("#bubbleBadge").textContent = state.unreadCount;
@@ -257,7 +284,7 @@ function listenForChats() {
   });
 }
 
-// --- FLOATING BUBBLE LOGIC ---
+// --- FLOATING BUBBLE ---
 function initBubbleDrag() {
   const bubble = document.getElementById("floatingBubble");
   let isDragging = false;
@@ -282,12 +309,8 @@ function initBubbleDrag() {
     const evt = e.type === "touchmove" ? e.touches[0] : e;
     const dx = evt.clientX - startX;
     const dy = evt.clientY - startY;
-
-    let newLeft = initialLeft + dx;
-    let newTop = initialTop + dy;
-
-    bubble.style.left = `${newLeft}px`;
-    bubble.style.top = `${newTop}px`;
+    bubble.style.left = `${initialLeft + dx}px`;
+    bubble.style.top = `${initialTop + dy}px`;
     bubble.style.right = "auto";
     bubble.style.bottom = "auto";
   };
@@ -297,36 +320,30 @@ function initBubbleDrag() {
   };
 
   const onClickBubble = () => {
-    if (!hasMoved) {
-      openChatWindow();
-    }
+    if (!hasMoved) openChatWindow();
   };
 
   bubble.addEventListener("mousedown", startDrag);
   window.addEventListener("mousemove", onDrag);
   window.addEventListener("mouseup", stopDrag);
   bubble.addEventListener("click", onClickBubble);
-
   bubble.addEventListener("touchstart", startDrag);
   window.addEventListener("touchmove", onDrag, { passive: false });
   window.addEventListener("touchend", stopDrag);
 }
 
-// --- CHAT WINDOW LOGIC (UPDATED FOR BUBBLE TOGGLE) ---
-
-// SAAT MEMBUKA WINDOW -> BUBBLE HILANG
+// --- CHAT WINDOW ---
 window.openChatWindow = () => {
   $("#floatingChatWindow").classList.add("active");
-  $("#floatingBubble").classList.add("hidden"); // Sembunyikan bubble
+  $("#floatingBubble").classList.add("hidden");
   loadChatList();
   $("#viewChatList").classList.remove("hidden");
   $("#viewChatRoom").classList.remove("active");
 };
 
-// SAAT MENUTUP WINDOW -> BUBBLE MUNCUL LAGI
 window.closeChatWindow = () => {
   $("#floatingChatWindow").classList.remove("active");
-  $("#floatingBubble").classList.remove("hidden"); // Tampilkan bubble kembali
+  $("#floatingBubble").classList.remove("hidden");
 };
 
 function loadChatList() {
@@ -358,13 +375,11 @@ window.openChatRoom = (chatId, userName) => {
   state.activeChatId = chatId;
   $("#viewChatRoom").classList.add("active");
   $("#roomTitle").textContent = userName;
-
   if (state.unsubMsg) state.unsubMsg();
   const q = query(
     collection(db, "chats", chatId, "messages"),
     orderBy("ts", "asc")
   );
-
   state.unsubMsg = onSnapshot(q, (snap) => {
     $("#msgBox").innerHTML = snap.docs
       .map((d) => {
@@ -404,7 +419,6 @@ function scrollToBottom() {
   if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-// --- SENDING MESSAGES ---
 window.sendMessage = async (content = null, type = "text") => {
   if (!state.activeChatId) return;
   if (!content) {
@@ -413,16 +427,13 @@ window.sendMessage = async (content = null, type = "text") => {
     input.value = "";
     input.focus();
   }
-
   if (!content) return;
-
   await addDoc(collection(db, "chats", state.activeChatId, "messages"), {
     text: content,
     type: type,
     from: state.vendor.id,
     ts: Date.now(),
   });
-
   let preview =
     type === "text"
       ? content
@@ -435,105 +446,14 @@ window.sendMessage = async (content = null, type = "text") => {
     lastMessage: "Anda: " + preview,
     lastUpdate: Date.now(),
   });
-
   scrollToBottom();
 };
-
 $("#sendReplyBtn").addEventListener("click", () => sendMessage());
 $("#replyInput").addEventListener("keypress", (e) => {
   if (e.key === "Enter") sendMessage();
 });
 
-// --- CHAT MENUS ---
-window.toggleAttachMenu = () => {
-  $("#attachMenu").classList.toggle("active");
-  $("#emojiPanel").classList.remove("active");
-};
-window.toggleEmojiPanel = () => {
-  $("#emojiPanel").classList.toggle("active");
-  $("#attachMenu").classList.remove("active");
-  if ($("#tabEmoji").children.length === 0) {
-    const emojis = [
-      "😀",
-      "😁",
-      "😂",
-      "😍",
-      "😎",
-      "😭",
-      "😡",
-      "👍",
-      "👎",
-      "🙏",
-      "🔥",
-      "✨",
-      "❤️",
-      "🛒",
-      "📦",
-      "🏍️",
-    ];
-    $("#tabEmoji").innerHTML = emojis
-      .map(
-        (e) =>
-          `<div class="emoji-item" onclick="insertEmoji('${e}')">${e}</div>`
-      )
-      .join("");
-  }
-};
-window.showTab = (type) => {
-  $("#tabEmoji").style.display = type === "emoji" ? "grid" : "none";
-  $("#tabSticker").style.display = type === "sticker" ? "grid" : "none";
-  $$(".panel-tab").forEach((t) => t.classList.remove("active"));
-  event.target.classList.add("active");
-  if (type === "sticker" && $("#tabSticker").children.length === 0) {
-    const stickers = [
-      "🍔",
-      "🍕",
-      "🍜",
-      "☕",
-      "🛵",
-      "✅",
-      "❌",
-      "⏳",
-      "🏠",
-      "💵",
-      "😋",
-      "🥡",
-    ];
-    $("#tabSticker").innerHTML = stickers
-      .map(
-        (s) =>
-          `<div class="sticker-item" style="font-size:40px; text-align:center;" onclick="sendSticker('${s}')">${s}</div>`
-      )
-      .join("");
-  }
-};
-window.insertEmoji = (e) => {
-  $("#replyInput").value += e;
-};
-window.triggerImage = () => {
-  $("#imageInput").click();
-  $("#attachMenu").classList.remove("active");
-};
-window.handleImageUpload = async (event) => {
-  const file = event.target.files[0];
-  if (file) {
-    const base64 = await compressImage(file, 500, 0.7);
-    sendMessage(base64, "image");
-  }
-};
-window.sendLocation = async () => {
-  $("#attachMenu").classList.remove("active");
-  if (!state.vendor.lat || !state.vendor.lon)
-    return alert("Lokasi toko belum diset!");
-  const mapsUrl = `https://www.google.com/maps?q=${state.vendor.lat},${state.vendor.lon}`;
-  sendMessage(mapsUrl, "location");
-};
-window.sendSticker = (src) => {
-  sendMessage(src, "sticker");
-  document.getElementById("emojiPanel").classList.remove("active");
-};
-
-// --- RENDER & OTHER UI ---
+// --- UI HELPERS ---
 function renderUI() {
   if (!state.vendor) return;
   $("#vName").textContent = state.vendor.name;
@@ -543,7 +463,6 @@ function renderUI() {
     $("#shopLogoPreview").classList.remove("hidden");
     $("#shopLogoPlaceholder").classList.add("hidden");
   }
-
   const isExpired = state.vendor.subscriptionExpiry < Date.now();
   $("#subAlert").classList.add("hidden");
   $("#subPending").classList.add("hidden");
@@ -571,11 +490,10 @@ function renderUI() {
     enableShop();
   }
 
-  // UPDATE: Menambahkan Jumlah Terjual di UI Menu
   $("#menuList").innerHTML =
     (state.vendor.menu || [])
       .map((m, idx) => {
-        const soldCount = state.menuSalesCounts[m.name] || 0; // Ambil jumlah terjual dari map
+        const soldCount = state.menuSalesCounts[m.name] || 0;
         return `
     <div class="menu-card">
       <div style="display:flex; align-items:center;">
@@ -633,7 +551,7 @@ function enableShop() {
   }
 }
 
-// --- REDEEM CODE & PAY ---
+// --- LOGIC LAINNYA ---
 window.redeemCode = async () => {
   const inputCode = parseInt($("#activationCode").value);
   if (!state.approvedSub || !state.approvedSub.activationCode)
@@ -690,7 +608,6 @@ window.submitSubscription = async (method) => {
   alert("Permintaan dikirim! Tunggu validasi Admin.");
 };
 
-// --- NAVIGATION ---
 window.goSeller = (screen) => {
   $$(".nav-item").forEach((n) => n.classList.remove("active"));
   $$(".sb-item").forEach((n) => n.classList.remove("active"));
@@ -707,7 +624,6 @@ window.goSeller = (screen) => {
   }
 };
 
-// ... Rest of map & image upload functions from previous code ...
 window.triggerLogoUpload = () => $("#shopLogoInput").click();
 window.handleLogoUpload = async (input) => {
   if (input.files[0]) {
@@ -789,6 +705,7 @@ window.deleteMenu = async (idx) => {
     await updateDoc(doc(db, "vendors", state.vendor.id), { menu: upd });
   }
 };
+
 function renderPaymentSettings() {
   const methods = state.vendor.paymentMethods || ["cash"];
   const hasQris = methods.includes("qris");
@@ -802,12 +719,9 @@ function renderPaymentSettings() {
 
   if (hasQris) {
     qrisConfig.classList.remove("hidden");
-
-    // Cek kelengkapan data
     const hasData = !!state.vendor.qrisData;
     const hasImage = !!state.vendor.qrisImage;
 
-    // Isi input jika ada data
     if (state.vendor.qrisData)
       $("#qrisDataInput").value = state.vendor.qrisData;
 
@@ -838,6 +752,7 @@ function renderPaymentSettings() {
     qrisStatus.style.color = "#94a3b8";
   }
 }
+
 window.updatePaymentMethod = async () => {
   const cash = $("#chkCash").checked;
   const qris = $("#chkQris").checked;
@@ -853,19 +768,64 @@ window.updatePaymentMethod = async () => {
     paymentMethods: newMethods,
   });
 };
+
 window.triggerQrisUpload = () => $("#qrisInput").click();
+
+// --- MODIFIED: UPLOAD IMAGE & AUTO DECODE QR STRING ---
 window.handleQrisUpload = async (input) => {
   if (input.files[0]) {
+    const file = input.files[0];
     try {
-      const c = await compressImage(input.files[0], 500, 0.7);
-      await updateDoc(doc(db, "vendors", state.vendor.id), { qrisImage: c });
-      alert("QRIS Uploaded!");
+      // 1. Proses Gambar (Visual)
+      const c = await compressImage(file, 500, 0.7);
+
+      // 2. Proses Text (Auto Decode)
+      const decodedText = await extractQRFromImage(file);
+
+      let updateData = { qrisImage: c };
+
+      // Jika berhasil decode, simpan juga text-nya otomatis
+      if (decodedText && decodedText.startsWith("000201")) {
+        updateData.qrisData = decodedText;
+        $("#qrisDataInput").value = decodedText; // Tampilkan di textarea
+        alert("✅ Gambar QRIS terupload & Kode berhasil diekstrak otomatis!");
+      } else {
+        alert(
+          "✅ Gambar QRIS terupload. (Kode tidak terbaca otomatis, silakan copy manual jika perlu dinamis)"
+        );
+      }
+
+      await updateDoc(doc(db, "vendors", state.vendor.id), updateData);
+      renderPaymentSettings();
     } catch (e) {
       alert(e.message);
     }
     input.value = "";
   }
 };
+
+// --- MODIFIED: SAVE QRIS DATA (FIXED SPACE BUG) ---
+window.saveQrisData = async () => {
+  // HANYA TRIM UJUNG, JANGAN HAPUS SPASI DALAM
+  const rawString = $("#qrisDataInput").value.trim();
+
+  if (rawString.length < 20 || !rawString.startsWith("000201")) {
+    return alert(
+      "Format QRIS tidak valid. Harus diawali '000201'. Cobalah upload gambar QRIS Anda agar sistem membaca otomatis."
+    );
+  }
+
+  try {
+    await updateDoc(doc(db, "vendors", state.vendor.id), {
+      qrisData: rawString,
+    });
+    alert("✅ Data QRIS Dinamis berhasil disimpan!");
+    renderPaymentSettings();
+  } catch (e) {
+    alert("Gagal simpan: " + e.message);
+  }
+};
+
 function renderOrdersList() {
   const list = state.orders.sort(
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
@@ -960,7 +920,6 @@ $("#statusToggle").addEventListener("change", async (e) => {
   });
 });
 
-// --- UPDATED: CALCULATE SALES PER ITEM ---
 function calculateStats() {
   const now = new Date();
   const d = new Date(
@@ -983,8 +942,6 @@ function calculateStats() {
     week = 0,
     month = 0,
     total = 0;
-
-  // Reset Sales Counts Map
   let counts = {};
 
   state.orders.forEach((o) => {
@@ -995,8 +952,6 @@ function calculateStats() {
       if (t >= w) week += val;
       if (t >= m) month += val;
       total += val;
-
-      // Count Items
       if (o.items && Array.isArray(o.items)) {
         o.items.forEach((i) => {
           counts[i.name] = (counts[i.name] || 0) + i.qty;
@@ -1004,15 +959,11 @@ function calculateStats() {
       }
     }
   });
-
-  // Save to state & Re-render menu to show badges
   state.menuSalesCounts = counts;
   $("#statToday").textContent = rupiah(today);
   $("#statWeek").textContent = rupiah(week);
   $("#statMonth").textContent = rupiah(month);
   $("#statTotal").textContent = rupiah(total);
-
-  // Call renderUI to update badges (if vendor data is already loaded)
   if (state.vendor) renderUI();
 }
 
@@ -1087,26 +1038,5 @@ function stopGPS() {
 $$("[data-close]").forEach((b) =>
   b.addEventListener("click", window.closeModal)
 );
-
-window.saveQrisData = async () => {
-  // Ambil value dan hapus spasi/enter yang tidak sengaja tercopy
-  const rawString = $("#qrisDataInput").value.replace(/\s/g, "").trim();
-
-  if (rawString.length < 20 || !rawString.startsWith("000201")) {
-    return alert(
-      "Format QRIS tidak valid. Pastikan Anda menyalin hasil scan (teks) dari kode QRIS Anda. Harus diawali '000201'."
-    );
-  }
-
-  try {
-    await updateDoc(doc(db, "vendors", state.vendor.id), {
-      qrisData: rawString,
-    });
-    alert("✅ Data QRIS Dinamis berhasil disimpan!");
-    renderPaymentSettings();
-  } catch (e) {
-    alert("Gagal simpan: " + e.message);
-  }
-};
 
 initApp();

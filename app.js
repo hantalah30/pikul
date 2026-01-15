@@ -604,97 +604,6 @@ function renderInbox() {
     list || `<div class="empty-state-box">Belum ada pedagang.</div>`;
 }
 
-// --- TOPUP SYSTEM (SECURE REQUEST) ---
-// Fungsi ini menggantikan window.doTopup yang lama
-window.openTopupModal = () => {
-  state.topupAmount = 0;
-  state.tempTopupProof = null;
-  $("#topupProofText").textContent = "📷 Upload Bukti";
-  $(".proof-upload").style.background = "#f8fafc";
-  $(".proof-upload").style.borderColor = "#cbd5e1";
-
-  // Render Grid Pilihan Harga
-  const amounts = [
-    10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 100000,
-  ];
-  const grid = $("#topupGrid");
-  grid.innerHTML = amounts
-    .map(
-      (amt) =>
-        `<div class="amount-btn" onclick="selectTopupAmount(${amt}, this)">${rupiah(
-          amt
-        )}</div>`
-    )
-    .join("");
-
-  openModal("topupModal");
-};
-
-window.selectTopupAmount = (amt, el) => {
-  state.topupAmount = amt;
-  // Reset visual selection
-  $$(".amount-btn").forEach((b) => b.classList.remove("active"));
-  // Highlight selected
-  el.classList.add("active");
-};
-
-window.triggerTopupProof = () => {
-  $("#topupProofInput").click();
-};
-
-window.handleTopupProof = async (input) => {
-  if (input.files && input.files[0]) {
-    try {
-      const compressed = await compressImage(input.files[0], 500, 0.7);
-      state.tempTopupProof = compressed;
-      $("#topupProofText").textContent = "✅ Foto Tersimpan";
-      $(".proof-upload").style.background = "#f0fdf4";
-      $(".proof-upload").style.borderColor = "#22c55e";
-    } catch (e) {
-      alert("Gagal proses gambar");
-    }
-  }
-};
-
-window.copyToClipboard = (text) => {
-  navigator.clipboard.writeText(text);
-  showToast("Nomor rekening disalin!");
-};
-
-window.submitTopupRequest = async () => {
-  if (!state.user) return requireLogin();
-  if (state.topupAmount === 0) return alert("Pilih nominal topup dulu.");
-  if (!state.tempTopupProof) return alert("Wajib upload bukti transfer.");
-
-  const btn = $("#btnSubmitTopup");
-  btn.disabled = true;
-  btn.textContent = "Mengirim...";
-
-  try {
-    // Create Request in Database (Pending Status)
-    await addDoc(collection(db, "topups"), {
-      userId: state.user.id,
-      userName: state.user.name,
-      amount: state.topupAmount,
-      proof: state.tempTopupProof,
-      status: "pending", // Secure: Only admin can change this to approved
-      timestamp: Date.now(),
-      method: "transfer",
-    });
-
-    closeModal("topupModal");
-    showToast("✅ Permintaan Topup dikirim. Tunggu admin verifikasi.");
-
-    // Reset
-    state.topupAmount = 0;
-    state.tempTopupProof = null;
-  } catch (e) {
-    alert("Gagal kirim: " + e.message);
-  }
-  btn.disabled = false;
-  btn.textContent = "Ajukan Isi Saldo";
-};
-
 // --- STANDARD APP FUNCTIONS (Home, Map, etc) ---
 let bannerInterval;
 function renderHome() {
@@ -1685,56 +1594,78 @@ function generateCRC16(str) {
     }
   }
   let hex = (crc & 0xffff).toString(16).toUpperCase();
-  return hex.length === 3 ? "0" + hex : hex.padStart(4, "0");
+  return hex.padStart(4, "0"); // FIXED: Selalu 4 digit
 }
 
 function createDynamicQRIS(rawString, amount) {
-  // 1. Bersihkan string
+  if (!rawString || rawString.length < 20) return rawString;
+
   let qris = rawString.trim();
 
-  // 2. Ubah Tag 01 (Point of Initiation) dari 11 (Static) ke 12 (Dynamic)
-  // Biasanya ada di awal: 000201 010211 ...
-  if (qris.includes("010211")) {
-    qris = qris.replace("010211", "010212");
+  // 1. Parsing TLV untuk membangun ulang string
+  let newString = "";
+  let i = 0;
+  let addedAmount = false;
+
+  while (i < qris.length) {
+    // Cek jika cukup karakter untuk ID(2)+Len(2)
+    if (i + 4 > qris.length) break;
+
+    let tag = qris.substring(i, i + 2);
+    let lenStr = qris.substring(i + 2, i + 4);
+    let len = parseInt(lenStr, 10);
+
+    // Cek validitas panjang
+    if (isNaN(len) || i + 4 + len > qris.length) break;
+
+    let value = qris.substring(i + 4, i + 4 + len);
+
+    // STOP jika bertemu tag CRC (63)
+    if (tag === "63") {
+      break;
+    }
+
+    // --- MODIFIKASI LOGIKA ---
+
+    // 1. Tag 01 (Point of Initiation Method): 11 (Static) -> 12 (Dynamic)
+    if (tag === "01") {
+      value = "12";
+    }
+
+    // 2. Tag 54 (Transaction Amount): LEWATI yang lama, kita akan tambah sendiri
+    if (tag === "54") {
+      i += 4 + len;
+      continue;
+    }
+
+    // 3. Inject Tag 54 (Amount) sebelum Tag 58 (Country Code)
+    // Standar mengharuskan 54 sebelum 58.
+    if (tag === "58" && !addedAmount) {
+      let amtStr = Math.floor(amount).toString();
+      let amtLen = amtStr.length.toString().padStart(2, "0");
+      newString += "54" + amtLen + amtStr;
+      addedAmount = true;
+    }
+
+    // Tambahkan tag saat ini ke string baru
+    newString += tag + lenStr.padStart(2, "0") + value;
+
+    i += 4 + len;
   }
 
-  // 3. Hapus CRC lama (Tag 63 di akhir)
-  // Cari posisi tag 6304
-  let crcIndex = qris.lastIndexOf("6304");
-  if (crcIndex !== -1) {
-    qris = qris.substring(0, crcIndex);
-  } else {
-    // Fallback jika format aneh, potong 4 karakter terakhir (nilai CRC lama) dan 4 karakter tag (6304)
-    qris = qris.slice(0, -8);
+  // Fallback: Jika amount belum ditambahkan (misal tidak ada tag 58), tambahkan di akhir
+  if (!addedAmount) {
+    let amtStr = Math.floor(amount).toString();
+    let amtLen = amtStr.length.toString().padStart(2, "0");
+    newString += "54" + amtLen + amtStr;
   }
 
-  // 4. Hapus Tag 54 lama jika ada (agar tidak double amount)
-  // Regex mencari tag 54 diikuti 2 digit panjang
-  qris = qris.replace(/54\d{2}\d+/, "");
+  // 4. Tambah Header CRC
+  newString += "6304";
 
-  // 5. Siapkan Tag 54 Baru (Transaction Amount)
-  let strAmount = amount.toString();
-  let lenAmount = strAmount.length.toString().padStart(2, "0");
-  let tag54 = "54" + lenAmount + strAmount;
-
-  // 6. Sisipkan Tag 54 sebelum Tag 58 (Country Code)
-  // Ini posisi standar yang paling aman
-  let countryTagIndex = qris.indexOf("5802ID");
-  if (countryTagIndex !== -1) {
-    qris = qris.slice(0, countryTagIndex) + tag54 + qris.slice(countryTagIndex);
-  } else {
-    // Jika tidak ketemu tag 58, taruh di akhir data sebelum CRC
-    qris += tag54;
-  }
-
-  // 7. Tambahkan Header CRC
-  qris += "6304";
-
-  // 8. Hitung CRC baru
-  let newCRC = generateCRC16(qris);
-
-  // 9. Gabungkan
-  return qris + newCRC;
+  // 5. Hitung CRC
+  let crc = generateCRC16(newString);
+  return newString + crc;
 }
 
 initAuth();
