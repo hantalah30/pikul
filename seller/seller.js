@@ -794,27 +794,48 @@ function renderPaymentSettings() {
   const hasQris = methods.includes("qris");
   $("#chkCash").checked = methods.includes("cash");
   $("#chkQris").checked = hasQris;
+
   const qrisConfig = $("#qrisConfig");
+  const qrisStatus = $("#qrisStatus");
+  const qrisImg = $("#qrisImg");
+  const qrisPh = $("#qrisPlaceholder");
+
   if (hasQris) {
     qrisConfig.classList.remove("hidden");
-    if (state.vendor.qrisImage) {
-      $("#qrisStatus").textContent = "✅ Aktif";
-      $("#qrisStatus").style.color = "#10b981";
-      $("#qrisImg").src = state.vendor.qrisImage;
-      $("#qrisImg").classList.remove("hidden");
-      $("#qrisPlaceholder").classList.add("hidden");
+
+    // Cek kelengkapan data
+    const hasData = !!state.vendor.qrisData;
+    const hasImage = !!state.vendor.qrisImage;
+
+    // Isi input jika ada data
+    if (state.vendor.qrisData)
+      $("#qrisDataInput").value = state.vendor.qrisData;
+
+    if (hasData) {
+      qrisStatus.textContent = "✅ Dinamis Aktif";
+      qrisStatus.style.color = "#10b981";
+    } else if (hasImage) {
+      qrisStatus.textContent = "⚠️ Statis (Gambar Saja)";
+      qrisStatus.style.color = "#f59e0b";
+    } else {
+      qrisStatus.textContent = "❌ Belum Setup";
+      qrisStatus.style.color = "#ef4444";
+    }
+
+    if (hasImage) {
+      qrisImg.src = state.vendor.qrisImage;
+      qrisImg.classList.remove("hidden");
+      qrisPh.classList.add("hidden");
       $(".qris-preview").classList.add("has-image");
     } else {
-      $("#qrisStatus").textContent = "⚠️ Upload Gambar";
-      $("#qrisStatus").style.color = "#f59e0b";
-      $("#qrisImg").classList.add("hidden");
-      $("#qrisPlaceholder").classList.remove("hidden");
+      qrisImg.classList.add("hidden");
+      qrisPh.classList.remove("hidden");
       $(".qris-preview").classList.remove("has-image");
     }
   } else {
     qrisConfig.classList.add("hidden");
-    $("#qrisStatus").textContent = "Belum Aktif";
-    $("#qrisStatus").style.color = "#94a3b8";
+    qrisStatus.textContent = "Belum Aktif";
+    qrisStatus.style.color = "#94a3b8";
   }
 }
 window.updatePaymentMethod = async () => {
@@ -1066,5 +1087,26 @@ function stopGPS() {
 $$("[data-close]").forEach((b) =>
   b.addEventListener("click", window.closeModal)
 );
+
+window.saveQrisData = async () => {
+  // Ambil value dan hapus spasi/enter yang tidak sengaja tercopy
+  const rawString = $("#qrisDataInput").value.replace(/\s/g, "").trim();
+
+  if (rawString.length < 20 || !rawString.startsWith("000201")) {
+    return alert(
+      "Format QRIS tidak valid. Pastikan Anda menyalin hasil scan (teks) dari kode QRIS Anda. Harus diawali '000201'."
+    );
+  }
+
+  try {
+    await updateDoc(doc(db, "vendors", state.vendor.id), {
+      qrisData: rawString,
+    });
+    alert("✅ Data QRIS Dinamis berhasil disimpan!");
+    renderPaymentSettings();
+  } catch (e) {
+    alert("Gagal simpan: " + e.message);
+  }
+};
 
 initApp();

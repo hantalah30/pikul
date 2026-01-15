@@ -22,6 +22,7 @@
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       crossorigin=""
     ></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
       :root {
         --primary: #ff7a00;
@@ -1746,14 +1747,45 @@
             <option value="cash">💵 Tunai</option>
           </select>
           <div id="qrisContainer" class="qris-display hidden">
-            <small>Scan untuk membayar</small
-            ><img id="qrisImageDisplay" src="" alt="QRIS" /><label
+            <div
+              id="qrisDynamicArea"
+              style="
+                background: white;
+                padding: 10px;
+                border-radius: 8px;
+                display: none;
+                justify-content: center;
+              "
+            >
+              <div id="qrisCanvas"></div>
+            </div>
+            <img
+              id="qrisImageDisplay"
+              src=""
+              alt="QRIS Statis"
+              style="display: none"
+            />
+
+            <div
+              style="
+                margin-top: 10px;
+                text-align: center;
+                color: var(--primary);
+              "
+            >
+              <b id="qrisNominalDisplay" style="font-size: 18px"></b>
+            </div>
+            <small style="display: block; text-align: center; color: #64748b"
+              >Scan untuk bayar sesuai nominal</small
+            >
+
+            <label
               style="
                 display: block;
                 text-align: left;
                 font-size: 12px;
                 font-weight: 600;
-                margin-top: 10px;
+                margin-top: 15px;
               "
               >Upload Bukti (Wajib)</label
             >

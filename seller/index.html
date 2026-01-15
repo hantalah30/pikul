@@ -760,6 +760,18 @@
           max-width: 500px;
         }
       }
+
+      .qris-data-box {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 11px;
+        background: #f1f5f9;
+        margin-top: 8px;
+        font-family: monospace;
+        resize: vertical;
+      }
     </style>
   </head>
   <body>
@@ -1008,12 +1020,13 @@
                         gap: 10px;
                         cursor: pointer;
                       "
-                      ><input
+                    >
+                      <input
                         type="checkbox"
                         id="chkCash"
                         onchange="updatePaymentMethod()"
-                      /><span>💵 Tunai</span></label
-                    >
+                      /><span>💵 Tunai</span>
+                    </label>
                   </div>
                   <div
                     class="payment-row"
@@ -1034,15 +1047,59 @@
                           gap: 10px;
                           cursor: pointer;
                         "
-                        ><input
+                      >
+                        <input
                           type="checkbox"
                           id="chkQris"
                           onchange="updatePaymentMethod()"
-                        /><span>📱 QRIS</span></label
-                      >
+                        /><span>📱 QRIS Dinamis</span>
+                      </label>
                       <small class="muted" id="qrisStatus">Belum Aktif</small>
                     </div>
-                    <div id="qrisConfig" class="hidden" style="width: 100%">
+                    <div
+                      id="qrisConfig"
+                      class="hidden"
+                      style="width: 100%; margin-top: 10px"
+                    >
+                      <label style="font-size: 12px; font-weight: 700"
+                        >Data String QRIS (Wajib untuk Dinamis)</label
+                      >
+                      <p
+                        style="
+                          font-size: 10px;
+                          color: #64748b;
+                          margin: 2px 0 5px;
+                        "
+                      >
+                        Scan QRIS cetak Anda dengan aplikasi scanner, lalu copy
+                        teks kodenya (biasanya diawali "000201...") dan paste di
+                        bawah ini.
+                      </p>
+                      <textarea
+                        id="qrisDataInput"
+                        class="qris-data-box"
+                        rows="3"
+                        placeholder="000201010211265700..."
+                      ></textarea>
+                      <button
+                        class="btn small primary"
+                        style="width: 100%; margin-top: 5px"
+                        onclick="saveQrisData()"
+                      >
+                        Simpan Data QRIS
+                      </button>
+
+                      <hr
+                        style="
+                          margin: 15px 0;
+                          border: none;
+                          border-top: 1px dashed #ddd;
+                        "
+                      />
+
+                      <label style="font-size: 12px; font-weight: 700"
+                        >Gambar QRIS (Opsional/Cadangan)</label
+                      >
                       <div class="qris-preview" onclick="triggerQrisUpload()">
                         <img
                           id="qrisImg"
@@ -1055,7 +1112,7 @@
                           style="text-align: center; color: var(--text-muted)"
                         >
                           <div style="font-size: 24px">📷</div>
-                          <small>Klik untuk upload QRIS</small>
+                          <small>Upload Foto</small>
                         </div>
                       </div>
                       <input
@@ -1446,7 +1503,7 @@
         </div>
       </div>
     </div>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script type="module" src="seller.js"></script>
   </body>
 </html>

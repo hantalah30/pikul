@@ -1155,34 +1155,73 @@ function renderCartModal() {
         }</span><button class="ctrl-btn add" onclick="updateCartQty(${idx}, 1)">+</button></div><button class="iconBtn" style="width:30px; height:30px; margin-left:10px; border-color:#fee; color:red; background:#fff5f5" onclick="deleteCartItem(${idx})">🗑</button></div>`
     )
     .join("");
-  $("#checkoutTotal").textContent = rupiah(
-    state.cart.reduce((a, b) => a + b.price * b.qty, 0)
-  );
+
+  const totalAmount = state.cart.reduce((a, b) => a + b.price * b.qty, 0);
+  $("#checkoutTotal").textContent = rupiah(totalAmount);
+
   const vendorId = state.cart[0].vendorId;
   const vendor = state.vendors.find((v) => v.id === vendorId);
   const paySelect = $("#payMethod");
   const qrisCont = $("#qrisContainer");
   const qrisImg = $("#qrisImageDisplay");
+  const qrisDynamicDiv = $("#qrisDynamicArea"); // Pastikan div ini ada di HTML
+  const qrisCanvas = $("#qrisCanvas"); // Pastikan div ini ada di HTML
+
   paySelect.innerHTML = "";
   qrisCont.classList.add("hidden");
+
   if (vendor && vendor.paymentMethods) {
-    if (vendor.paymentMethods.includes("cash")) {
+    if (vendor.paymentMethods.includes("cash"))
       paySelect.innerHTML += `<option value="cash">💵 Tunai</option>`;
-    }
-    if (vendor.paymentMethods.includes("qris") && vendor.qrisImage) {
+    if (vendor.paymentMethods.includes("qris"))
       paySelect.innerHTML += `<option value="qris">📱 QRIS</option>`;
-    }
   } else {
     paySelect.innerHTML = `<option value="cash">💵 Tunai</option>`;
   }
+
   paySelect.onchange = () => {
     if (paySelect.value === "qris") {
-      qrisImg.src = vendor.qrisImage;
       qrisCont.classList.remove("hidden");
+
+      // LOGIC GENERATE QRIS
+      if (vendor.qrisData) {
+        // Jika seller sudah input string QRIS
+        qrisImg.style.display = "none";
+        $("#qrisNominalDisplay").textContent = rupiah(totalAmount);
+        $("#qrisNominalDisplay").style.display = "block";
+
+        if (qrisDynamicDiv) qrisDynamicDiv.style.display = "flex";
+
+        try {
+          // Generate String Baru
+          const dynamicString = createDynamicQRIS(vendor.qrisData, totalAmount);
+          console.log("QR String:", dynamicString); // Debugging
+
+          // Render QR Code
+          qrisCanvas.innerHTML = "";
+          new QRCode(qrisCanvas, {
+            text: dynamicString,
+            width: 200,
+            height: 200,
+            correctLevel: QRCode.CorrectLevel.L,
+          });
+        } catch (err) {
+          console.error(err);
+          alert("Gagal membuat QRIS Dinamis. Menggunakan statis.");
+          qrisImg.src = vendor.qrisImage;
+          qrisImg.style.display = "block";
+        }
+      } else if (vendor.qrisImage) {
+        // Fallback ke Gambar jika Seller belum input String
+        if (qrisDynamicDiv) qrisDynamicDiv.style.display = "none";
+        $("#qrisNominalDisplay").style.display = "none";
+        qrisImg.src = vendor.qrisImage;
+        qrisImg.style.display = "block";
+      } else {
+        alert("Toko ini belum mengatur pembayaran QRIS dengan benar.");
+      }
+
       state.tempPaymentProof = null;
-      $("#proofText").textContent = "📷 Klik untuk upload bukti";
-      $(".proof-upload").style.borderColor = "#cbd5e1";
-      $(".proof-upload").style.background = "#f8fafc";
     } else {
       qrisCont.classList.add("hidden");
       state.tempPaymentProof = null;
@@ -1632,5 +1671,70 @@ window.submitRating = async () => {
   }
   btn.textContent = "Kirim Penilaian";
 };
+
+function generateCRC16(str) {
+  let crc = 0xffff;
+  for (let c = 0; c < str.length; c++) {
+    crc ^= str.charCodeAt(c) << 8;
+    for (let i = 0; i < 8; i++) {
+      if (crc & 0x8000) {
+        crc = (crc << 1) ^ 0x1021;
+      } else {
+        crc = crc << 1;
+      }
+    }
+  }
+  let hex = (crc & 0xffff).toString(16).toUpperCase();
+  return hex.length === 3 ? "0" + hex : hex.padStart(4, "0");
+}
+
+function createDynamicQRIS(rawString, amount) {
+  // 1. Bersihkan string
+  let qris = rawString.trim();
+
+  // 2. Ubah Tag 01 (Point of Initiation) dari 11 (Static) ke 12 (Dynamic)
+  // Biasanya ada di awal: 000201 010211 ...
+  if (qris.includes("010211")) {
+    qris = qris.replace("010211", "010212");
+  }
+
+  // 3. Hapus CRC lama (Tag 63 di akhir)
+  // Cari posisi tag 6304
+  let crcIndex = qris.lastIndexOf("6304");
+  if (crcIndex !== -1) {
+    qris = qris.substring(0, crcIndex);
+  } else {
+    // Fallback jika format aneh, potong 4 karakter terakhir (nilai CRC lama) dan 4 karakter tag (6304)
+    qris = qris.slice(0, -8);
+  }
+
+  // 4. Hapus Tag 54 lama jika ada (agar tidak double amount)
+  // Regex mencari tag 54 diikuti 2 digit panjang
+  qris = qris.replace(/54\d{2}\d+/, "");
+
+  // 5. Siapkan Tag 54 Baru (Transaction Amount)
+  let strAmount = amount.toString();
+  let lenAmount = strAmount.length.toString().padStart(2, "0");
+  let tag54 = "54" + lenAmount + strAmount;
+
+  // 6. Sisipkan Tag 54 sebelum Tag 58 (Country Code)
+  // Ini posisi standar yang paling aman
+  let countryTagIndex = qris.indexOf("5802ID");
+  if (countryTagIndex !== -1) {
+    qris = qris.slice(0, countryTagIndex) + tag54 + qris.slice(countryTagIndex);
+  } else {
+    // Jika tidak ketemu tag 58, taruh di akhir data sebelum CRC
+    qris += tag54;
+  }
+
+  // 7. Tambahkan Header CRC
+  qris += "6304";
+
+  // 8. Hitung CRC baru
+  let newCRC = generateCRC16(qris);
+
+  // 9. Gabungkan
+  return qris + newCRC;
+}
 
 initAuth();
