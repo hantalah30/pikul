@@ -27,7 +27,7 @@ function rupiah(n) {
 
 let state = {
   vendor: null,
-  watchId: null,
+  watchId: null, // ID untuk Live GPS tracking
   map: null,
   marker: null,
   locMode: "gps",
@@ -47,7 +47,7 @@ let state = {
 window.triggerPayProofUpload = () => $("#payProofInput").click();
 window.closePayModal = () => $("#payModal").classList.add("hidden");
 window.triggerMenuImageUpload = () => $("#mImageInput").click();
-window.closeModal = () => $("#menuModal").classList.add("hidden");
+window.closeModal = (id = "menuModal") => $("#" + id).classList.add("hidden");
 
 // --- HELPER: COMPRESS IMAGE ---
 function compressImage(file, maxWidth = 500, quality = 0.7) {
@@ -75,7 +75,7 @@ function compressImage(file, maxWidth = 500, quality = 0.7) {
   });
 }
 
-// --- HELPER: EXTRACT QR TEXT FROM IMAGE (NEW) ---
+// --- HELPER: EXTRACT QR TEXT ---
 function extractQRFromImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -88,12 +88,11 @@ function extractQRFromImage(file) {
         canvas.height = img.height;
         ctx.drawImage(img, 0, 0);
 
-        // Menggunakan library jsQR yang sudah ada di index.html
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-        if (code) {
-          resolve(code.data);
+        if (typeof jsQR !== "undefined") {
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height);
+          if (code) resolve(code.data);
+          else resolve(null);
         } else {
           resolve(null);
         }
@@ -826,6 +825,17 @@ window.saveQrisData = async () => {
   }
 };
 
+// --- FUNGSI BUKA MODAL BUKTI TRANSFER ---
+window.viewProof = (oid) => {
+  const order = state.orders.find((o) => o.id === oid);
+  if (order && order.paymentProof) {
+    $("#proofImageFull").src = order.paymentProof;
+    $("#proofModal").classList.remove("hidden");
+  } else {
+    alert("Bukti tidak ditemukan");
+  }
+};
+
 function renderOrdersList() {
   const list = state.orders.sort(
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
@@ -851,7 +861,17 @@ function renderOrdersList() {
     let btn = "";
     if (active) {
       if (o.status === "Menunggu Konfirmasi Bayar") {
-        btn = `<div style="background:#f8fafc; padding:10px; border-radius:8px; margin-bottom:10px;"><p style="margin:0 0 5px 0; font-size:12px;"><b>Bukti Transfer:</b></p><img src="${o.paymentProof}" style="width:100%; border-radius:8px; margin-bottom:8px; border:1px solid #ccc; cursor:pointer;" onclick="window.open(this.src)" /><div style="display:flex; gap:8px;"><button class="btn full" style="background:#ef4444; color:white;" onclick="updStat('${o.id}','Dibatalkan (Bukti Salah)')">Tolak</button><button class="btn primary full" onclick="updStat('${o.id}','Diproses')">Terima</button></div></div>`;
+        const proofBtn = o.paymentProof
+          ? `<button class="btn small info" onclick="viewProof('${o.id}')" style="width:100%; margin-bottom:8px; border:1px solid #0ea5e9; background:#e0f2fe; color:#0284c7;">📄 Lihat Bukti Transfer</button>`
+          : "";
+
+        btn = `<div style="background:#f8fafc; padding:10px; border-radius:8px; margin-bottom:10px;">
+                ${proofBtn}
+                <div style="display:flex; gap:8px;">
+                    <button class="btn full" style="background:#ef4444; color:white;" onclick="updStat('${o.id}','Dibatalkan (Bukti Salah)')">Tolak</button>
+                    <button class="btn primary full" onclick="updStat('${o.id}','Diproses')">Terima</button>
+                </div>
+               </div>`;
       } else if (o.status === "Diproses") {
         btn = `<button class="btn primary full" onclick="updStat('${o.id}','Siap Diambil/Diantar')">✅ Selesai Masak</button>`;
       } else if (o.status === "Siap Diambil/Diantar") {
@@ -863,6 +883,12 @@ function renderOrdersList() {
       ? `<a href="https://wa.me/${waNum}?text=Halo" target="_blank" style="font-size:12px; color:#22c55e; text-decoration:none; font-weight:600; background:#f0fdf4; padding:4px 8px; border-radius:6px; border:1px solid #22c55e;">📞 WhatsApp</a>`
       : `<span class="muted" style="font-size:12px">No WA Tidak Ada</span>`;
     const deleteBtn = `<button onclick="deleteOrder('${o.id}')" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:12px; text-decoration:underline; margin-left:auto;">🗑️ Hapus Pesanan</button>`;
+
+    const historyProofBtn =
+      !active && o.paymentMethod === "qris" && o.paymentProof
+        ? `<button onclick="viewProof('${o.id}')" style="background:none; border:none; color:#0ea5e9; cursor:pointer; font-size:12px; text-decoration:underline; margin-right:10px;">📄 Bukti</button>`
+        : "";
+
     return `<div class="order-item"><div class="ord-head"><div><b>${
       o.userName
     }</b> <span style="color:#94a3b8; font-size:12px;">• ${new Date(
@@ -880,7 +906,7 @@ function renderOrdersList() {
       o.paymentMethod === "qris" ? "QRIS" : "Tunai"
     })</span><b style="font-size:16px;">${rupiah(
       o.total
-    )}</b></div><div style="display:flex; margin-top:8px;">${deleteBtn}</div></div>${
+    )}</b></div><div style="display:flex; margin-top:8px;">${historyProofBtn}${deleteBtn}</div></div>${
       btn ? `<div class="ord-foot">${btn}</div>` : ""
     }</div>`;
   };
@@ -967,6 +993,7 @@ function calculateStats() {
   if (state.vendor) renderUI();
 }
 
+// --- FIXED MAPS LOGIC (LIVE GPS) ---
 function initMap() {
   if (state.map) return;
   state.map = L.map("sellerMap").setView(
@@ -986,57 +1013,94 @@ function initMap() {
   });
   state.marker = L.marker([state.vendor.lat, state.vendor.lon], {
     icon: icon,
-    draggable: false,
+    draggable: false, // Default false, enabled in Manual mode
   }).addTo(state.map);
+
+  // Event listener for DRAG (Manual Mode)
   state.marker.on("dragend", async (e) => {
     const { lat, lng } = e.target.getLatLng();
     await updateDoc(doc(db, "vendors", state.vendor.id), { lat, lon: lng });
   });
 }
+
+// --- LOCATION MODE SWITCHER ---
 window.setLocMode = async (mode) => {
   state.locMode = mode;
   updateModeButtons();
+
+  // Save preference to DB
   await updateDoc(doc(db, "vendors", state.vendor.id), { locationMode: mode });
+
   handleLocationLogic();
 };
+
 function updateModeButtons() {
   $$(".mode-tab").forEach((b) => b.classList.remove("active"));
+  // Assuming order: [0]=GPS, [1]=Manual
   state.locMode === "gps"
     ? $$(".mode-tab")[0].classList.add("active")
     : $$(".mode-tab")[1].classList.add("active");
+
   $("#manualHint").classList.toggle("hidden", state.locMode !== "manual");
 }
+
 function handleLocationLogic() {
   if (!state.map || !state.marker) return;
+
   if (state.locMode === "gps") {
+    // Mode GPS: Matikan drag, Nyalakan WatchPosition
     state.marker.dragging.disable();
     startGPS();
   } else {
+    // Mode Manual: Matikan WatchPosition, Nyalakan drag
     stopGPS();
     state.marker.dragging.enable();
   }
 }
+
+// --- LIVE GPS TRACKING ---
 function startGPS() {
-  if (!navigator.geolocation) return;
+  if (!navigator.geolocation) {
+    alert("Browser tidak support GPS.");
+    return;
+  }
+  // Prevent multiple watchers
   if (state.watchId) return;
+
+  const options = {
+    enableHighAccuracy: true,
+    timeout: 10000,
+    maximumAge: 0,
+  };
+
   state.watchId = navigator.geolocation.watchPosition(
     async (pos) => {
       const lat = pos.coords.latitude;
       const lon = pos.coords.longitude;
+
+      // Update DB Realtime
       await updateDoc(doc(db, "vendors", state.vendor.id), { lat, lon });
+
+      // Update UI Map
       if (state.marker) state.marker.setLatLng([lat, lon]);
       if (state.map) state.map.setView([lat, lon], 16);
     },
-    null,
-    { enableHighAccuracy: true }
+    (err) => {
+      console.error("GPS Error:", err);
+    },
+    options
   );
 }
+
 function stopGPS() {
-  if (state.watchId) navigator.geolocation.clearWatch(state.watchId);
-  state.watchId = null;
+  if (state.watchId) {
+    navigator.geolocation.clearWatch(state.watchId);
+    state.watchId = null;
+  }
 }
+
 $$("[data-close]").forEach((b) =>
-  b.addEventListener("click", window.closeModal)
+  b.addEventListener("click", (e) => window.closeModal(e.target.dataset.close))
 );
 
 initApp();

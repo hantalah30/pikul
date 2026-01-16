@@ -7,13 +7,6 @@
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"
     />
     <title>PIKUL Mitra - Kelola Usahamu</title>
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta
-      name="apple-mobile-web-app-status-bar-style"
-      content="black-translucent"
-    />
-    <meta name="apple-mobile-web-app-title" content="PIKUL" />
-    <link rel="apple-touch-icon" href="../pikul.jpeg" />
     <link rel="icon" type="image/jpeg" href="../Mitra-Pikul.png" />
     <link rel="stylesheet" href="styles.css" />
     <link
@@ -1255,7 +1248,6 @@
           </section>
         </main>
       </div>
-
       <nav class="bottom-nav mobile-only">
         <button class="nav-item active" onclick="goSeller('Home')">
           <div class="nav-icon">🏠</div>
@@ -1270,6 +1262,32 @@
           <span>Kasir</span>
         </button>
       </nav>
+    </div>
+
+    <div id="proofModal" class="modal hidden">
+      <div class="modal-overlay" onclick="closeModal('proofModal')"></div>
+      <div class="modal-sheet" style="text-align: center">
+        <div class="modal-header">
+          <h3>Bukti Pembayaran</h3>
+          <button class="icon-btn-close" onclick="closeModal('proofModal')">
+            ✕
+          </button>
+        </div>
+        <img
+          id="proofImageFull"
+          src=""
+          style="
+            width: 100%;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            max-height: 60vh;
+            object-fit: contain;
+          "
+        />
+        <button class="btn primary full" onclick="closeModal('proofModal')">
+          Tutup
+        </button>
+      </div>
     </div>
 
     <div id="floatingBubble" class="floating-bubble hidden">
@@ -1521,27 +1539,5 @@
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script type="module" src="seller.js"></script>
-    <script>
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-          // Sesuaikan path sw.js tergantung lokasi file HTML
-          // Jika di root (index.html): "./sw.js"
-          // Jika di dalam folder (seller/index.html): "../sw.js"
-
-          const swPath =
-            window.location.pathname.includes("/seller/") ||
-            window.location.pathname.includes("/admin/")
-              ? "../sw.js"
-              : "./sw.js";
-
-          navigator.serviceWorker
-            .register(swPath)
-            .then((reg) =>
-              console.log("PWA Service Worker Registered!", reg.scope)
-            )
-            .catch((err) => console.log("PWA Error:", err));
-        });
-      }
-    </script>
   </body>
 </html>

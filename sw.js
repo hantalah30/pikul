@@ -1,4 +1,4 @@
-const CACHE_NAME = "pikul-app-v2";
+const CACHE_NAME = "pikul-app-v3";
 const ASSETS_TO_CACHE = [
   // --- ROOT (CUSTOMER) ---
   "./",
@@ -8,6 +8,8 @@ const ASSETS_TO_CACHE = [
   "./firebase-config.js",
   "./pikul.jpeg",
   "./manifest.json",
+  "./seller/manifest-kasir.json", // Tambahkan baris ini
+  "./Kasir.png",
 
   // --- SELLER ---
   "./seller/",
