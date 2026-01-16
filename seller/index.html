@@ -7,6 +7,13 @@
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"
     />
     <title>PIKUL Mitra - Kelola Usahamu</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="PIKUL" />
+    <link rel="apple-touch-icon" href="../pikul.jpeg" />
     <link rel="icon" type="image/jpeg" href="../Mitra-Pikul.png" />
     <link rel="stylesheet" href="styles.css" />
     <link
@@ -1514,5 +1521,27 @@
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script type="module" src="seller.js"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          // Sesuaikan path sw.js tergantung lokasi file HTML
+          // Jika di root (index.html): "./sw.js"
+          // Jika di dalam folder (seller/index.html): "../sw.js"
+
+          const swPath =
+            window.location.pathname.includes("/seller/") ||
+            window.location.pathname.includes("/admin/")
+              ? "../sw.js"
+              : "./sw.js";
+
+          navigator.serviceWorker
+            .register(swPath)
+            .then((reg) =>
+              console.log("PWA Service Worker Registered!", reg.scope)
+            )
+            .catch((err) => console.log("PWA Error:", err));
+        });
+      }
+    </script>
   </body>
 </html>
