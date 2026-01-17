@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
@@ -1089,7 +1089,9 @@
         font-size: 20px;
         cursor: pointer;
         padding: 5px;
-        transition: transform 0.2s, color 0.2s;
+        transition:
+          transform 0.2s,
+          color 0.2s;
       }
       .icon-btn:hover {
         color: #fff;
@@ -1943,7 +1945,7 @@
           navigator.serviceWorker
             .register(swPath)
             .then((reg) =>
-              console.log("PWA Service Worker Registered!", reg.scope)
+              console.log("PWA Service Worker Registered!", reg.scope),
             )
             .catch((err) => console.log("PWA Error:", err));
         });
