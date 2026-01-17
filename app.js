@@ -963,6 +963,119 @@ window.openVendor = (id) => {
       .join("");
   openModal("vendorModal");
 };
+
+// --- UPDATE: Fungsi Helper untuk hitung penjualan ---
+async function getVendorStats(vendorId) {
+  // Ambil semua order yang SUDAH SELESAI dari toko ini
+  const q = query(
+    collection(db, "orders"),
+    where("vendorId", "==", vendorId),
+    where("status", "==", "Selesai")
+  );
+
+  const snap = await getDocs(q);
+  const counts = {};
+
+  snap.forEach((d) => {
+    const data = d.data();
+    if (data.items && Array.isArray(data.items)) {
+      data.items.forEach((item) => {
+        // Kita hitung berdasarkan Nama Menu (konsisten dengan seller.js)
+        // Jika ada itemId, bisa digunakan juga sebagai key
+        const key = item.name;
+        counts[key] = (counts[key] || 0) + item.qty;
+      });
+    }
+  });
+
+  return counts;
+}
+
+// --- UPDATE: openVendor menjadi ASYNC untuk load data penjualan ---
+window.openVendor = async (id) => {
+  state.selectedVendorId = id;
+  const v = state.vendors.find((x) => x.id === id);
+  if (!v) return;
+
+  $("#vTitle").textContent = v.name;
+  $("#vMeta").textContent = v.type.toUpperCase();
+
+  const isClosed = !v.isLive;
+  let banner = "";
+  if (isClosed) {
+    banner = `<div class="shop-closed-banner">🔒 Maaf, Toko Sedang Tutup</div>`;
+  }
+
+  // Tampilkan Loading sementara di list menu
+  $(
+    "#menuList"
+  ).innerHTML = `<div style="text-align:center; padding:20px; color:#999;">⏳ Memuat menu & data penjualan...</div>`;
+  openModal("vendorModal");
+
+  // 1. Ambil Data Statistik Penjualan
+  let salesCounts = {};
+  try {
+    salesCounts = await getVendorStats(id);
+  } catch (e) {
+    console.error("Gagal load stats", e);
+  }
+
+  // 2. Cari Angka Tertinggi untuk menentukan "Best Seller" (Juara 1)
+  let maxSold = 0;
+  Object.values(salesCounts).forEach((qty) => {
+    if (qty > maxSold) maxSold = qty;
+  });
+
+  const menuData =
+    v.menu && v.menu.length > 0 ? v.menu : MENU_DEFAULTS[v.type] || [];
+
+  // 3. Render Menu dengan Badge
+  $("#menuList").innerHTML =
+    banner +
+    menuData
+      .map((m) => {
+        const btnState = isClosed ? "disabled" : "";
+        const btnText = isClosed ? "Tutup" : "+ Tambah";
+        const btnClass = isClosed ? "btn small" : "btn small primary";
+        const imgDisplay = m.image
+          ? `<img src="${m.image}" class="menu-img" loading="lazy" />`
+          : `<div class="menu-img">🍲</div>`;
+
+        // Logika Badge
+        const sold = salesCounts[m.name] || 0;
+        let badgesHtml = "";
+
+        if (sold > 0) {
+          let badgeContent = "";
+
+          // Jika item ini penjualannya sama dengan maxSold (dan > 0), berarti Best Seller
+          if (sold === maxSold) {
+            badgeContent += `<div class="badge-best-seller">👑 Best Seller</div>`;
+          }
+
+          // Tampilkan jumlah terjual
+          badgeContent += `<div class="badge-sold">🔥 ${sold} Terjual</div>`;
+
+          badgesHtml = `<div class="badge-sold-container">${badgeContent}</div>`;
+        }
+
+        return `
+    <div class="menu-item-card">
+      ${imgDisplay}
+      <div class="menu-info">
+        <b>${m.name}</b>
+        <div class="muted">${rupiah(m.price)}</div>
+        ${badgesHtml} </div>
+      <div class="menu-btn-container">
+        <button class="${btnClass}" ${btnState} onclick="addToCart('${id}', '${
+          m.id
+        }', '${m.name}', ${m.price})">${btnText}</button>
+      </div>
+    </div>`;
+      })
+      .join("");
+};
+
 window.addToCart = (vid, mid, mName, mPrice) => {
   if (!state.user) return requireLogin();
   const v = state.vendors.find((x) => x.id === vid);
