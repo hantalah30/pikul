@@ -16,6 +16,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
+const audioSelesaiMasak = new Audio("pesanan-selesai-dimasak.mp3");
+const audioBayarBerhasil = new Audio("pembayaran-berhasil.mp3");
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
@@ -289,15 +292,61 @@ async function bootApp() {
     if (!$("#screenHome").classList.contains("hidden")) renderHome();
   });
 
+  // Di dalam bootApp()...
+
   if (state.user) {
     onSnapshot(
       query(collection(db, "orders"), where("userId", "==", state.user.id)),
       (s) => {
+        // --- LOGIKA SUARA GLOBAL ---
+        // Jalankan hanya jika bukan loading pertama kali
+        if (!state.firstLoad) {
+          s.docChanges().forEach((change) => {
+            // Kita hanya peduli jika data diubah (modified)
+            if (change.type === "modified") {
+              const newData = change.doc.data();
+              // Ambil data LAMA dari state sebelum di-timpa
+              const oldData = state.orders.find((o) => o.id === change.doc.id);
+
+              if (oldData) {
+                // 1. Cek: Pembayaran Berhasil (Menunggu -> Diproses)
+                if (
+                  oldData.status === "Menunggu Konfirmasi Bayar" &&
+                  newData.status === "Diproses"
+                ) {
+                  console.log("🔔 Pembayaran berhasil!");
+                  audioBayarBerhasil
+                    .play()
+                    .catch((e) => console.log("Audio error:", e));
+                  showToast("✅ Pembayaran Berhasil Diverifikasi!");
+                }
+
+                // 2. Cek: Selesai Masak (Diproses -> Siap Diambil)
+                if (
+                  oldData.status === "Diproses" &&
+                  newData.status === "Siap Diambil/Diantar"
+                ) {
+                  console.log("🔔 Pesanan selesai masak!");
+                  audioSelesaiMasak
+                    .play()
+                    .catch((e) => console.log("Audio error:", e));
+                  showToast("🍲 Pesanan Selesai Dimasak!");
+                }
+              }
+            }
+          });
+        }
+        // -----------------------------
+
+        // Update State Data (Logika Tampilan)
         let raw = s.docs.map((d) => ({ id: d.id, ...d.data() }));
         state.orders = raw.sort(
           (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
         );
         state.firstLoad = false;
+
+        // Render ulang tampilan jika sedang di halaman Orders
+        // (Tapi suara tetap jalan meskipun sedang di Home/Profile)
         renderOrders();
       },
     );
@@ -305,10 +354,6 @@ async function bootApp() {
     state.orders = [];
     renderOrders();
   }
-  renderProfile();
-  window.go("Home");
-  startGPS();
-  updateFab();
 }
 
 // --- GPS SYSTEM IMPROVED ---

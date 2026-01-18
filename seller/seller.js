@@ -17,6 +17,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { firebaseConfig } from "../firebase-config.js";
 
+const audioOrderanBaru = new Audio("orderan-baru.mp3");
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
@@ -274,14 +276,28 @@ async function initApp() {
       collection(db, "orders"),
       where("vendorId", "==", state.vendor.id),
     );
+
+    // GANTI BAGIAN onSnapshot INI:
     onSnapshot(qOrd, (snap) => {
       snap.docChanges().forEach((change) => {
+        // Logika Suara: Cek jika ada pesanan BARU masuk
         if (change.type === "added" && !state.firstLoad) {
           const data = change.doc.data();
-          if (Date.now() - new Date(data.createdAt).getTime() < 60000)
-            playNotification();
+          // Cek waktu agar tidak bunyi saat reload, hanya jika pesanan baru < 1 menit
+          const isRecent =
+            Date.now() - new Date(data.createdAt).getTime() < 60000;
+
+          if (isRecent) {
+            console.log("🔔 Ada orderan baru, mainkan suara!");
+            audioOrderanBaru
+              .play()
+              .catch((e) => console.log("Perlu interaksi user agar bunyi:", e));
+            if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
+          }
         }
       });
+
+      // Update State Data (Logika Tampilan)
       state.orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       renderOrdersList();
       calculateStats();
@@ -533,11 +549,12 @@ function enableShop() {
 }
 
 function playNotification() {
-  const audio = document.getElementById("notifSound");
-  if (audio) {
-    audio.play().catch((e) => console.log("Audio autoplay blocked by browser"));
-    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-  }
+  // Menggunakan file audio baru
+  audioOrderanBaru.play().catch((e) => {
+    console.log("Audio autoplay diblokir browser, perlu interaksi user: ", e);
+  });
+
+  if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
 }
 
 // --- CHAT LOGIC (NEW) ---
