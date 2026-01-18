@@ -4,6 +4,7 @@ import {
   collection,
   addDoc,
   getDocs,
+  getDoc,
   doc,
   onSnapshot,
   query,
@@ -11,6 +12,7 @@ import {
   orderBy,
   updateDoc,
   setDoc,
+  increment,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
@@ -56,7 +58,9 @@ let state = {
   topupAmount: 0,
   tempTopupProof: null,
   watchId: null,
-  mapLocked: false, // Fitur Lock GPS
+  mapLocked: false,
+  // State Voucher
+  activeVoucher: null, // { code, type, value, id }
 };
 
 let isIslandExpanded = false;
@@ -92,7 +96,7 @@ function generatePin() {
 function getDistanceVal(v) {
   if (!state.you.ok) return 999999;
   return Math.sqrt(
-    Math.pow(v.lat - state.you.lat, 2) + Math.pow(v.lon - state.you.lon, 2)
+    Math.pow(v.lat - state.you.lat, 2) + Math.pow(v.lon - state.you.lon, 2),
   );
 }
 
@@ -217,9 +221,6 @@ async function initAuth() {
   const uid = localStorage.getItem("pikul_user_id");
   if (uid) {
     try {
-      const { getDoc } = await import(
-        "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
-      );
       const snap = await getDoc(doc(db, "users", uid));
       if (snap.exists()) state.user = { id: snap.id, ...snap.data() };
       else localStorage.removeItem("pikul_user_id");
@@ -264,13 +265,11 @@ async function bootApp() {
     });
   }
 
-  // LISTENER VENDORS (REALTIME UPDATE POSISI)
   onSnapshot(collection(db, "vendors"), (s) => {
     state.vendors = s.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderMapChips();
     if (!$("#screenHome").classList.contains("hidden")) renderVendors();
 
-    // UPDATE MAP MARKER JIKA PETA AKTIF
     if (
       !$("#screenMap").classList.contains("hidden") ||
       state.trackingVendorId
@@ -296,11 +295,11 @@ async function bootApp() {
       (s) => {
         let raw = s.docs.map((d) => ({ id: d.id, ...d.data() }));
         state.orders = raw.sort(
-          (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+          (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
         );
         state.firstLoad = false;
         renderOrders();
-      }
+      },
     );
   } else {
     state.orders = [];
@@ -328,28 +327,20 @@ function startGPS() {
 
   state.watchId = navigator.geolocation.watchPosition(
     (p) => {
-      // Update Posisi User
       state.you = { ok: true, lat: p.coords.latitude, lon: p.coords.longitude };
-
-      // Update UI Status
       const gpsStatus = $("#gpsStatus");
       if (gpsStatus) {
         gpsStatus.textContent = "GPS Aktif";
-        gpsStatus.className = "pill success"; // Hijau
+        gpsStatus.className = "pill success";
         gpsStatus.style.background = "#dcfce7";
         gpsStatus.style.color = "#166534";
       }
-
-      // Update Marker di Peta
       if (state.map && state.userMarker) {
         state.userMarker.setLatLng([state.you.lat, state.you.lon]);
-
-        // Fitur Lock Camera
         if (state.mapLocked) {
           state.map.setView([state.you.lat, state.you.lon], 16);
         }
-
-        updateMapMarkers(); // Re-calc distance
+        updateMapMarkers();
       }
     },
     (err) => {
@@ -357,7 +348,7 @@ function startGPS() {
       $("#gpsStatus").textContent = "GPS Error";
       $("#gpsStatus").className = "pill warn";
     },
-    options
+    options,
   );
 }
 
@@ -368,25 +359,23 @@ function initMap() {
 
   state.map = L.map("map", { zoomControl: false }).setView(
     [state.you.lat, state.you.lon],
-    15
+    15,
   );
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "© OSM",
   }).addTo(state.map);
 
-  // User Marker (Titik Biru Kedip)
   const userIcon = L.divIcon({ className: "user-pulse", iconSize: [20, 20] });
   state.userMarker = L.marker([state.you.lat, state.you.lon], {
     icon: userIcon,
   }).addTo(state.map);
 
-  // Lingkaran Akurasi (Visual)
   L.circle([state.you.lat, state.you.lon], {
     color: "#3b82f6",
     fillColor: "#3b82f6",
     fillOpacity: 0.1,
-    radius: 100, // Fixed radius visual
+    radius: 100,
     weight: 1,
   }).addTo(state.map);
 
@@ -409,16 +398,12 @@ window.toggleMapLock = () => {
 function updateMapMarkers(fitBounds = false) {
   if (!state.map) return;
   const cat = state.mapCategory.toLowerCase();
-
   let filtered = state.vendors.filter(
-    (v) => cat === "semua" || v.type.toLowerCase().includes(cat)
+    (v) => cat === "semua" || v.type.toLowerCase().includes(cat),
   );
-
-  // Sort by Distance if GPS OK
   if (state.you.ok)
     filtered.sort((a, b) => getDistanceVal(a) - getDistanceVal(b));
 
-  // Render List Terdekat di Bawah Peta
   $("#realtimeList").innerHTML = filtered
     .map((v, idx) => {
       const isClosed = !v.isLive;
@@ -427,25 +412,23 @@ function updateMapMarkers(fitBounds = false) {
       const itemClass = isNearest
         ? "listItem nearest"
         : isClosed
-        ? "listItem closed"
-        : "listItem";
+          ? "listItem closed"
+          : "listItem";
       return `<div class="${itemClass}" onclick="openVendor('${
         v.id
       }')" style="cursor:pointer"><div class="rowBetween"><div><b>${v.ico} ${
         v.name
       }</b><div class="muted" style="font-size:12px">(${v.lat.toFixed(
-        4
+        4,
       )}, ${v.lon.toFixed(
-        4
+        4,
       )})</div></div><div class="pill small">${statusText}</div></div></div>`;
     })
     .join("");
 
-  // Manage Markers
   const bounds = L.latLngBounds();
   if (state.you.ok) bounds.extend([state.you.lat, state.you.lon]);
 
-  // Remove old markers that are filtered out
   Object.keys(state.markers).forEach((id) => {
     const v = filtered.find((x) => x.id === id);
     if (!v) {
@@ -454,15 +437,10 @@ function updateMapMarkers(fitBounds = false) {
     }
   });
 
-  // Add/Update Markers
   filtered.forEach((v) => {
     bounds.extend([v.lat, v.lon]);
-
     if (state.markers[v.id]) {
-      // Animate Move: Leaflet setLatLng is smooth by default if CSS transition enabled
       state.markers[v.id].setLatLng([v.lat, v.lon]);
-
-      // Update Icon Style based on Status
       const el = state.markers[v.id].getElement();
       if (el) {
         if (!v.isLive) el.style.filter = "grayscale(100%) opacity(0.5)";
@@ -487,11 +465,7 @@ function updateMapMarkers(fitBounds = false) {
   }
 }
 
-// ... (Sisa fungsi UI Chat, Cart, Promo tetap sama, hanya perbaikan GPS di atas) ...
-
 // --- STANDARD APP FUNCTIONS ---
-// (Bagian ini tidak berubah drastis, hanya memastikan integrasi dengan update GPS)
-
 window.expandIsland = () => {
   if (isIslandExpanded || !state.chatWithVendorId) return;
   const island = document.getElementById("dynamicIsland");
@@ -531,13 +505,12 @@ window.selectChat = (vid) => {
 
 async function renderChatInsideIsland() {
   const vid = state.chatWithVendorId;
-  const v = state.vendors.find((x) => x.id === vid);
   const chatBox = $("#diChatBox");
   chatBox.innerHTML = "";
   if (state.unsubChats) state.unsubChats();
   const q = query(
     collection(db, "chats", `${state.user.id}_${vid}`, "messages"),
-    orderBy("ts", "asc")
+    orderBy("ts", "asc"),
   );
   state.unsubChats = onSnapshot(q, (s) => {
     chatBox.innerHTML = s.docs
@@ -599,10 +572,10 @@ window.sendMessage = async (content = null, type = "text") => {
     type === "text"
       ? content
       : type === "image"
-      ? "📷 Foto"
-      : type === "sticker"
-      ? "😊 Stiker"
-      : "📍 Lokasi";
+        ? "📷 Foto"
+        : type === "sticker"
+          ? "😊 Stiker"
+          : "📍 Lokasi";
   const v = state.vendors.find((x) => x.id === vid);
   await setDoc(
     doc(db, "chats", cid),
@@ -614,7 +587,7 @@ window.sendMessage = async (content = null, type = "text") => {
       lastMessage: preview,
       lastUpdate: Date.now(),
     },
-    { merge: true }
+    { merge: true },
   );
   scrollToBottom();
 };
@@ -697,9 +670,8 @@ document
 
 function renderInbox() {
   if (!state.user) {
-    $(
-      "#inboxList"
-    ).innerHTML = `<div class="empty-state-box">Login untuk melihat pesan.</div>`;
+    $("#inboxList").innerHTML =
+      `<div class="empty-state-box">Login untuk melihat pesan.</div>`;
     return;
   }
   const list = state.vendors
@@ -741,23 +713,24 @@ function renderHome() {
             : `<div class="promo-tag">Info Promo</div>`
         }<h3 class="promo-title">${p.t}</h3><p class="promo-desc">${
           p.d
-        }</p></div></div>`
+        }</p></div></div>`,
     )
     .join("");
   $("#promoDots").innerHTML = promoData
     .map(
       (_, i) =>
-        `<div class="dot ${i === 0 ? "active" : ""}" id="dot-${i}"></div>`
+        `<div class="dot ${i === 0 ? "active" : ""}" id="dot-${i}"></div>`,
     )
     .join("");
   setupBannerScroll(promoData.length);
 }
+let bannerInterval;
 function setupBannerScroll(count) {
   const slider = $("#promoList");
   if (bannerInterval) clearInterval(bannerInterval);
   slider.addEventListener("scroll", () => {
     const activeIndex = Math.round(
-      slider.scrollLeft / (slider.offsetWidth * 0.9)
+      slider.scrollLeft / (slider.offsetWidth * 0.9),
     );
     for (let i = 0; i < count; i++) {
       const dot = $(`#dot-${i}`);
@@ -778,7 +751,7 @@ function renderVendors() {
   let list = state.vendors.filter(
     (v) =>
       v.name.toLowerCase().includes(q) &&
-      (cat === "semua" || v.type.includes(cat))
+      (cat === "semua" || v.type.includes(cat)),
   );
   if (state.you.ok) {
     list.sort((a, b) => {
@@ -794,7 +767,7 @@ function renderVendors() {
         const statusBadge = isClosed
           ? `<span class="chip closed">🔴 TUTUP</span>`
           : `<span class="chip" style="background:#dcfce7; color:#166534;"><span class="status-dot"></span> BUKA • ${distText(
-              v
+              v,
             )}</span>`;
         const cardClass = isClosed ? "vendorCard closed" : "vendorCard open";
         const actionText = isClosed ? "Tutup" : "Lihat Menu";
@@ -806,8 +779,8 @@ function renderVendors() {
         <div class="vMeta">
             <b>${v.name}</b>
             <div class="muted">⭐ ${v.rating ? v.rating.toFixed(1) : "New"} • ${
-          v.busy
-        }</div>
+              v.busy
+            }</div>
             <div class="chips">
                 <span class="chip">${v.type.toUpperCase()}</span>
                 ${statusBadge}
@@ -892,7 +865,7 @@ function selectVendorOnMap(v) {
         opacity: 0.7,
         dashArray: "10, 10",
         lineCap: "round",
-      }
+      },
     ).addTo(state.map);
     state.map.fitBounds(state.routeLine.getBounds(), {
       padding: [50, 150],
@@ -923,75 +896,27 @@ const MENU_DEFAULTS = {
   kopi: [{ id: "k1", name: "Kopi Susu", price: 12000 }],
   nasi: [{ id: "n1", name: "Nasi Goreng", price: 18000 }],
 };
-window.openVendor = (id) => {
-  state.selectedVendorId = id;
-  const v = state.vendors.find((x) => x.id === id);
-  if (!v) return;
-  $("#vTitle").textContent = v.name;
-  $("#vMeta").textContent = v.type;
-  const isClosed = !v.isLive;
-  let banner = "";
-  if (isClosed) {
-    banner = `<div class="shop-closed-banner">🔒 Maaf, Toko Sedang Tutup</div>`;
-  }
-  let menuData =
-    v.menu && v.menu.length > 0 ? v.menu : MENU_DEFAULTS[v.type] || [];
-  $("#menuList").innerHTML =
-    banner +
-    menuData
-      .map((m) => {
-        const btnState = isClosed ? "disabled" : "";
-        const btnText = isClosed ? "Tutup" : "+ Tambah";
-        const btnClass = isClosed ? "btn small" : "btn small primary";
-        const imgDisplay = m.image
-          ? `<img src="${m.image}" class="menu-img" loading="lazy" />`
-          : `<div class="menu-img">🍲</div>`;
-        return `
-    <div class="menu-item-card">
-      ${imgDisplay}
-      <div class="menu-info">
-        <b>${m.name}</b>
-        <div class="muted">${rupiah(m.price)}</div>
-      </div>
-      <div class="menu-btn-container">
-        <button class="${btnClass}" ${btnState} onclick="addToCart('${id}', '${
-          m.id
-        }', '${m.name}', ${m.price})">${btnText}</button>
-      </div>
-    </div>`;
-      })
-      .join("");
-  openModal("vendorModal");
-};
 
-// --- UPDATE: Fungsi Helper untuk hitung penjualan ---
 async function getVendorStats(vendorId) {
-  // Ambil semua order yang SUDAH SELESAI dari toko ini
   const q = query(
     collection(db, "orders"),
     where("vendorId", "==", vendorId),
-    where("status", "==", "Selesai")
+    where("status", "==", "Selesai"),
   );
-
   const snap = await getDocs(q);
   const counts = {};
-
   snap.forEach((d) => {
     const data = d.data();
     if (data.items && Array.isArray(data.items)) {
       data.items.forEach((item) => {
-        // Kita hitung berdasarkan Nama Menu (konsisten dengan seller.js)
-        // Jika ada itemId, bisa digunakan juga sebagai key
         const key = item.name;
         counts[key] = (counts[key] || 0) + item.qty;
       });
     }
   });
-
   return counts;
 }
 
-// --- UPDATE: openVendor menjadi ASYNC untuk load data penjualan ---
 window.openVendor = async (id) => {
   state.selectedVendorId = id;
   const v = state.vendors.find((x) => x.id === id);
@@ -1006,13 +931,10 @@ window.openVendor = async (id) => {
     banner = `<div class="shop-closed-banner">🔒 Maaf, Toko Sedang Tutup</div>`;
   }
 
-  // Tampilkan Loading sementara di list menu
-  $(
-    "#menuList"
-  ).innerHTML = `<div style="text-align:center; padding:20px; color:#999;">⏳ Memuat menu & data penjualan...</div>`;
+  $("#menuList").innerHTML =
+    `<div style="text-align:center; padding:20px; color:#999;">⏳ Memuat menu & data penjualan...</div>`;
   openModal("vendorModal");
 
-  // 1. Ambil Data Statistik Penjualan
   let salesCounts = {};
   try {
     salesCounts = await getVendorStats(id);
@@ -1020,7 +942,6 @@ window.openVendor = async (id) => {
     console.error("Gagal load stats", e);
   }
 
-  // 2. Cari Angka Tertinggi untuk menentukan "Best Seller" (Juara 1)
   let maxSold = 0;
   Object.values(salesCounts).forEach((qty) => {
     if (qty > maxSold) maxSold = qty;
@@ -1029,7 +950,6 @@ window.openVendor = async (id) => {
   const menuData =
     v.menu && v.menu.length > 0 ? v.menu : MENU_DEFAULTS[v.type] || [];
 
-  // 3. Render Menu dengan Badge
   $("#menuList").innerHTML =
     banner +
     menuData
@@ -1041,21 +961,14 @@ window.openVendor = async (id) => {
           ? `<img src="${m.image}" class="menu-img" loading="lazy" />`
           : `<div class="menu-img">🍲</div>`;
 
-        // Logika Badge
         const sold = salesCounts[m.name] || 0;
         let badgesHtml = "";
-
         if (sold > 0) {
           let badgeContent = "";
-
-          // Jika item ini penjualannya sama dengan maxSold (dan > 0), berarti Best Seller
           if (sold === maxSold) {
             badgeContent += `<div class="badge-best-seller">👑 Best Seller</div>`;
           }
-
-          // Tampilkan jumlah terjual
           badgeContent += `<div class="badge-sold">🔥 ${sold} Terjual</div>`;
-
           badgesHtml = `<div class="badge-sold-container">${badgeContent}</div>`;
         }
 
@@ -1065,7 +978,8 @@ window.openVendor = async (id) => {
       <div class="menu-info">
         <b>${m.name}</b>
         <div class="muted">${rupiah(m.price)}</div>
-        ${badgesHtml} </div>
+        ${badgesHtml}
+      </div>
       <div class="menu-btn-container">
         <button class="${btnClass}" ${btnState} onclick="addToCart('${id}', '${
           m.id
@@ -1082,6 +996,13 @@ window.addToCart = (vid, mid, mName, mPrice) => {
   if (v && !v.isLive) {
     return alert("Maaf, toko ini sedang tutup. Tidak bisa memesan.");
   }
+  // Reset voucher jika ganti vendor
+  if (state.cart.length > 0 && state.cart[0].vendorId !== vid) {
+    if (!confirm("Ganti toko? Keranjang sebelumnya akan dihapus.")) return;
+    state.cart = [];
+    state.activeVoucher = null; // Reset voucher
+  }
+
   if (!mName) {
     const type = v ? v.type : "bakso";
     const item = MENU_DEFAULTS[type].find((x) => x.id === mid);
@@ -1136,7 +1057,73 @@ window.handleProofUpload = async (input) => {
     input.value = "";
   }
 };
+
+// --- NEW: VOUCHER LOGIC ---
+window.checkVoucher = async () => {
+  const code = $("#voucherInput").value.trim().toUpperCase();
+  if (!code) return alert("Masukkan kode promo");
+
+  if (state.cart.length === 0) return alert("Keranjang kosong");
+  const vendorId = state.cart[0].vendorId;
+
+  const btn = $("#btnCheckVoucher");
+  const originalText = btn.textContent;
+  btn.textContent = "⏳...";
+  btn.disabled = true;
+
+  try {
+    // Query ke koleksi 'vouchers'
+    const q = query(collection(db, "vouchers"), where("code", "==", code));
+    const snap = await getDocs(q);
+
+    if (snap.empty) {
+      alert("Kode promo tidak ditemukan");
+      state.activeVoucher = null;
+    } else {
+      const vData = snap.docs[0].data();
+      const vId = snap.docs[0].id;
+
+      // Validasi: Cek Vendor (Global atau Spesifik Toko)
+      if (vData.vendorId && vData.vendorId !== vendorId) {
+        alert("Kode promo ini tidak berlaku untuk toko ini.");
+        state.activeVoucher = null;
+      }
+      // Validasi: Cek Kuota (Rebutan)
+      else if (vData.quota <= 0) {
+        alert("Yah, Voucher sudah habis! (Rebutan)");
+        state.activeVoucher = null;
+      } else {
+        // Valid!
+        state.activeVoucher = {
+          id: vId,
+          code: vData.code,
+          type: vData.type, // 'percent' or 'fixed'
+          value: vData.value,
+          quota: vData.quota,
+        };
+        showToast("Voucher berhasil dipasang! 🎉");
+      }
+    }
+  } catch (e) {
+    console.error(e);
+    alert("Gagal cek voucher");
+  }
+
+  btn.textContent = originalText;
+  btn.disabled = false;
+  renderCartModal(); // Update UI harga
+};
+
+window.removeVoucher = () => {
+  state.activeVoucher = null;
+  $("#voucherInput").value = "";
+  renderCartModal();
+};
+
 function renderCartModal() {
+  const vendorId = state.cart[0].vendorId;
+  const vendor = state.vendors.find((v) => v.id === vendorId);
+
   $("#checkoutItems").innerHTML = state.cart
     .map(
       (i, idx) =>
@@ -1146,13 +1133,76 @@ function renderCartModal() {
           i.vendorName
         }</div></div><div class="cart-controls"><button class="ctrl-btn" onclick="updateCartQty(${idx}, -1)">-</button><span class="ctrl-qty">${
           i.qty
-        }</span><button class="ctrl-btn add" onclick="updateCartQty(${idx}, 1)">+</button></div><button class="iconBtn" style="width:30px; height:30px; margin-left:10px; border-color:#fee; color:red; background:#fff5f5" onclick="deleteCartItem(${idx})">🗑</button></div>`
+        }</span><button class="ctrl-btn add" onclick="updateCartQty(${idx}, 1)">+</button></div><button class="iconBtn" style="width:30px; height:30px; margin-left:10px; border-color:#fee; color:red; background:#fff5f5" onclick="deleteCartItem(${idx})">🗑</button></div>`,
     )
     .join("");
-  const totalAmount = state.cart.reduce((a, b) => a + b.price * b.qty, 0);
-  $("#checkoutTotal").textContent = rupiah(totalAmount);
-  const vendorId = state.cart[0].vendorId;
-  const vendor = state.vendors.find((v) => v.id === vendorId);
+
+  // Perhitungan Harga
+  const subTotal = state.cart.reduce((a, b) => a + b.price * b.qty, 0);
+  let discount = 0;
+
+  if (state.activeVoucher) {
+    if (state.activeVoucher.type === "percent") {
+      discount = subTotal * (state.activeVoucher.value / 100);
+    } else {
+      discount = state.activeVoucher.value;
+    }
+    // Max diskon tidak boleh melebihi subtotal
+    if (discount > subTotal) discount = subTotal;
+  }
+
+  const finalTotal = subTotal - discount;
+
+  // Render UI Total
+  let totalHtml = "";
+  if (state.activeVoucher) {
+    totalHtml = `
+        <div class="rowBetween muted" style="font-size:13px;"><span>Subtotal</span><span>${rupiah(subTotal)}</span></div>
+        <div class="rowBetween" style="font-size:13px; color:green;"><span>Diskon (${state.activeVoucher.code})</span><span>- ${rupiah(discount)}</span></div>
+        <div class="rowBetween" style="font-size:18px; font-weight:bold; margin-top:8px; border-top:1px dashed #ccc; padding-top:8px;"><span>Total</span><span>${rupiah(finalTotal)}</span></div>
+      `;
+  } else {
+    totalHtml = `<b style="font-size:20px;">${rupiah(finalTotal)}</b>`;
+  }
+
+  $("#checkoutTotal").innerHTML = totalHtml;
+
+  // Render UI Input Voucher (Inject HTML jika belum ada)
+  const voucherArea = $("#voucherArea");
+  if (!voucherArea) {
+    // Insert Voucher Area sebelum Total jika belum ada di HTML
+    const container = $("#checkoutModal .modal-body"); // Pastikan selector benar sesuai HTML
+    // Karena struktur HTML checkoutModal statis, kita bisa inject via JS dynamic
+    // Atau asumsikan User akan menambahkan div dengan id 'voucherContainer' di index.html
+    // Solusi Aman: Tambahkan dinamis di bawah checkoutItems
+    const vDiv = document.createElement("div");
+    vDiv.id = "voucherArea";
+    vDiv.style.marginTop = "15px";
+    vDiv.style.padding = "10px";
+    vDiv.style.background = "#f8fafc";
+    vDiv.style.borderRadius = "8px";
+    $("#checkoutItems").after(vDiv);
+  }
+
+  if ($("#voucherArea")) {
+    if (state.activeVoucher) {
+      $("#voucherArea").innerHTML = `
+            <div class="rowBetween" style="align-items:center;">
+                <div style="color:green; font-weight:bold;">✅ ${state.activeVoucher.code} Terpasang</div>
+                <button class="btn small ghost" style="color:red;" onclick="removeVoucher()">Hapus</button>
+            </div>
+            <div style="font-size:11px; color:#666; margin-top:4px;">Diskon: ${state.activeVoucher.type === "percent" ? state.activeVoucher.value + "%" : rupiah(state.activeVoucher.value)}</div>
+          `;
+    } else {
+      $("#voucherArea").innerHTML = `
+            <div style="display:flex; gap:8px;">
+                <input type="text" id="voucherInput" placeholder="Punya kode promo?" style="flex:1; border:1px solid #ddd; padding:8px; border-radius:6px; font-size:14px; text-transform:uppercase;">
+                <button id="btnCheckVoucher" class="btn small primary" onclick="checkVoucher()">Pakai</button>
+            </div>
+          `;
+    }
+  }
+
   const paySelect = $("#payMethod");
   const qrisCont = $("#qrisContainer");
   const qrisImg = $("#qrisImageDisplay");
@@ -1169,17 +1219,18 @@ function renderCartModal() {
   } else {
     paySelect.innerHTML = `<option value="cash">💵 Tunai</option>`;
   }
+
+  // Update QRIS Logic with Final Total
   paySelect.onchange = () => {
     if (paySelect.value === "qris") {
       qrisCont.classList.remove("hidden");
       if (vendor.qrisData) {
         qrisImg.style.display = "none";
-        $("#qrisNominalDisplay").textContent = rupiah(totalAmount);
+        $("#qrisNominalDisplay").textContent = rupiah(finalTotal); // Use Final Total
         $("#qrisNominalDisplay").style.display = "block";
         if (qrisDynamicDiv) qrisDynamicDiv.style.display = "flex";
         try {
-          const dynamicString = createDynamicQRIS(vendor.qrisData, totalAmount);
-          console.log("QR String:", dynamicString);
+          const dynamicString = createDynamicQRIS(vendor.qrisData, finalTotal);
           qrisCanvas.innerHTML = "";
           new QRCode(qrisCanvas, {
             text: dynamicString,
@@ -1188,7 +1239,6 @@ function renderCartModal() {
             correctLevel: QRCode.CorrectLevel.L,
           });
         } catch (err) {
-          console.error(err);
           alert("Gagal membuat QRIS Dinamis. Menggunakan statis.");
           qrisImg.src = vendor.qrisImage;
           qrisImg.style.display = "block";
@@ -1207,7 +1257,11 @@ function renderCartModal() {
       state.tempPaymentProof = null;
     }
   };
+
+  // Trigger change manual agar QRIS update nominal jika user ganti voucher saat dropdown sudah QRIS
+  if (paySelect.value === "qris") paySelect.onchange();
 }
+
 $("#placeOrderBtn").addEventListener("click", async () => {
   if (!state.user) return requireLogin();
   const btn = $("#placeOrderBtn");
@@ -1217,7 +1271,7 @@ $("#placeOrderBtn").addEventListener("click", async () => {
     let phone = state.user.phone;
     if (!phone || phone.length < 9) {
       phone = prompt(
-        "Wajib isi Nomor WhatsApp aktif untuk konfirmasi pesanan:"
+        "Wajib isi Nomor WhatsApp aktif untuk konfirmasi pesanan:",
       );
       if (!phone || phone.length < 9) {
         alert("Nomor WA tidak valid. Pesanan dibatalkan.");
@@ -1228,10 +1282,46 @@ $("#placeOrderBtn").addEventListener("click", async () => {
       await updateDoc(doc(db, "users", state.user.id), { phone: phone });
       state.user.phone = phone;
     }
-    const total = state.cart.reduce((a, b) => a + b.price * b.qty, 0);
+
+    // --- FINAL CALCULATION ---
+    const subTotal = state.cart.reduce((a, b) => a + b.price * b.qty, 0);
+    let discount = 0;
+    let voucherCodeUsed = null;
+
+    // Cek Voucher Terakhir (Rebutan)
+    if (state.activeVoucher) {
+      const vRef = doc(db, "vouchers", state.activeVoucher.id);
+      const vSnap = await getDoc(vRef);
+
+      if (vSnap.exists() && vSnap.data().quota > 0) {
+        // Apply Discount
+        if (state.activeVoucher.type === "percent") {
+          discount = subTotal * (state.activeVoucher.value / 100);
+        } else {
+          discount = state.activeVoucher.value;
+        }
+        if (discount > subTotal) discount = subTotal;
+        voucherCodeUsed = state.activeVoucher.code;
+
+        // KURANGI KUOTA (Atomically)
+        await updateDoc(vRef, {
+          quota: increment(-1),
+        });
+      } else {
+        alert("Maaf! Voucher baru saja habis digunakan orang lain.");
+        state.activeVoucher = null;
+        renderCartModal();
+        btn.disabled = false;
+        btn.textContent = "Pesan & Verifikasi";
+        return;
+      }
+    }
+
+    const total = subTotal - discount;
     const vName = state.cart[0].vendorName;
     const vId = state.cart[0].vendorId;
     const payment = $("#payMethod").value;
+
     if (payment === "qris" && !state.tempPaymentProof) {
       alert("Wajib upload bukti transfer untuk pembayaran QRIS!");
       btn.disabled = false;
@@ -1246,6 +1336,9 @@ $("#placeOrderBtn").addEventListener("click", async () => {
       vendorId: vId,
       vendorName: vName,
       items: state.cart,
+      subTotal: subTotal, // Simpan harga asli
+      discount: discount, // Simpan diskon
+      voucherCode: voucherCodeUsed, // Simpan kode
       total: total,
       note: $("#orderNote").value,
       paymentMethod: payment,
@@ -1255,8 +1348,10 @@ $("#placeOrderBtn").addEventListener("click", async () => {
       status: payment === "qris" ? "Menunggu Konfirmasi Bayar" : "Diproses",
       createdAt: new Date().toISOString(),
     });
+
     state.cart = [];
     state.tempPaymentProof = null;
+    state.activeVoucher = null; // Reset Voucher
     localStorage.removeItem("pikul_cart");
     updateFab();
     closeModal("checkoutModal");
@@ -1268,6 +1363,7 @@ $("#placeOrderBtn").addEventListener("click", async () => {
   btn.disabled = false;
   btn.textContent = "Pesan & Verifikasi";
 });
+
 window.updateCartQty = (idx, change) => {
   const item = state.cart[idx];
   item.qty += change;
@@ -1304,7 +1400,7 @@ function renderOrders() {
   const filtered = state.orders.filter((o) =>
     state.activeOrderTab === "active"
       ? o.status !== "Selesai" && !o.status.includes("Dibatalkan")
-      : o.status === "Selesai" || o.status.includes("Dibatalkan")
+      : o.status === "Selesai" || o.status.includes("Dibatalkan"),
   );
   if (!filtered.length) {
     list.innerHTML = `<div class="empty-state"><span class="empty-icon">${
@@ -1350,10 +1446,15 @@ function renderOrders() {
         statusIcon = "❌";
         statusDesc = o.status;
       }
+      // Tampilkan info diskon di riwayat
+      const discountInfo = o.discount
+        ? `<span style="font-size:11px; color:green; display:block;">Hemat: ${rupiah(o.discount)} (${o.voucherCode})</span>`
+        : "";
+
       return `<div class="order-card"><div class="oc-header"><div><b style="font-size:15px">${
         o.vendorName
       }</b><div class="muted" style="font-size:11px">${new Date(
-        o.createdAt
+        o.createdAt,
       ).toLocaleString([], {
         day: "numeric",
         month: "short",
@@ -1364,9 +1465,9 @@ function renderOrders() {
       }</span></div><div class="oc-body"><div style="font-size:13px; margin-bottom:12px">${items}</div>${
         state.activeOrderTab === "active"
           ? `<div class="step-compact"><div class="step-icon">${statusIcon}</div><div><b style="font-size:13px; display:block">${o.status}</b><span class="muted" style="font-size:11px">${statusDesc}</span></div></div>`
-          : `<div class="rowBetween"><span class="muted" style="font-size:12px">Total Bayar</span><b style="font-size:16px">${rupiah(
-              o.total
-            )}</b></div>`
+          : `<div class="rowBetween"><span class="muted" style="font-size:12px">Total Bayar</span><div style="text-align:right;">${discountInfo}<b style="font-size:16px">${rupiah(
+              o.total,
+            )}</b></div></div>`
       }</div>${
         actionButtons
           ? `<div class="oc-footer" style="display:block">${actionButtons}</div>`
@@ -1406,7 +1507,7 @@ window.go = (n) => {
   if (n === "Messages") renderInbox();
 };
 $$(".nav").forEach((b) =>
-  b.addEventListener("click", () => window.go(b.dataset.go))
+  b.addEventListener("click", () => window.go(b.dataset.go)),
 );
 function renderProfile() {
   const container = $("#profileContent");
@@ -1418,7 +1519,7 @@ function renderProfile() {
     }</b><span id="pEmail" class="muted" style="font-size: 12px">${
       state.user.email
     }</span></div></div></div><hr style="border: none; border-top: 1px solid var(--border); margin: 16px 0;" /><div class="rowBetween" style="margin-bottom: 10px"><span class="muted">Saldo</span><b class="big" style="color: var(--primary)" id="wallet">${rupiah(
-      state.user.wallet
+      state.user.wallet,
     )}</b></div><button class="btn primary" onclick="openTopupModal()" style="width: 100%">+ Isi Saldo</button></div>`;
     if (logoutBtn) {
       logoutBtn.style.display = "block";
@@ -1466,7 +1567,7 @@ function distText(v) {
   if (!state.you.ok) return "? km";
   const d =
     Math.sqrt(
-      Math.pow(v.lat - state.you.lat, 2) + Math.pow(v.lon - state.you.lon, 2)
+      Math.pow(v.lat - state.you.lat, 2) + Math.pow(v.lon - state.you.lon, 2),
     ) * 111;
   return d.toFixed(1) + " km";
 }
@@ -1477,7 +1578,7 @@ function closeModal(id) {
   $("#" + id).classList.add("hidden");
 }
 $$("[data-close]").forEach((el) =>
-  el.addEventListener("click", () => closeModal(el.dataset.close))
+  el.addEventListener("click", () => closeModal(el.dataset.close)),
 );
 
 window.openTopupModal = () => {
@@ -1494,8 +1595,8 @@ window.openTopupModal = () => {
     .map(
       (amt) =>
         `<div class="amount-btn" onclick="selectTopupAmount(${amt}, this)">${rupiah(
-          amt
-        )}</div>`
+          amt,
+        )}</div>`,
     )
     .join("");
   openModal("topupModal");
@@ -1568,7 +1669,7 @@ window.updateStarUI = (n) => {
       (i) =>
         `<span onclick="updateStarUI(${i})" style="color: ${
           i <= n ? "#ffc107" : "#e2e8f0"
-        }; transition:0.2s; cursor:pointer;">★</span>`
+        }; transition:0.2s; cursor:pointer;">★</span>`,
     )
     .join("");
   $("#starContainer").innerHTML = stars;

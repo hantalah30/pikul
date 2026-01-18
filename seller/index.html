@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
@@ -498,56 +498,125 @@
         background: linear-gradient(135deg, #ff7a00, #ff5e00);
       }
 
-      .attach-menu {
-        position: absolute;
-        bottom: 60px;
-        left: 10px;
-        background: white;
-        padding: 10px;
-        border-radius: 12px;
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
-        display: flex;
-        gap: 10px;
-        transform: scale(0);
-        transform-origin: bottom left;
-        transition: 0.2s;
-        z-index: 99;
-      }
-      .attach-menu.active {
-        transform: scale(1);
-      }
-      .attach-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 18px;
-        margin-bottom: 2px;
-      }
-      .emoji-panel {
-        height: 0;
-        overflow: hidden;
-        background: #fff;
-        transition: height 0.3s;
-      }
-      .emoji-panel.active {
-        height: 160px;
-        padding: 8px;
-      }
-      .emoji-grid {
+      /* --- VOUCHER TICKET STYLES (RESTORED FROM OLD) --- */
+      .voucher-grid {
         display: grid;
-        grid-template-columns: repeat(6, 1fr);
-        gap: 5px;
-        height: 120px;
-        overflow-y: auto;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 16px;
+        padding-bottom: 20px;
       }
-      .emoji-item {
-        font-size: 22px;
+      .voucher-ticket {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e2e8f0;
+        display: flex;
+        overflow: hidden;
+        position: relative;
+        transition: transform 0.2s;
+      }
+      .voucher-ticket:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+      }
+      .ticket-left {
+        background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+        padding: 16px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        border-right: 2px dashed #cbd5e1;
+        position: relative;
+      }
+      .ticket-left::after,
+      .ticket-left::before {
+        content: "";
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        background: #f8fafc;
+        border-radius: 50%;
+        right: -11px;
+        border: 1px solid #e2e8f0;
+        z-index: 10;
+      }
+      .ticket-left::after {
+        top: -12px;
+      }
+      .ticket-left::before {
+        bottom: -12px;
+      }
+      .ticket-right {
+        width: 110px;
+        background: #ffffff;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-between;
         text-align: center;
+      }
+
+      .v-code {
+        font-family: "Courier New", monospace;
+        font-weight: 800;
+        font-size: 18px;
+        color: #ea580c;
+        letter-spacing: 1px;
+        margin-bottom: 4px;
+      }
+      .v-value {
+        font-size: 20px;
+        font-weight: bold;
+        color: #1e293b;
+      }
+      .v-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        color: #64748b;
+        letter-spacing: 0.5px;
+      }
+      .quota-track {
+        width: 100%;
+        height: 6px;
+        background: #f1f5f9;
+        border-radius: 10px;
+        margin: 8px 0 4px;
+        overflow: hidden;
+      }
+      .quota-fill {
+        height: 100%;
+        background: #22c55e;
+        border-radius: 10px;
+      }
+      .quota-text {
+        font-size: 10px;
+        color: #64748b;
+      }
+      .used-badge {
+        background: #dbeafe;
+        color: #1e40af;
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        margin-top: 4px;
+        display: inline-block;
+      }
+      .btn-del-mini {
+        background: #fee2e2;
+        color: #ef4444;
+        border: none;
+        border-radius: 6px;
+        padding: 6px;
+        width: 100%;
         cursor: pointer;
+        font-size: 11px;
+        font-weight: 600;
+        transition: 0.2s;
+      }
+      .btn-del-mini:hover {
+        background: #fecaca;
       }
 
       /* --- DASHBOARD STYLES (NEW) --- */
@@ -667,7 +736,8 @@
         background: rgba(0, 0, 0, 0.4);
         backdrop-filter: blur(2px);
       }
-      .modal-sheet {
+      .modal-sheet,
+      .modal-content {
         position: relative;
         width: min(600px, 100%);
         background: #fff;
@@ -677,6 +747,7 @@
         overflow-y: auto;
         animation: slideUp 0.3s;
         z-index: 2001;
+        box-sizing: border-box;
       }
       .modal-header {
         display: flex;
@@ -756,7 +827,8 @@
         .modal {
           align-items: center;
         }
-        .modal-sheet {
+        .modal-sheet,
+        .modal-content {
           border-radius: 24px;
           max-width: 500px;
         }
@@ -897,7 +969,10 @@
           <button class="sb-item" onclick="goSeller('Orders')">
             <span class="icon">📦</span> Pesanan
           </button>
-          <button class="sb-item" onclick="window.location.href='kasir.html'">
+          <button class="sb-item" onclick="goSeller('Promo')">
+            <span class="icon">🎫</span> Promo & Voucher
+          </button>
+          <button class="sb-item" onclick="window.location.href = 'kasir.html'">
             <span class="icon">🖥️</span> Kasir / POS
           </button>
         </nav>
@@ -1246,6 +1321,29 @@
               </div>
             </div>
           </section>
+
+          <section id="sellerPromo" class="hidden">
+            <div class="section-card">
+              <div class="section-header">
+                <div>
+                  <h3>Kelola Voucher & Promo</h3>
+                  <p class="muted" style="font-size: 13px; margin: 0">
+                    Buat diskon menarik untuk pelanggan Anda.
+                  </p>
+                </div>
+                <button onclick="openVoucherModal()" class="btn primary">
+                  + Buat Voucher Baru
+                </button>
+              </div>
+
+              <div style="margin-top: 20px">
+                <h4 style="margin-bottom: 15px; color: #64748b">
+                  Voucher Aktif
+                </h4>
+                <div id="voucherListContainer" class="voucher-grid"></div>
+              </div>
+            </div>
+          </section>
         </main>
       </div>
       <nav class="bottom-nav mobile-only">
@@ -1257,7 +1355,11 @@
           <div class="nav-icon">📦</div>
           <span>Pesanan</span>
         </button>
-        <button class="nav-item" onclick="window.location.href='kasir.html'">
+        <button class="nav-item" onclick="goSeller('Promo')">
+          <div class="nav-icon">🎫</div>
+          <span>Promo</span>
+        </button>
+        <button class="nav-item" onclick="window.location.href = 'kasir.html'">
           <div class="nav-icon">🖥️</div>
           <span>Kasir</span>
         </button>
@@ -1323,47 +1425,17 @@
           <b id="roomTitle" style="font-size: 14px">User</b>
         </div>
         <div id="msgBox" class="room-messages"></div>
-
-        <div id="attachMenu" class="attach-menu">
-          <div class="attach-item" onclick="triggerImage()">
-            <div class="attach-icon" style="background: #ec4899">📷</div>
-          </div>
-          <div class="attach-item" onclick="sendLocation()">
-            <div class="attach-icon" style="background: #0ea5e9">📍</div>
-          </div>
-        </div>
-
-        <div id="emojiPanel" class="emoji-panel">
-          <div class="panel-tabs">
-            <span class="panel-tab active" onclick="showTab('emoji')"
-              >EMOJI</span
-            ><span class="panel-tab" onclick="showTab('sticker')">STIKER</span>
-          </div>
-          <div id="tabEmoji" class="emoji-grid"></div>
-          <div id="tabSticker" class="sticker-grid" style="display: none"></div>
-        </div>
-
         <div class="chat-input-bar">
-          <button class="icon-btn" onclick="toggleAttachMenu()">+</button>
           <input
             id="replyInput"
             class="reply-input"
             placeholder="Tulis pesan..."
             autocomplete="off"
           />
-          <button class="icon-btn" onclick="toggleEmojiPanel()">☺</button>
           <button id="sendReplyBtn" class="btn-send-round">➤</button>
         </div>
       </div>
     </div>
-
-    <input
-      type="file"
-      id="imageInput"
-      accept="image/*"
-      style="display: none"
-      onchange="handleImageUpload(event)"
-    />
 
     <div id="menuModal" class="modal hidden">
       <div class="modal-overlay" onclick="closeModal()"></div>
@@ -1401,13 +1473,20 @@
             <label>Nama Makanan</label
             ><input
               id="mName"
+              class="form-input"
               placeholder="Contoh: Nasi Goreng Spesial"
               required
             />
           </div>
           <div class="input-group">
             <label>Harga (Rp)</label
-            ><input id="mPrice" type="number" placeholder="15000" required />
+            ><input
+              id="mPrice"
+              class="form-input"
+              type="number"
+              placeholder="15000"
+              required
+            />
           </div>
           <button class="btn primary full" style="margin-top: 20px">
             Simpan Menu
@@ -1415,6 +1494,63 @@
         </form>
       </div>
     </div>
+
+    <div id="voucherModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>🎫 Buat Voucher Baru</h3>
+          <button
+            class="iconBtn icon-btn-close"
+            onclick="closeModal('voucherModal')"
+          >
+            ✕
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Kode Promo (Huruf & Angka)</label>
+            <input
+              type="text"
+              id="vCode"
+              class="form-input"
+              placeholder="CONTOH: JUMATBERKAH"
+              style="text-transform: uppercase"
+            />
+          </div>
+          <div style="display: flex; gap: 10px; margin-bottom: 15px">
+            <div style="flex: 1">
+              <label class="form-label">Tipe</label>
+              <select id="vType" class="form-select">
+                <option value="fixed">Nominal (Rp)</option>
+                <option value="percent">Persen (%)</option>
+              </select>
+            </div>
+            <div style="flex: 1">
+              <label class="form-label">Nilai</label>
+              <input
+                type="number"
+                id="vValue"
+                class="form-input"
+                placeholder="Mis: 5000"
+              />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Kuota (Jumlah Tiket)</label>
+            <input
+              type="number"
+              id="vQuota"
+              class="form-input"
+              placeholder="Mis: 10"
+            />
+          </div>
+          <button class="btn primary full" onclick="submitVoucher()">
+            Terbitkan Voucher
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div id="payModal" class="modal hidden">
       <div class="modal-overlay" onclick="closePayModal()"></div>
       <div class="modal-sheet">
@@ -1428,6 +1564,8 @@
             margin-bottom: 16px;
             background: #f0f9ff;
             border: 1px solid #bae6fd;
+            padding: 15px;
+            border-radius: 12px;
           "
         >
           <div style="font-size: 14px; font-weight: bold; color: #0284c7">
@@ -1537,6 +1675,13 @@
         </div>
       </div>
     </div>
+
+    <audio
+      id="notifSound"
+      src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"
+      preload="auto"
+    ></audio>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script type="module" src="seller.js"></script>
   </body>

@@ -953,3 +953,153 @@ input:disabled + .slider {
   font-size: 11px;
   font-weight: bold;
 }
+
+/* --- VOUCHER / PROMO STYLES --- */
+
+/* Grid Layout: Desktop 2 kolom, Mobile 1 kolom */
+.voucher-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+  padding: 10px 0;
+}
+
+/* Tampilan Kartu Ala Tiket */
+.voucher-ticket {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+
+.voucher-ticket:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Bagian Kiri (Kode & Diskon) */
+.ticket-left {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-right: 2px dashed #cbd5e1;
+  position: relative;
+}
+
+/* Efek "Bolong" Setengah Lingkaran di Garis Putus-putus */
+.ticket-left::after,
+.ticket-left::before {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: #fff; /* Sesuaikan warna background modal/body */
+  border-radius: 50%;
+  right: -10px;
+  border: 1px solid #e2e8f0;
+}
+.ticket-left::after {
+  top: -12px;
+}
+.ticket-left::before {
+  bottom: -12px;
+}
+
+/* Bagian Kanan (Info Kuota & Hapus) */
+.ticket-right {
+  width: 110px;
+  background: #ffffff;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  text-align: center;
+}
+
+/* Elemen Tipografi */
+.v-code {
+  font-family: "Courier New", Courier, monospace; /* Font ala struk/tiket */
+  font-weight: 800;
+  font-size: 18px;
+  color: #ea580c;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.v-value {
+  font-size: 20px;
+  font-weight: bold;
+  color: #1e293b;
+}
+
+.v-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.5px;
+}
+
+/* Progress Bar Kuota */
+.quota-track {
+  width: 100%;
+  height: 6px;
+  background: #f1f5f9;
+  border-radius: 10px;
+  margin: 8px 0 4px;
+  overflow: hidden;
+}
+
+.quota-fill {
+  height: 100%;
+  background: #22c55e; /* Hijau */
+  border-radius: 10px;
+}
+
+.quota-text {
+  font-size: 10px;
+  color: #64748b;
+}
+
+.used-badge {
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+  display: inline-block;
+}
+
+/* Tombol Hapus Kecil */
+.btn-del-mini {
+  background: #fee2e2;
+  color: #ef4444;
+  border: none;
+  border-radius: 6px;
+  padding: 6px;
+  width: 100%;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  transition: 0.2s;
+}
+.btn-del-mini:hover {
+  background: #fecaca;
+}
+
+/* RESPONSIVE MOBILE */
+@media (max-width: 600px) {
+  .voucher-grid {
+    grid-template-columns: 1fr; /* Stack ke bawah di HP */
+  }
+}

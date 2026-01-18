@@ -104,7 +104,9 @@ body {
   display: flex;
   gap: 12px;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 .vendorCard:hover {
   transform: translateY(-2px);
@@ -1121,4 +1123,48 @@ select {
   padding: 4px 8px;
   border-radius: 6px;
   box-shadow: 0 2px 5px rgba(245, 158, 11, 0.3);
+}
+
+/* --- VOUCHER INPUT STYLES --- */
+.voucher-container {
+  display: flex;
+  gap: 8px;
+  margin: 15px 0;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.voucher-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+}
+
+.btn-voucher {
+  background: #333;
+  color: white;
+  border: none;
+  padding: 0 15px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.discount-row {
+  color: #16a34a; /* Green */
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.total-strikethrough {
+  text-decoration: line-through;
+  color: #999;
+  font-size: 0.9em;
+  margin-right: 5px;
 }

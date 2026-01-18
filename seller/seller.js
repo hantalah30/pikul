@@ -13,6 +13,7 @@ import {
   orderBy,
   setDoc,
   deleteDoc,
+  serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { firebaseConfig } from "../firebase-config.js";
 
@@ -34,6 +35,7 @@ let state = {
   activeChatId: null,
   unsubMsg: null,
   orders: [],
+  vouchers: [],
   editingMenuIndex: null,
   tempMenuImage: null,
   tempPayProof: null,
@@ -41,15 +43,22 @@ let state = {
   approvedSub: null,
   unreadCount: 0,
   menuSalesCounts: {},
+  firstLoad: true, // Untuk mencegah notifikasi bunyi saat refresh halaman
 };
 
 // --- GLOBAL EXPORTS ---
 window.triggerPayProofUpload = () => $("#payProofInput").click();
 window.closePayModal = () => $("#payModal").classList.add("hidden");
 window.triggerMenuImageUpload = () => $("#mImageInput").click();
-window.closeModal = (id = "menuModal") => $("#" + id).classList.add("hidden");
+window.closeModal = (id) => {
+  if (!id) {
+    $(".modal:not(.hidden)").forEach((m) => m.classList.add("hidden"));
+  } else {
+    $("#" + id).classList.add("hidden");
+  }
+};
 
-// --- HELPER: COMPRESS IMAGE ---
+// --- HELPER FUNCTIONS ---
 function compressImage(file, maxWidth = 500, quality = 0.7) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -75,7 +84,6 @@ function compressImage(file, maxWidth = 500, quality = 0.7) {
   });
 }
 
-// --- HELPER: EXTRACT QR TEXT ---
 function extractQRFromImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -160,7 +168,9 @@ $("#registerForm").addEventListener("submit", async (e) => {
     email = $("#regEmail").value.trim(),
     password = $("#regPass").value,
     btn = e.target.querySelector("button");
+
   if (password.length < 6) return alert("Password minimal 6 karakter");
+
   btn.disabled = true;
   btn.textContent = "Mendaftar...";
   try {
@@ -172,6 +182,7 @@ $("#registerForm").addEventListener("submit", async (e) => {
       btn.textContent = "Daftar";
       return;
     }
+
     const newVendor = {
       email,
       password,
@@ -212,6 +223,7 @@ window.logout = () => {
 async function initApp() {
   const vid = localStorage.getItem("pikul_seller_id");
   if (!vid) return $("#auth").classList.remove("hidden");
+
   try {
     const docSnap = await getDoc(doc(db, "vendors", vid));
     if (!docSnap.exists()) {
@@ -222,6 +234,7 @@ async function initApp() {
     $("#auth").classList.add("hidden");
     $(".app-layout").classList.remove("hidden");
 
+    // Realtime Listeners
     onSnapshot(doc(db, "vendors", state.vendor.id), (doc) => {
       if (doc.exists()) {
         state.vendor = { id: doc.id, ...doc.data() };
@@ -233,7 +246,7 @@ async function initApp() {
     onSnapshot(
       query(
         collection(db, "subscriptions"),
-        where("vendorId", "==", state.vendor.id)
+        where("vendorId", "==", state.vendor.id),
       ),
       (snap) => {
         const pending = snap.docs.find((d) => d.data().status === "pending");
@@ -243,216 +256,194 @@ async function initApp() {
           ? { id: approved.id, ...approved.data() }
           : null;
         renderUI();
-      }
+      },
+    );
+
+    onSnapshot(
+      query(
+        collection(db, "vouchers"),
+        where("vendorId", "==", state.vendor.id),
+      ),
+      (snap) => {
+        state.vouchers = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        renderVoucherList();
+      },
     );
 
     const qOrd = query(
       collection(db, "orders"),
-      where("vendorId", "==", state.vendor.id)
+      where("vendorId", "==", state.vendor.id),
     );
     onSnapshot(qOrd, (snap) => {
+      snap.docChanges().forEach((change) => {
+        if (change.type === "added" && !state.firstLoad) {
+          const data = change.doc.data();
+          if (Date.now() - new Date(data.createdAt).getTime() < 60000)
+            playNotification();
+        }
+      });
       state.orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       renderOrdersList();
       calculateStats();
+      state.firstLoad = false;
     });
 
     listenForChats();
     initBubbleDrag();
+    goSeller("Home");
   } catch (e) {
     console.error(e);
     $("#auth").classList.remove("hidden");
   }
 }
 
-function listenForChats() {
-  const q = query(
-    collection(db, "chats"),
-    where("vendorId", "==", state.vendor.id)
-  );
-  onSnapshot(q, (snap) => {
-    if (!snap.empty) {
-      if (!$("#floatingChatWindow").classList.contains("active")) {
-        $("#floatingBubble").classList.remove("hidden");
-      }
-      state.unreadCount = 0;
-      if (state.unreadCount > 0) {
-        $("#bubbleBadge").textContent = state.unreadCount;
-        $("#bubbleBadge").classList.add("visible");
-      }
-    }
-  });
-}
+// --- NAVIGATION UPDATED (OLD STYLE FOR PROMO) ---
+window.goSeller = (screen) => {
+  // Reset Nav Styles
+  $$(".nav-item").forEach((n) => n.classList.remove("active"));
+  $$(".sb-item").forEach((n) => n.classList.remove("active"));
 
-// --- FLOATING BUBBLE ---
-function initBubbleDrag() {
-  const bubble = document.getElementById("floatingBubble");
-  let isDragging = false;
-  let hasMoved = false;
-  let startX, startY, initialLeft, initialTop;
+  // Hide All Sections
+  $("#sellerHome").classList.add("hidden");
+  $("#sellerOrders").classList.add("hidden");
+  $("#sellerPromo").classList.add("hidden");
 
-  const startDrag = (e) => {
-    const evt = e.type === "touchstart" ? e.touches[0] : e;
-    startX = evt.clientX;
-    startY = evt.clientY;
-    const rect = bubble.getBoundingClientRect();
-    initialLeft = rect.left;
-    initialTop = rect.top;
-    isDragging = true;
-    hasMoved = false;
-  };
-
-  const onDrag = (e) => {
-    if (!isDragging) return;
-    e.preventDefault();
-    hasMoved = true;
-    const evt = e.type === "touchmove" ? e.touches[0] : e;
-    const dx = evt.clientX - startX;
-    const dy = evt.clientY - startY;
-    bubble.style.left = `${initialLeft + dx}px`;
-    bubble.style.top = `${initialTop + dy}px`;
-    bubble.style.right = "auto";
-    bubble.style.bottom = "auto";
-  };
-
-  const stopDrag = () => {
-    isDragging = false;
-  };
-
-  const onClickBubble = () => {
-    if (!hasMoved) openChatWindow();
-  };
-
-  bubble.addEventListener("mousedown", startDrag);
-  window.addEventListener("mousemove", onDrag);
-  window.addEventListener("mouseup", stopDrag);
-  bubble.addEventListener("click", onClickBubble);
-  bubble.addEventListener("touchstart", startDrag);
-  window.addEventListener("touchmove", onDrag, { passive: false });
-  window.addEventListener("touchend", stopDrag);
-}
-
-// --- CHAT WINDOW ---
-window.openChatWindow = () => {
-  $("#floatingChatWindow").classList.add("active");
-  $("#floatingBubble").classList.add("hidden");
-  loadChatList();
-  $("#viewChatList").classList.remove("hidden");
-  $("#viewChatRoom").classList.remove("active");
-};
-
-window.closeChatWindow = () => {
-  $("#floatingChatWindow").classList.remove("active");
-  $("#floatingBubble").classList.remove("hidden");
-};
-
-function loadChatList() {
-  const q = query(
-    collection(db, "chats"),
-    where("vendorId", "==", state.vendor.id)
-  );
-  onSnapshot(q, (snap) => {
-    let list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    list.sort((a, b) => b.lastUpdate - a.lastUpdate);
-    $("#chatListContent").innerHTML =
-      list
-        .map(
-          (c) =>
-            `<div class="chat-entry" onclick="openChatRoom('${c.id}', '${c.userName}')">
-                <div class="chat-avatar">👤</div>
-                <div class="chat-info">
-                    <span class="chat-name">${c.userName}</span>
-                    <span class="chat-last">${c.lastMessage}</span>
-                </div>
-            </div>`
-        )
-        .join("") ||
-      '<div style="text-align:center; padding:20px; color:#999;">Belum ada chat.</div>';
-  });
-}
-
-window.openChatRoom = (chatId, userName) => {
-  state.activeChatId = chatId;
-  $("#viewChatRoom").classList.add("active");
-  $("#roomTitle").textContent = userName;
-  if (state.unsubMsg) state.unsubMsg();
-  const q = query(
-    collection(db, "chats", chatId, "messages"),
-    orderBy("ts", "asc")
-  );
-  state.unsubMsg = onSnapshot(q, (snap) => {
-    $("#msgBox").innerHTML = snap.docs
-      .map((d) => {
-        const m = d.data();
-        const isMe = m.from === state.vendor.id;
-        let contentHtml = "";
-        if (m.type === "image")
-          contentHtml = `<div class="bubble me"><img src="${m.text}" loading="lazy" /></div>`;
-        else if (m.type === "sticker")
-          contentHtml = `<div class="bubble sticker me"><img src="${m.text}" style="width:100px; border:none;" /></div>`;
-        else if (m.type === "location") {
-          const link = m.text.startsWith("http") ? m.text : "#";
-          contentHtml = `<a href="${link}" target="_blank" class="bubble location ${
-            isMe ? "me" : "them"
-          }"><span>📍</span> Lokasi Toko</a>`;
-        } else
-          contentHtml = `<div class="bubble ${isMe ? "me" : "them"}">${
-            m.text
-          }</div>`;
-        return `<div style="display:flex; justify-content:${
-          isMe ? "flex-end" : "flex-start"
-        }; margin-bottom: 6px;">${contentHtml}</div>`;
-      })
-      .join("");
-    scrollToBottom();
-  });
-};
-
-window.backToChatList = () => {
-  $("#viewChatRoom").classList.remove("active");
-  state.activeChatId = null;
-  if (state.unsubMsg) state.unsubMsg();
-};
-
-function scrollToBottom() {
-  const chatBox = document.getElementById("msgBox");
-  if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
-}
-
-window.sendMessage = async (content = null, type = "text") => {
-  if (!state.activeChatId) return;
-  if (!content) {
-    const input = document.getElementById("replyInput");
-    content = input.value.trim();
-    input.value = "";
-    input.focus();
+  // Show Selected Section & Active Nav
+  if (screen === "Home") {
+    $$(".nav-item")[0].classList.add("active");
+    $$(".sb-item")[0].classList.add("active");
+    $("#sellerHome").classList.remove("hidden");
+  } else if (screen === "Orders") {
+    $$(".nav-item")[1].classList.add("active");
+    $$(".sb-item")[1].classList.add("active");
+    $("#sellerOrders").classList.remove("hidden");
+  } else if (screen === "Promo") {
+    $$(".nav-item")[2].classList.add("active");
+    $$(".sb-item")[2].classList.add("active");
+    $("#sellerPromo").classList.remove("hidden");
+    renderVoucherList();
   }
-  if (!content) return;
-  await addDoc(collection(db, "chats", state.activeChatId, "messages"), {
-    text: content,
-    type: type,
-    from: state.vendor.id,
-    ts: Date.now(),
-  });
-  let preview =
-    type === "text"
-      ? content
-      : type === "image"
-      ? "📷 Foto"
-      : type === "sticker"
-      ? "😊 Stiker"
-      : "📍 Lokasi";
-  await updateDoc(doc(db, "chats", state.activeChatId), {
-    lastMessage: "Anda: " + preview,
-    lastUpdate: Date.now(),
-  });
-  scrollToBottom();
 };
-$("#sendReplyBtn").addEventListener("click", () => sendMessage());
-$("#replyInput").addEventListener("keypress", (e) => {
-  if (e.key === "Enter") sendMessage();
-});
 
-// --- UI HELPERS ---
+// --- VOUCHER MANAGEMENT (OLD LOGIC RESTORED) ---
+window.openVoucherModal = () => {
+  $("#voucherModal").classList.remove("hidden");
+};
+
+window.submitVoucher = async () => {
+  const code = $("#vCode").value.trim().toUpperCase();
+  const type = $("#vType").value;
+  const value = Number($("#vValue").value);
+  const quota = Number($("#vQuota").value);
+
+  if (!code) return alert("Kode promo wajib diisi");
+  if (value <= 0) return alert("Nilai potongan harus lebih dari 0");
+  if (quota <= 0) return alert("Kuota harus lebih dari 0");
+
+  const exists = state.vouchers.find((v) => v.code === code);
+  if (exists) return alert("Kode promo ini sudah ada di daftar aktif.");
+
+  const btn = $("#voucherModal .btn.primary");
+  const oriText = btn ? btn.textContent : "Simpan";
+  if (btn) {
+    btn.textContent = "Menyimpan...";
+    btn.disabled = true;
+  }
+
+  try {
+    await addDoc(collection(db, "vouchers"), {
+      vendorId: state.vendor.id,
+      code: code,
+      type: type,
+      value: value,
+      quota: quota,
+      initialQuota: quota,
+      createdAt: serverTimestamp(),
+    });
+
+    $("#vCode").value = "";
+    $("#vValue").value = "";
+    $("#vQuota").value = "";
+    closeModal("voucherModal");
+    alert("Voucher berhasil diterbitkan! 🎉");
+  } catch (e) {
+    alert("Gagal: " + e.message);
+  }
+
+  if (btn) {
+    btn.textContent = oriText;
+    btn.disabled = false;
+  }
+};
+
+function renderVoucherList() {
+  const list = $("#voucherListContainer"); // Target Container di PAGE, bukan modal
+  if (!list) return;
+  list.innerHTML = "";
+
+  if (state.vouchers.length === 0) {
+    list.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align:center; padding:50px; border:2px dashed #e2e8f0; border-radius:12px; color:#94a3b8;">
+                <div style="font-size:40px; margin-bottom:10px;">🎫</div>
+                Belum ada voucher aktif.<br>Buat satu untuk menarik pembeli!
+            </div>`;
+    return;
+  }
+
+  state.vouchers.forEach((v) => {
+    const initial = v.initialQuota || v.quota;
+    const used = initial - v.quota;
+    const percentUsed = (used / initial) * 100;
+
+    const valueDisplay =
+      v.type === "percent"
+        ? `<span style="font-size:24px">${v.value}%</span>`
+        : `<span style="font-size:14px; font-weight:normal; color:#64748b;">Rp</span> ${v.value.toLocaleString("id-ID")}`;
+
+    const progressColor = percentUsed > 80 ? "#ef4444" : "#22c55e";
+
+    const card = document.createElement("div");
+    card.className = "voucher-ticket";
+    card.innerHTML = `
+            <div class="ticket-left">
+                <div class="v-label">KODE PROMO</div>
+                <div class="v-code">${v.code}</div>
+                <div style="margin-top:8px;">
+                    <div class="v-label">DISKON</div>
+                    <div class="v-value">${valueDisplay}</div>
+                </div>
+                <div class="used-badge">
+                      🔥 Terpakai: ${used}x
+                </div>
+            </div>
+            
+            <div class="ticket-right">
+                <div style="width:100%">
+                    <div class="v-label">KUOTA</div>
+                    <div style="font-size:16px; font-weight:bold; color:#334155;">${v.quota}</div>
+                    
+                    <div class="quota-track">
+                        <div class="quota-fill" style="width: ${100 - percentUsed}%; background:${progressColor}"></div>
+                    </div>
+                    <div class="quota-text">dari ${initial}</div>
+                </div>
+
+                <button class="btn-del-mini" onclick="deleteVoucher('${v.id}')">
+                    🗑 Hapus
+                </button>
+            </div>
+        `;
+    list.appendChild(card);
+  });
+}
+
+window.deleteVoucher = async (vid) => {
+  if (confirm("Hapus voucher? Pembeli tidak bisa menggunakannya lagi.")) {
+    await deleteDoc(doc(db, "vouchers", vid));
+  }
+};
+
+// --- UI & OTHER LOGIC ---
 function renderUI() {
   if (!state.vendor) return;
   $("#vName").textContent = state.vendor.name;
@@ -484,11 +475,12 @@ function renderUI() {
   } else {
     $("#subActive").classList.remove("hidden");
     $("#expDate").textContent = new Date(
-      state.vendor.subscriptionExpiry
+      state.vendor.subscriptionExpiry,
     ).toLocaleDateString();
     enableShop();
   }
 
+  // --- Render Menu ---
   $("#menuList").innerHTML =
     (state.vendor.menu || [])
       .map((m, idx) => {
@@ -496,21 +488,11 @@ function renderUI() {
         return `
     <div class="menu-card">
       <div style="display:flex; align-items:center;">
-        ${
-          m.image
-            ? `<img src="${m.image}" class="menu-thumb" />`
-            : '<div class="menu-thumb" style="display:flex;align-items:center;justify-content:center;">🍲</div>'
-        }
+        ${m.image ? `<img src="${m.image}" class="menu-thumb" />` : '<div class="menu-thumb" style="display:flex;align-items:center;justify-content:center;">🍲</div>'}
         <div>
             <div style="font-weight:700">${m.name}</div>
-            <div style="color:var(--text-muted); font-size:13px;">${rupiah(
-              m.price
-            )}</div>
-            ${
-              soldCount > 0
-                ? `<div class="sold-count">🔥 ${soldCount} Terjual</div>`
-                : ""
-            }
+            <div style="color:var(--text-muted); font-size:13px;">${rupiah(m.price)}</div>
+            ${soldCount > 0 ? `<div class="sold-count">🔥 ${soldCount} Terjual</div>` : ""}
         </div>
       </div>
       <div class="menu-actions">
@@ -550,79 +532,367 @@ function enableShop() {
   }
 }
 
-// --- LOGIC LAINNYA ---
-window.redeemCode = async () => {
-  const inputCode = parseInt($("#activationCode").value);
-  if (!state.approvedSub || !state.approvedSub.activationCode)
-    return alert("Data kode tidak ditemukan.");
-  if (inputCode === state.approvedSub.activationCode) {
-    const now = Date.now();
-    await updateDoc(doc(db, "vendors", state.vendor.id), {
-      subscriptionExpiry: now + 30 * 24 * 60 * 60 * 1000,
-    });
-    await updateDoc(doc(db, "subscriptions", state.approvedSub.id), {
-      status: "redeemed",
-    });
-    alert("Kode Benar! Akun Anda aktif.");
-  } else {
-    alert("Kode Salah!");
+function playNotification() {
+  const audio = document.getElementById("notifSound");
+  if (audio) {
+    audio.play().catch((e) => console.log("Audio autoplay blocked by browser"));
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
   }
-};
-$("#payBtn").addEventListener("click", () =>
-  $("#payModal").classList.remove("hidden")
-);
-window.selectPayMethod = (method) => {
-  if (method === "cash") {
-    $("#payCash").classList.remove("hidden");
-    $("#payQris").classList.add("hidden");
-  } else {
-    $("#payCash").classList.add("hidden");
-    $("#payQris").classList.remove("hidden");
-  }
-};
-window.handlePayProof = async (input) => {
-  if (input.files && input.files[0]) {
-    try {
-      state.tempPayProof = await compressImage(input.files[0], 500, 0.6);
-      $("#payProofText").textContent = "✅ Bukti Siap";
-    } catch (e) {
-      alert("Gagal proses gambar");
+}
+
+// --- CHAT LOGIC (NEW) ---
+function listenForChats() {
+  const q = query(
+    collection(db, "chats"),
+    where("vendorId", "==", state.vendor.id),
+  );
+  onSnapshot(q, (snap) => {
+    if (!snap.empty) {
+      if (!$("#floatingChatWindow").classList.contains("active")) {
+        $("#floatingBubble").classList.remove("hidden");
+      }
+      state.unreadCount = 0;
+      if (state.unreadCount > 0) {
+        $("#bubbleBadge").textContent = state.unreadCount;
+        $("#bubbleBadge").classList.add("visible");
+      }
     }
-  }
-};
-window.submitSubscription = async (method) => {
-  if (method === "qris" && !state.tempPayProof)
-    return alert("Mohon upload bukti transfer dulu.");
-  await addDoc(collection(db, "subscriptions"), {
-    vendorId: state.vendor.id,
-    vendorName: state.vendor.name,
-    amount: 5000,
-    timestamp: Date.now(),
-    type: "Premium Bulanan",
-    method: method,
-    proof: state.tempPayProof || null,
-    status: "pending",
   });
-  $("#payModal").classList.add("hidden");
-  alert("Permintaan dikirim! Tunggu validasi Admin.");
+}
+
+function initBubbleDrag() {
+  const bubble = document.getElementById("floatingBubble");
+  let isDragging = false;
+  let hasMoved = false;
+  let startX, startY, initialLeft, initialTop;
+
+  const startDrag = (e) => {
+    const evt = e.type === "touchstart" ? e.touches[0] : e;
+    startX = evt.clientX;
+    startY = evt.clientY;
+    const rect = bubble.getBoundingClientRect();
+    initialLeft = rect.left;
+    initialTop = rect.top;
+    isDragging = true;
+    hasMoved = false;
+  };
+
+  const onDrag = (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    hasMoved = true;
+    const evt = e.type === "touchmove" ? e.touches[0] : e;
+    const dx = evt.clientX - startX;
+    const dy = evt.clientY - startY;
+    bubble.style.left = `${initialLeft + dx}px`;
+    bubble.style.top = `${initialTop + dy}px`;
+    bubble.style.right = "auto";
+    bubble.style.bottom = "auto";
+  };
+
+  const stopDrag = () => {
+    isDragging = false;
+  };
+  const onClickBubble = () => {
+    if (!hasMoved) openChatWindow();
+  };
+
+  bubble.addEventListener("mousedown", startDrag);
+  window.addEventListener("mousemove", onDrag);
+  window.addEventListener("mouseup", stopDrag);
+  bubble.addEventListener("click", onClickBubble);
+  bubble.addEventListener("touchstart", startDrag);
+  window.addEventListener("touchmove", onDrag, { passive: false });
+  window.addEventListener("touchend", stopDrag);
+}
+
+window.openChatWindow = () => {
+  $("#floatingChatWindow").classList.add("active");
+  $("#floatingBubble").classList.add("hidden");
+  loadChatList();
+  $("#viewChatList").classList.remove("hidden");
+  $("#viewChatRoom").classList.remove("active");
+};
+window.closeChatWindow = () => {
+  $("#floatingChatWindow").classList.remove("active");
+  $("#floatingBubble").classList.remove("hidden");
 };
 
-window.goSeller = (screen) => {
-  $$(".nav-item").forEach((n) => n.classList.remove("active"));
-  $$(".sb-item").forEach((n) => n.classList.remove("active"));
-  $("#sellerHome").classList.add("hidden");
-  $("#sellerOrders").classList.add("hidden");
-  if (screen === "Home") {
-    $$(".nav-item")[0].classList.add("active");
-    $$(".sb-item")[0].classList.add("active");
-    $("#sellerHome").classList.remove("hidden");
-  } else if (screen === "Orders") {
-    $$(".nav-item")[1].classList.add("active");
-    $$(".sb-item")[1].classList.add("active");
-    $("#sellerOrders").classList.remove("hidden");
+function loadChatList() {
+  const q = query(
+    collection(db, "chats"),
+    where("vendorId", "==", state.vendor.id),
+  );
+  onSnapshot(q, (snap) => {
+    let list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    list.sort((a, b) => b.lastUpdate - a.lastUpdate);
+    $("#chatListContent").innerHTML =
+      list
+        .map(
+          (c) =>
+            `<div class="chat-entry" onclick="openChatRoom('${c.id}', '${c.userName}')">
+            <div class="chat-avatar">👤</div>
+            <div class="chat-info">
+                <span class="chat-name">${c.userName}</span>
+                <span class="chat-last">${c.lastMessage}</span>
+            </div>
+        </div>`,
+        )
+        .join("") ||
+      '<div style="text-align:center; padding:20px; color:#999;">Belum ada chat.</div>';
+  });
+}
+
+window.openChatRoom = (chatId, userName) => {
+  state.activeChatId = chatId;
+  $("#viewChatRoom").classList.add("active");
+  $("#roomTitle").textContent = userName;
+  if (state.unsubMsg) state.unsubMsg();
+  const q = query(
+    collection(db, "chats", chatId, "messages"),
+    orderBy("ts", "asc"),
+  );
+  state.unsubMsg = onSnapshot(q, (snap) => {
+    $("#msgBox").innerHTML = snap.docs
+      .map((d) => {
+        const m = d.data();
+        const isMe = m.from === state.vendor.id;
+        let contentHtml = "";
+        if (m.type === "image")
+          contentHtml = `<div class="bubble me"><img src="${m.text}" loading="lazy" /></div>`;
+        else if (m.type === "sticker")
+          contentHtml = `<div class="bubble sticker me"><img src="${m.text}" style="width:100px; border:none;" /></div>`;
+        else if (m.type === "location") {
+          const link = m.text.startsWith("http") ? m.text : "#";
+          contentHtml = `<a href="${link}" target="_blank" class="bubble location ${isMe ? "me" : "them"}"><span>📍</span> Lokasi Toko</a>`;
+        } else
+          contentHtml = `<div class="bubble ${isMe ? "me" : "them"}">${m.text}</div>`;
+        return `<div style="display:flex; justify-content:${isMe ? "flex-end" : "flex-start"}; margin-bottom: 6px;">${contentHtml}</div>`;
+      })
+      .join("");
+    scrollToBottom();
+  });
+};
+
+window.backToChatList = () => {
+  $("#viewChatRoom").classList.remove("active");
+  state.activeChatId = null;
+  if (state.unsubMsg) state.unsubMsg();
+};
+
+function scrollToBottom() {
+  const chatBox = document.getElementById("msgBox");
+  if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+window.sendMessage = async (content = null, type = "text") => {
+  if (!state.activeChatId) return;
+  if (!content) {
+    const input = document.getElementById("replyInput");
+    content = input.value.trim();
+    input.value = "";
+    input.focus();
+  }
+  if (!content) return;
+  await addDoc(collection(db, "chats", state.activeChatId, "messages"), {
+    text: content,
+    type: type,
+    from: state.vendor.id,
+    ts: Date.now(),
+  });
+  let preview =
+    type === "text"
+      ? content
+      : type === "image"
+        ? "📷 Foto"
+        : type === "sticker"
+          ? "😊 Stiker"
+          : "📍 Lokasi";
+  await updateDoc(doc(db, "chats", state.activeChatId), {
+    lastMessage: "Anda: " + preview,
+    lastUpdate: Date.now(),
+  });
+  scrollToBottom();
+};
+$("#sendReplyBtn").addEventListener("click", () => sendMessage());
+$("#replyInput").addEventListener("keypress", (e) => {
+  if (e.key === "Enter") sendMessage();
+});
+
+// --- MAP & GPS (NEW) ---
+function initMap() {
+  if (state.map) return;
+  state.map = L.map("sellerMap").setView(
+    [state.vendor.lat, state.vendor.lon],
+    15,
+  );
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OSM",
+  }).addTo(state.map);
+  const icon = L.divIcon({
+    className: "vendor-pin",
+    html: `<div style="background:white; padding:4px; border-radius:8px; border:2px solid #ff7a00; font-size:20px; text-align:center; width:40px;">${state.vendor.ico || "🏪"}</div>`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+  });
+  state.marker = L.marker([state.vendor.lat, state.vendor.lon], {
+    icon: icon,
+    draggable: false,
+  }).addTo(state.map);
+  state.marker.on("dragend", async (e) => {
+    const { lat, lng } = e.target.getLatLng();
+    await updateDoc(doc(db, "vendors", state.vendor.id), { lat, lon: lng });
+  });
+}
+window.setLocMode = async (mode) => {
+  state.locMode = mode;
+  updateModeButtons();
+  await updateDoc(doc(db, "vendors", state.vendor.id), { locationMode: mode });
+  handleLocationLogic();
+};
+function updateModeButtons() {
+  $$(".mode-tab").forEach((b) => b.classList.remove("active"));
+  state.locMode === "gps"
+    ? $$(".mode-tab")[0].classList.add("active")
+    : $$(".mode-tab")[1].classList.add("active");
+  $("#manualHint").classList.toggle("hidden", state.locMode !== "manual");
+}
+function handleLocationLogic() {
+  if (!state.map || !state.marker) return;
+  if (state.locMode === "gps") {
+    state.marker.dragging.disable();
+    startGPS();
+  } else {
+    stopGPS();
+    state.marker.dragging.enable();
+  }
+}
+function startGPS() {
+  if (!navigator.geolocation) {
+    alert("Browser tidak support GPS.");
+    return;
+  }
+  if (state.watchId) return;
+  const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
+  state.watchId = navigator.geolocation.watchPosition(
+    async (pos) => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      await updateDoc(doc(db, "vendors", state.vendor.id), { lat, lon });
+      if (state.marker) state.marker.setLatLng([lat, lon]);
+      if (state.map) state.map.setView([lat, lon], 16);
+    },
+    (err) => {
+      console.error("GPS Error:", err);
+    },
+    options,
+  );
+}
+function stopGPS() {
+  if (state.watchId) {
+    navigator.geolocation.clearWatch(state.watchId);
+    state.watchId = null;
+  }
+}
+
+// --- PAYMENT & QRIS (NEW) ---
+window.updatePaymentMethod = async () => {
+  const cash = $("#chkCash").checked;
+  const qris = $("#chkQris").checked;
+  let newMethods = [];
+  if (cash) newMethods.push("cash");
+  if (qris) newMethods.push("qris");
+  if (newMethods.length === 0) {
+    alert("Pilih minimal satu.");
+    $("#chkCash").checked = true;
+    return;
+  }
+  await updateDoc(doc(db, "vendors", state.vendor.id), {
+    paymentMethods: newMethods,
+  });
+};
+window.saveQrisData = async () => {
+  const rawString = $("#qrisDataInput").value.trim();
+  if (rawString.length < 20 || !rawString.startsWith("000201")) {
+    return alert("Format QRIS tidak valid. Harus diawali '000201'.");
+  }
+  try {
+    await updateDoc(doc(db, "vendors", state.vendor.id), {
+      qrisData: rawString,
+    });
+    alert("✅ Data QRIS Dinamis berhasil disimpan!");
+    renderPaymentSettings();
+  } catch (e) {
+    alert("Gagal simpan: " + e.message);
   }
 };
+window.handleQrisUpload = async (input) => {
+  if (input.files[0]) {
+    const file = input.files[0];
+    try {
+      const c = await compressImage(file, 500, 0.7);
+      const decodedText = await extractQRFromImage(file);
+      let updateData = { qrisImage: c };
+      if (decodedText && decodedText.startsWith("000201")) {
+        updateData.qrisData = decodedText;
+        $("#qrisDataInput").value = decodedText;
+        alert("✅ Gambar QRIS terupload & Kode berhasil diekstrak otomatis!");
+      } else {
+        alert("✅ Gambar QRIS terupload. (Kode tidak terbaca otomatis)");
+      }
+      await updateDoc(doc(db, "vendors", state.vendor.id), updateData);
+      renderPaymentSettings();
+    } catch (e) {
+      alert(e.message);
+    }
+    input.value = "";
+  }
+};
+function renderPaymentSettings() {
+  const methods = state.vendor.paymentMethods || ["cash"];
+  const hasQris = methods.includes("qris");
+  $("#chkCash").checked = methods.includes("cash");
+  $("#chkQris").checked = hasQris;
+  const qrisConfig = $("#qrisConfig");
+  const qrisStatus = $("#qrisStatus");
+  const qrisImg = $("#qrisImg");
+  const qrisPh = $("#qrisPlaceholder");
 
+  if (hasQris) {
+    qrisConfig.classList.remove("hidden");
+    const hasData = !!state.vendor.qrisData;
+    const hasImage = !!state.vendor.qrisImage;
+    if (state.vendor.qrisData)
+      $("#qrisDataInput").value = state.vendor.qrisData;
+    if (hasData) {
+      qrisStatus.textContent = "✅ Dinamis Aktif";
+      qrisStatus.style.color = "#10b981";
+    } else if (hasImage) {
+      qrisStatus.textContent = "⚠️ Statis (Gambar Saja)";
+      qrisStatus.style.color = "#f59e0b";
+    } else {
+      qrisStatus.textContent = "❌ Belum Setup";
+      qrisStatus.style.color = "#ef4444";
+    }
+    if (hasImage) {
+      qrisImg.src = state.vendor.qrisImage;
+      qrisImg.classList.remove("hidden");
+      qrisPh.classList.add("hidden");
+      $(".qris-preview").classList.add("has-image");
+    } else {
+      qrisImg.classList.add("hidden");
+      qrisPh.classList.remove("hidden");
+      $(".qris-preview").classList.remove("has-image");
+    }
+  } else {
+    qrisConfig.classList.add("hidden");
+    qrisStatus.textContent = "Belum Aktif";
+    qrisStatus.style.color = "#94a3b8";
+  }
+}
+window.triggerQrisUpload = () => $("#qrisInput").click();
+
+// --- MENU CRUD ---
 window.triggerLogoUpload = () => $("#shopLogoInput").click();
 window.handleLogoUpload = async (input) => {
   if (input.files[0]) {
@@ -695,7 +965,7 @@ $("#menuForm").addEventListener("submit", async (e) => {
     updMenu[state.editingMenuIndex] = newItem;
   else updMenu.push(newItem);
   await updateDoc(doc(db, "vendors", state.vendor.id), { menu: updMenu });
-  window.closeModal();
+  closeModal("menuModal");
 });
 window.deleteMenu = async (idx) => {
   if (confirm("Hapus?")) {
@@ -705,264 +975,81 @@ window.deleteMenu = async (idx) => {
   }
 };
 
-function renderPaymentSettings() {
-  const methods = state.vendor.paymentMethods || ["cash"];
-  const hasQris = methods.includes("qris");
-  $("#chkCash").checked = methods.includes("cash");
-  $("#chkQris").checked = hasQris;
-
-  const qrisConfig = $("#qrisConfig");
-  const qrisStatus = $("#qrisStatus");
-  const qrisImg = $("#qrisImg");
-  const qrisPh = $("#qrisPlaceholder");
-
-  if (hasQris) {
-    qrisConfig.classList.remove("hidden");
-    const hasData = !!state.vendor.qrisData;
-    const hasImage = !!state.vendor.qrisImage;
-
-    if (state.vendor.qrisData)
-      $("#qrisDataInput").value = state.vendor.qrisData;
-
-    if (hasData) {
-      qrisStatus.textContent = "✅ Dinamis Aktif";
-      qrisStatus.style.color = "#10b981";
-    } else if (hasImage) {
-      qrisStatus.textContent = "⚠️ Statis (Gambar Saja)";
-      qrisStatus.style.color = "#f59e0b";
-    } else {
-      qrisStatus.textContent = "❌ Belum Setup";
-      qrisStatus.style.color = "#ef4444";
-    }
-
-    if (hasImage) {
-      qrisImg.src = state.vendor.qrisImage;
-      qrisImg.classList.remove("hidden");
-      qrisPh.classList.add("hidden");
-      $(".qris-preview").classList.add("has-image");
-    } else {
-      qrisImg.classList.add("hidden");
-      qrisPh.classList.remove("hidden");
-      $(".qris-preview").classList.remove("has-image");
-    }
-  } else {
-    qrisConfig.classList.add("hidden");
-    qrisStatus.textContent = "Belum Aktif";
-    qrisStatus.style.color = "#94a3b8";
-  }
-}
-
-window.updatePaymentMethod = async () => {
-  const cash = $("#chkCash").checked;
-  const qris = $("#chkQris").checked;
-  let newMethods = [];
-  if (cash) newMethods.push("cash");
-  if (qris) newMethods.push("qris");
-  if (newMethods.length === 0) {
-    alert("Minimal satu metode aktif.");
-    $("#chkCash").checked = true;
-    return;
-  }
-  await updateDoc(doc(db, "vendors", state.vendor.id), {
-    paymentMethods: newMethods,
-  });
-};
-
-window.triggerQrisUpload = () => $("#qrisInput").click();
-
-// --- MODIFIED: UPLOAD IMAGE & AUTO DECODE QR STRING ---
-window.handleQrisUpload = async (input) => {
-  if (input.files[0]) {
-    const file = input.files[0];
-    try {
-      // 1. Proses Gambar (Visual)
-      const c = await compressImage(file, 500, 0.7);
-
-      // 2. Proses Text (Auto Decode)
-      const decodedText = await extractQRFromImage(file);
-
-      let updateData = { qrisImage: c };
-
-      // Jika berhasil decode, simpan juga text-nya otomatis
-      if (decodedText && decodedText.startsWith("000201")) {
-        updateData.qrisData = decodedText;
-        $("#qrisDataInput").value = decodedText; // Tampilkan di textarea
-        alert("✅ Gambar QRIS terupload & Kode berhasil diekstrak otomatis!");
-      } else {
-        alert(
-          "✅ Gambar QRIS terupload. (Kode tidak terbaca otomatis, silakan copy manual jika perlu dinamis)"
-        );
-      }
-
-      await updateDoc(doc(db, "vendors", state.vendor.id), updateData);
-      renderPaymentSettings();
-    } catch (e) {
-      alert(e.message);
-    }
-    input.value = "";
-  }
-};
-
-// --- MODIFIED: SAVE QRIS DATA (FIXED SPACE BUG) ---
-window.saveQrisData = async () => {
-  // HANYA TRIM UJUNG, JANGAN HAPUS SPASI DALAM
-  const rawString = $("#qrisDataInput").value.trim();
-
-  if (rawString.length < 20 || !rawString.startsWith("000201")) {
-    return alert(
-      "Format QRIS tidak valid. Harus diawali '000201'. Cobalah upload gambar QRIS Anda agar sistem membaca otomatis."
-    );
-  }
-
-  try {
+// --- SUBSCRIPTIONS ---
+window.redeemCode = async () => {
+  const inputCode = parseInt($("#activationCode").value);
+  if (!state.approvedSub || !state.approvedSub.activationCode)
+    return alert("Data kode tidak ditemukan.");
+  if (inputCode === state.approvedSub.activationCode) {
+    const now = Date.now();
     await updateDoc(doc(db, "vendors", state.vendor.id), {
-      qrisData: rawString,
+      subscriptionExpiry: now + 30 * 24 * 60 * 60 * 1000,
     });
-    alert("✅ Data QRIS Dinamis berhasil disimpan!");
-    renderPaymentSettings();
-  } catch (e) {
-    alert("Gagal simpan: " + e.message);
-  }
-};
-
-// --- FUNGSI BUKA MODAL BUKTI TRANSFER ---
-window.viewProof = (oid) => {
-  const order = state.orders.find((o) => o.id === oid);
-  if (order && order.paymentProof) {
-    $("#proofImageFull").src = order.paymentProof;
-    $("#proofModal").classList.remove("hidden");
+    await updateDoc(doc(db, "subscriptions", state.approvedSub.id), {
+      status: "redeemed",
+    });
+    alert("Kode Benar! Akun Anda aktif.");
   } else {
-    alert("Bukti tidak ditemukan");
+    alert("Kode Salah!");
   }
 };
-
-function renderOrdersList() {
-  const list = state.orders.sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  );
-  const activeOrders = list.filter(
-    (o) => o.status !== "Selesai" && !o.status.includes("Dibatalkan")
-  );
-  const historyOrders = list.filter(
-    (o) => o.status === "Selesai" || o.status.includes("Dibatalkan")
-  );
-  $("#incomingCount").textContent = activeOrders.length;
-  const renderItem = (o, active) => {
-    const itemsUI = (o.items || [])
-      .map((i) => `${i.qty}x ${i.name}`)
-      .join(", ");
-    let stCls =
-      o.status === "Diproses"
-        ? "status-process"
-        : o.status === "Siap Diambil/Diantar"
-        ? "status-deliv"
-        : "status-done";
-    if (o.status.includes("Dibatalkan")) stCls = "status-cancel";
-    let btn = "";
-    if (active) {
-      if (o.status === "Menunggu Konfirmasi Bayar") {
-        const proofBtn = o.paymentProof
-          ? `<button class="btn small info" onclick="viewProof('${o.id}')" style="width:100%; margin-bottom:8px; border:1px solid #0ea5e9; background:#e0f2fe; color:#0284c7;">📄 Lihat Bukti Transfer</button>`
-          : "";
-
-        btn = `<div style="background:#f8fafc; padding:10px; border-radius:8px; margin-bottom:10px;">
-                ${proofBtn}
-                <div style="display:flex; gap:8px;">
-                    <button class="btn full" style="background:#ef4444; color:white;" onclick="updStat('${o.id}','Dibatalkan (Bukti Salah)')">Tolak</button>
-                    <button class="btn primary full" onclick="updStat('${o.id}','Diproses')">Terima</button>
-                </div>
-               </div>`;
-      } else if (o.status === "Diproses") {
-        btn = `<button class="btn primary full" onclick="updStat('${o.id}','Siap Diambil/Diantar')">✅ Selesai Masak</button>`;
-      } else if (o.status === "Siap Diambil/Diantar") {
-        btn = `<div style="display:flex; gap:8px;"><input id="pin-${o.id}" placeholder="PIN (4 digit)" style="width:100px; padding:8px; border:1px solid #ccc; border-radius:8px; font-size:14px;" maxlength="4" /><button class="btn full" style="background:#10b981; color:white;" onclick="verifyPin('${o.id}', '${o.securePin}')">Verifikasi</button></div>`;
-      }
+$("#payBtn").addEventListener("click", () =>
+  $("#payModal").classList.remove("hidden"),
+);
+window.selectPayMethod = (method) => {
+  if (method === "cash") {
+    $("#payCash").classList.remove("hidden");
+    $("#payQris").classList.add("hidden");
+  } else {
+    $("#payCash").classList.add("hidden");
+    $("#payQris").classList.remove("hidden");
+  }
+};
+window.handlePayProof = async (input) => {
+  if (input.files && input.files[0]) {
+    try {
+      state.tempPayProof = await compressImage(input.files[0], 500, 0.6);
+      $("#payProofText").textContent = "✅ Bukti Siap";
+    } catch (e) {
+      alert("Gagal proses gambar");
     }
-    const waNum = formatWA(o.userPhone);
-    const waBtn = waNum
-      ? `<a href="https://wa.me/${waNum}?text=Halo" target="_blank" style="font-size:12px; color:#22c55e; text-decoration:none; font-weight:600; background:#f0fdf4; padding:4px 8px; border-radius:6px; border:1px solid #22c55e;">📞 WhatsApp</a>`
-      : `<span class="muted" style="font-size:12px">No WA Tidak Ada</span>`;
-    const deleteBtn = `<button onclick="deleteOrder('${o.id}')" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:12px; text-decoration:underline; margin-left:auto;">🗑️ Hapus Pesanan</button>`;
-
-    const historyProofBtn =
-      !active && o.paymentMethod === "qris" && o.paymentProof
-        ? `<button onclick="viewProof('${o.id}')" style="background:none; border:none; color:#0ea5e9; cursor:pointer; font-size:12px; text-decoration:underline; margin-right:10px;">📄 Bukti</button>`
-        : "";
-
-    return `<div class="order-item"><div class="ord-head"><div><b>${
-      o.userName
-    }</b> <span style="color:#94a3b8; font-size:12px;">• ${new Date(
-      o.createdAt
-    ).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    })}</span><div style="margin-top:6px;">${waBtn}</div></div><span class="ord-status ${stCls}">${
-      o.status
-    }</span></div><div class="ord-body"><p style="margin:0 0 10px 0; font-size:14px; line-height:1.5;">${itemsUI}</p>${
-      o.note
-        ? `<div style="background:#fff1f2; color:#be123c; padding:8px; border-radius:8px; font-size:12px; margin-bottom:10px;">📝 ${o.note}</div>`
-        : ""
-    }<div class="rowBetween"><span class="muted">Total (${
-      o.paymentMethod === "qris" ? "QRIS" : "Tunai"
-    })</span><b style="font-size:16px;">${rupiah(
-      o.total
-    )}</b></div><div style="display:flex; margin-top:8px;">${historyProofBtn}${deleteBtn}</div></div>${
-      btn ? `<div class="ord-foot">${btn}</div>` : ""
-    }</div>`;
-  };
-  $("#incomingOrdersList").innerHTML =
-    activeOrders.map((o) => renderItem(o, true)).join("") ||
-    `<div class="empty-state-box">Tidak ada pesanan aktif.</div>`;
-  $("#historyOrdersList").innerHTML = historyOrders
-    .map((o) => renderItem(o, false))
-    .join("");
-}
-window.updStat = async (oid, st) => {
-  if (confirm("Update status pesanan?"))
-    await updateDoc(doc(db, "orders", oid), { status: st });
-};
-window.verifyPin = async (oid, correctPin) => {
-  const inputPin = document.getElementById(`pin-${oid}`).value;
-  if (inputPin === correctPin) {
-    if (confirm("PIN Benar! Selesaikan pesanan?"))
-      await updateDoc(doc(db, "orders", oid), { status: "Selesai" });
-  } else {
-    alert("PIN SALAH!");
   }
 };
-window.deleteOrder = async (oid) => {
-  if (confirm("HAPUS PERMANEN?")) {
-    await deleteDoc(doc(db, "orders", oid));
-  }
-};
-$("#statusToggle").addEventListener("change", async (e) => {
-  if (state.vendor.subscriptionExpiry < Date.now()) {
-    e.target.checked = false;
-    alert("Masa aktif habis.");
-    return;
-  }
-  await updateDoc(doc(db, "vendors", state.vendor.id), {
-    isLive: e.target.checked,
+window.submitSubscription = async (method) => {
+  if (method === "qris" && !state.tempPayProof)
+    return alert("Mohon upload bukti transfer dulu.");
+  await addDoc(collection(db, "subscriptions"), {
+    vendorId: state.vendor.id,
+    vendorName: state.vendor.name,
+    amount: 5000,
+    timestamp: Date.now(),
+    type: "Premium Bulanan",
+    method: method,
+    proof: state.tempPayProof || null,
+    status: "pending",
   });
-});
+  $("#payModal").classList.add("hidden");
+  alert("Permintaan dikirim! Tunggu validasi Admin.");
+};
 
+// --- ORDER STATS ---
 function calculateStats() {
   const now = new Date();
   const d = new Date(
     now.getFullYear(),
     now.getMonth(),
-    now.getDate()
+    now.getDate(),
   ).getTime();
   const w = new Date(now.setDate(now.getDate() - now.getDay())).setHours(
     0,
     0,
     0,
-    0
+    0,
   );
   const m = new Date(
     new Date().getFullYear(),
     new Date().getMonth(),
-    1
+    1,
   ).getTime();
   let today = 0,
     week = 0,
@@ -993,114 +1080,132 @@ function calculateStats() {
   if (state.vendor) renderUI();
 }
 
-// --- FIXED MAPS LOGIC (LIVE GPS) ---
-function initMap() {
-  if (state.map) return;
-  state.map = L.map("sellerMap").setView(
-    [state.vendor.lat, state.vendor.lon],
-    15
+function renderOrdersList() {
+  const list = state.orders.sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
   );
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "© OSM",
-  }).addTo(state.map);
-  const icon = L.divIcon({
-    className: "vendor-pin",
-    html: `<div style="background:white; padding:4px; border-radius:8px; border:2px solid #ff7a00; font-size:20px; text-align:center; width:40px;">${
-      state.vendor.ico || "🏪"
-    }</div>`,
-    iconSize: [40, 40],
-    iconAnchor: [20, 40],
-  });
-  state.marker = L.marker([state.vendor.lat, state.vendor.lon], {
-    icon: icon,
-    draggable: false, // Default false, enabled in Manual mode
-  }).addTo(state.map);
+  const activeOrders = list.filter(
+    (o) => o.status !== "Selesai" && !o.status.includes("Dibatalkan"),
+  );
+  const historyOrders = list.filter(
+    (o) => o.status === "Selesai" || o.status.includes("Dibatalkan"),
+  );
+  $("#incomingCount").textContent = activeOrders.length;
+  const renderItem = (o, active) => {
+    const itemsUI = (o.items || [])
+      .map((i) => `${i.qty}x ${i.name}`)
+      .join(", ");
+    let stCls =
+      o.status === "Diproses"
+        ? "status-process"
+        : o.status === "Siap Diambil/Diantar"
+          ? "status-deliv"
+          : "status-done";
+    if (o.status.includes("Dibatalkan")) stCls = "status-cancel";
+    let btn = "";
+    if (active) {
+      if (o.status === "Menunggu Konfirmasi Bayar") {
+        const proofBtn = o.paymentProof
+          ? `<button class="btn small info" onclick="viewProof('${o.id}')" style="width:100%; margin-bottom:8px; border:1px solid #0ea5e9; background:#e0f2fe; color:#0284c7;">📄 Lihat Bukti Transfer</button>`
+          : "";
 
-  // Event listener for DRAG (Manual Mode)
-  state.marker.on("dragend", async (e) => {
-    const { lat, lng } = e.target.getLatLng();
-    await updateDoc(doc(db, "vendors", state.vendor.id), { lat, lon: lng });
-  });
+        btn = `<div style="background:#f8fafc; padding:10px; border-radius:8px; margin-bottom:10px;">
+                  ${proofBtn}
+                  <div style="display:flex; gap:8px;">
+                      <button class="btn full" style="background:#ef4444; color:white;" onclick="updStat('${o.id}','Dibatalkan (Bukti Salah)')">Tolak</button>
+                      <button class="btn primary full" onclick="updStat('${o.id}','Diproses')">Terima</button>
+                  </div>
+                 </div>`;
+      } else if (o.status === "Diproses") {
+        btn = `<button class="btn primary full" onclick="updStat('${o.id}','Siap Diambil/Diantar')">✅ Selesai Masak</button>`;
+      } else if (o.status === "Siap Diambil/Diantar") {
+        btn = `<div style="display:flex; gap:8px;"><input id="pin-${o.id}" placeholder="PIN (4 digit)" style="width:100px; padding:8px; border:1px solid #ccc; border-radius:8px; font-size:14px;" maxlength="4" /><button class="btn full" style="background:#10b981; color:white;" onclick="verifyPin('${o.id}', '${o.securePin}')">Verifikasi</button></div>`;
+      }
+    }
+    const waNum = formatWA(o.userPhone);
+    const waBtn = waNum
+      ? `<a href="https://wa.me/${waNum}?text=Halo" target="_blank" style="font-size:12px; color:#22c55e; text-decoration:none; font-weight:600; background:#f0fdf4; padding:4px 8px; border-radius:6px; border:1px solid #22c55e;">📞 WhatsApp</a>`
+      : `<span class="muted" style="font-size:12px">No WA Tidak Ada</span>`;
+    const deleteBtn = `<button onclick="deleteOrder('${o.id}')" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:12px; text-decoration:underline; margin-left:auto;">🗑️ Hapus Pesanan</button>`;
+
+    const historyProofBtn =
+      !active && o.paymentMethod === "qris" && o.paymentProof
+        ? `<button onclick="viewProof('${o.id}')" style="background:none; border:none; color:#0ea5e9; cursor:pointer; font-size:12px; text-decoration:underline; margin-right:10px;">📄 Bukti</button>`
+        : "";
+
+    // Show Voucher Info if Used
+    let voucherInfo = "";
+    if (o.discount > 0) {
+      voucherInfo = `<div style="color:green; font-size:12px; margin-top:4px;">🏷️ Hemat ${rupiah(o.discount)} (${o.voucherCode || "Promo"})</div>`;
+    }
+
+    return `<div class="order-item"><div class="ord-head"><div><b>${
+      o.userName
+    }</b> <span style="color:#94a3b8; font-size:12px;">• ${new Date(
+      o.createdAt,
+    ).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}</span><div style="margin-top:6px;">${waBtn}</div></div><span class="ord-status ${stCls}">${
+      o.status
+    }</span></div><div class="ord-body"><p style="margin:0 0 10px 0; font-size:14px; line-height:1.5;">${itemsUI}</p>${
+      o.note
+        ? `<div style="background:#fff1f2; color:#be123c; padding:8px; border-radius:8px; font-size:12px; margin-bottom:10px;">📝 ${o.note}</div>`
+        : ""
+    }<div class="rowBetween"><span class="muted">Total (${
+      o.paymentMethod === "qris" ? "QRIS" : "Tunai"
+    })</span><div style="text-align:right;">${voucherInfo}<b style="font-size:16px;">${rupiah(
+      o.total,
+    )}</b></div></div><div style="display:flex; margin-top:8px;">${historyProofBtn}${deleteBtn}</div></div>${
+      btn ? `<div class="ord-foot">${btn}</div>` : ""
+    }</div>`;
+  };
+  $("#incomingOrdersList").innerHTML =
+    activeOrders.map((o) => renderItem(o, true)).join("") ||
+    `<div class="empty-state-box">Tidak ada pesanan aktif.</div>`;
+  $("#historyOrdersList").innerHTML = historyOrders
+    .map((o) => renderItem(o, false))
+    .join("");
 }
-
-// --- LOCATION MODE SWITCHER ---
-window.setLocMode = async (mode) => {
-  state.locMode = mode;
-  updateModeButtons();
-
-  // Save preference to DB
-  await updateDoc(doc(db, "vendors", state.vendor.id), { locationMode: mode });
-
-  handleLocationLogic();
+window.updStat = async (oid, st) => {
+  await updateDoc(doc(db, "orders", oid), { status: st });
 };
-
-function updateModeButtons() {
-  $$(".mode-tab").forEach((b) => b.classList.remove("active"));
-  // Assuming order: [0]=GPS, [1]=Manual
-  state.locMode === "gps"
-    ? $$(".mode-tab")[0].classList.add("active")
-    : $$(".mode-tab")[1].classList.add("active");
-
-  $("#manualHint").classList.toggle("hidden", state.locMode !== "manual");
-}
-
-function handleLocationLogic() {
-  if (!state.map || !state.marker) return;
-
-  if (state.locMode === "gps") {
-    // Mode GPS: Matikan drag, Nyalakan WatchPosition
-    state.marker.dragging.disable();
-    startGPS();
+window.verifyPin = async (oid, correctPin) => {
+  const inputPin = document.getElementById(`pin-${oid}`).value;
+  if (inputPin === correctPin) {
+    if (confirm("PIN Benar! Selesaikan pesanan?"))
+      await updateDoc(doc(db, "orders", oid), { status: "Selesai" });
   } else {
-    // Mode Manual: Matikan WatchPosition, Nyalakan drag
-    stopGPS();
-    state.marker.dragging.enable();
+    alert("PIN SALAH!");
   }
-}
-
-// --- LIVE GPS TRACKING ---
-function startGPS() {
-  if (!navigator.geolocation) {
-    alert("Browser tidak support GPS.");
+};
+window.viewProof = (oid) => {
+  const order = state.orders.find((o) => o.id === oid);
+  if (order && order.paymentProof) {
+    $("#proofImageFull").src = order.paymentProof;
+    $("#proofModal").classList.remove("hidden");
+  } else {
+    alert("Bukti tidak ditemukan");
+  }
+};
+window.deleteOrder = async (oid) => {
+  if (confirm("HAPUS PERMANEN?")) {
+    await deleteDoc(doc(db, "orders", oid));
+  }
+};
+$("#statusToggle").addEventListener("change", async (e) => {
+  if (state.vendor.subscriptionExpiry < Date.now()) {
+    e.target.checked = false;
+    alert("Masa aktif habis.");
     return;
   }
-  // Prevent multiple watchers
-  if (state.watchId) return;
-
-  const options = {
-    enableHighAccuracy: true,
-    timeout: 10000,
-    maximumAge: 0,
-  };
-
-  state.watchId = navigator.geolocation.watchPosition(
-    async (pos) => {
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
-
-      // Update DB Realtime
-      await updateDoc(doc(db, "vendors", state.vendor.id), { lat, lon });
-
-      // Update UI Map
-      if (state.marker) state.marker.setLatLng([lat, lon]);
-      if (state.map) state.map.setView([lat, lon], 16);
-    },
-    (err) => {
-      console.error("GPS Error:", err);
-    },
-    options
-  );
-}
-
-function stopGPS() {
-  if (state.watchId) {
-    navigator.geolocation.clearWatch(state.watchId);
-    state.watchId = null;
-  }
-}
+  await updateDoc(doc(db, "vendors", state.vendor.id), {
+    isLive: e.target.checked,
+  });
+});
 
 $$("[data-close]").forEach((b) =>
-  b.addEventListener("click", (e) => window.closeModal(e.target.dataset.close))
+  b.addEventListener("click", (e) => window.closeModal(e.target.dataset.close)),
 );
 
 initApp();
