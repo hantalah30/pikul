@@ -13,7 +13,14 @@ import {
   updateDoc,
   setDoc,
   increment,
+  limit, // [BARU] Import limit
+  deleteDoc, // [BARU] Pastikan deleteDoc ada
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+// [BARU] Import Messaging untuk Notifikasi
+import {
+  getMessaging,
+  getToken,
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 const audioSelesaiMasak = new Audio("pesanan-selesai-dimasak.mp3");
@@ -21,6 +28,7 @@ const audioBayarBerhasil = new Audio("pembayaran-berhasil.mp3");
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const messaging = getMessaging(app); // [BARU] Init Messaging
 
 const $ = (q) => document.querySelector(q);
 const $$ = (q) => document.querySelectorAll(q);
@@ -63,7 +71,9 @@ let state = {
   watchId: null,
   mapLocked: false,
   // State Voucher
-  activeVoucher: null, // { code, type, value, id }
+  activeVoucher: null,
+  // [BARU] State Pengiriman
+  deliveryMethod: "pickup", // 'pickup' atau 'delivery'
 };
 
 let isIslandExpanded = false;
@@ -121,6 +131,49 @@ function loadCart() {
     }
   }
 }
+
+// --- [BARU] LOGIC NOTIFIKASI FCM ---
+async function initFCM(userId) {
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+      // GANTI 'GANTI_DENGAN_VAPID_KEY' dengan Keypair dari Firebase Console -> Project Settings -> Cloud Messaging -> Web Push cert
+      const token = await getToken(messaging, {
+        vapidKey: "GANTI_DENGAN_VAPID_KEY_ANDA",
+      });
+      if (token) {
+        console.log("FCM Token:", token);
+        // Simpan token ke database user (opsional, untuk kirim notif server-side)
+        // await updateDoc(doc(db, "users", userId), { fcmToken: token });
+      }
+    }
+  } catch (error) {
+    console.log("FCM Error:", error);
+  }
+}
+
+// --- [BARU] DELIVERY METHOD TOGGLE ---
+window.setDeliveryMethod = (method) => {
+  state.deliveryMethod = method;
+
+  // Update UI Button Class
+  const btnPickup = document.getElementById("btnPickup");
+  const btnDelivery = document.getElementById("btnDelivery");
+
+  if (btnPickup && btnDelivery) {
+    btnPickup.classList.toggle("active", method === "pickup");
+    btnDelivery.classList.toggle("active", method === "delivery");
+  }
+
+  const addrField = document.getElementById("deliveryAddressField");
+  if (addrField) {
+    if (method === "delivery") {
+      addrField.classList.remove("hidden");
+    } else {
+      addrField.classList.add("hidden");
+    }
+  }
+};
 
 // --- AUTH LOGIC ---
 window.switchAuthMode = (mode) => {
@@ -181,7 +234,6 @@ $("#loginForm").addEventListener("submit", async (e) => {
     showApp();
     bootApp();
 
-    // [TAMBAHKAN INI] Paksa pindah ke Dashboard (Home)
     window.go("Home");
     showToast("Selamat datang kembali! 👋");
   } catch (err) {
@@ -192,7 +244,6 @@ $("#loginForm").addEventListener("submit", async (e) => {
 });
 $("#registerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  // ... (kode validasi input tetap sama) ...
   const name = $("#regName").value.trim(),
     email = $("#regEmail").value.trim(),
     phone = $("#regPhone").value.trim(),
@@ -233,7 +284,6 @@ $("#registerForm").addEventListener("submit", async (e) => {
     showApp();
     bootApp();
 
-    // [TAMBAHKAN INI] Paksa pindah ke Dashboard (Home)
     window.go("Home");
     showToast("Akun berhasil dibuat! 🎉");
   } catch (err) {
@@ -281,6 +331,9 @@ async function bootApp() {
   loadCart();
 
   if (state.user) {
+    // [BARU] Jalankan FCM setelah login
+    initFCM(state.user.id);
+
     onSnapshot(doc(db, "users", state.user.id), (doc) => {
       if (doc.exists()) {
         state.user = { id: doc.id, ...doc.data() };
@@ -314,24 +367,18 @@ async function bootApp() {
     if (!$("#screenHome").classList.contains("hidden")) renderHome();
   });
 
-  // Di dalam bootApp()...
-
   if (state.user) {
     onSnapshot(
       query(collection(db, "orders"), where("userId", "==", state.user.id)),
       (s) => {
         // --- LOGIKA SUARA GLOBAL ---
-        // Jalankan hanya jika bukan loading pertama kali
         if (!state.firstLoad) {
           s.docChanges().forEach((change) => {
-            // Kita hanya peduli jika data diubah (modified)
             if (change.type === "modified") {
               const newData = change.doc.data();
-              // Ambil data LAMA dari state sebelum di-timpa
               const oldData = state.orders.find((o) => o.id === change.doc.id);
 
               if (oldData) {
-                // 1. Cek: Pembayaran Berhasil (Menunggu -> Diproses)
                 if (
                   oldData.status === "Menunggu Konfirmasi Bayar" &&
                   newData.status === "Diproses"
@@ -343,7 +390,6 @@ async function bootApp() {
                   showToast("✅ Pembayaran Berhasil Diverifikasi!");
                 }
 
-                // 2. Cek: Selesai Masak (Diproses -> Siap Diambil)
                 if (
                   oldData.status === "Diproses" &&
                   newData.status === "Siap Diambil/Diantar"
@@ -358,17 +404,12 @@ async function bootApp() {
             }
           });
         }
-        // -----------------------------
 
-        // Update State Data (Logika Tampilan)
         let raw = s.docs.map((d) => ({ id: d.id, ...d.data() }));
         state.orders = raw.sort(
           (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
         );
         state.firstLoad = false;
-
-        // Render ulang tampilan jika sedang di halaman Orders
-        // (Tapi suara tetap jalan meskipun sedang di Home/Profile)
         renderOrders();
       },
     );
@@ -570,19 +611,30 @@ window.selectChat = (vid) => {
   closeModal("vendorModal");
 };
 
+// --- [UPDATED] CHAT LOGIC WITH PAGINATION ---
 async function renderChatInsideIsland() {
   const vid = state.chatWithVendorId;
   const chatBox = $("#diChatBox");
   chatBox.innerHTML = "";
+
   if (state.unsubChats) state.unsubChats();
+
+  const cid = `${state.user.id}_${vid}`;
+
+  // [BARU] Tambahkan limit(20) dan urutkan descending (terbaru)
+  // Nanti kita reverse array-nya di client agar tampil urut dari atas ke bawah
   const q = query(
-    collection(db, "chats", `${state.user.id}_${vid}`, "messages"),
-    orderBy("ts", "asc"),
+    collection(db, "chats", cid, "messages"),
+    orderBy("ts", "desc"),
+    limit(20),
   );
+
   state.unsubChats = onSnapshot(q, (s) => {
-    chatBox.innerHTML = s.docs
-      .map((d) => {
-        const m = d.data();
+    // Reverse array agar pesan terlama ada di atas, terbaru di bawah
+    const messages = s.docs.map((d) => d.data()).reverse();
+
+    chatBox.innerHTML = messages
+      .map((m) => {
         const isMe = m.from === state.user.id;
         let contentHtml = "";
         if (m.type === "image") {
@@ -1244,10 +1296,6 @@ function renderCartModal() {
   const voucherArea = $("#voucherArea");
   if (!voucherArea) {
     // Insert Voucher Area sebelum Total jika belum ada di HTML
-    const container = $("#checkoutModal .modal-body"); // Pastikan selector benar sesuai HTML
-    // Karena struktur HTML checkoutModal statis, kita bisa inject via JS dynamic
-    // Atau asumsikan User akan menambahkan div dengan id 'voucherContainer' di index.html
-    // Solusi Aman: Tambahkan dinamis di bawah checkoutItems
     const vDiv = document.createElement("div");
     vDiv.id = "voucherArea";
     vDiv.style.marginTop = "15px";
@@ -1361,6 +1409,13 @@ $("#placeOrderBtn").addEventListener("click", async () => {
       full: selectedTime.toISOString(), // Untuk sorting kalau perlu
     };
   }
+
+  // [BARU] VALIDASI PENGIRIMAN
+  let deliveryAddress = null;
+  if (state.deliveryMethod === "delivery") {
+    deliveryAddress = $("#deliveryAddress").value.trim();
+    if (!deliveryAddress) return alert("Mohon isi alamat pengantaran!");
+  }
   // ---------------------------
 
   const btn = $("#placeOrderBtn");
@@ -1448,6 +1503,9 @@ $("#placeOrderBtn").addEventListener("click", async () => {
       createdAt: new Date().toISOString(),
       orderType: state.orderTimeType, // 'asap' atau 'po'
       schedule: scheduleData, // null atau object {date, time}
+      // [BARU] Data Pengiriman
+      deliveryMethod: state.deliveryMethod,
+      deliveryAddress: deliveryAddress,
     });
 
     state.cart = [];

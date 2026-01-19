@@ -1878,6 +1878,37 @@
             </div>
           </div>
 
+          <div style="margin: 15px 0">
+            <label class="input-label">Metode Pengiriman</label>
+            <div class="segment-control">
+              <button
+                id="btnPickup"
+                class="segment-btn active"
+                onclick="setDeliveryMethod('pickup')"
+              >
+                🛍️ Ambil Sendiri
+              </button>
+              <button
+                id="btnDelivery"
+                class="segment-btn"
+                onclick="setDeliveryMethod('delivery')"
+              >
+                🛵 Diantar Seller
+              </button>
+            </div>
+            <div
+              id="deliveryAddressField"
+              class="hidden"
+              style="margin-top: 10px"
+            >
+              <textarea
+                id="deliveryAddress"
+                class="input-field"
+                placeholder="Alamat lengkap pengantaran..."
+              ></textarea>
+            </div>
+          </div>
+
           <input
             id="orderNote"
             placeholder="Catatan..."

@@ -14,14 +14,20 @@ import {
   setDoc,
   deleteDoc,
   serverTimestamp,
-  limit, // [BARU] Import limit
+  limit, // Import limit
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+// [BARU] Import Messaging
+import {
+  getMessaging,
+  getToken,
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 import { firebaseConfig } from "../firebase-config.js";
 
 const audioOrderanBaru = new Audio("orderan-baru.mp3");
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const messaging = getMessaging(app); // [BARU] Init Messaging
 
 const $ = (q) => document.querySelector(q);
 const $$ = (q) => document.querySelectorAll(q);
@@ -38,8 +44,8 @@ let state = {
   locMode: "gps",
   activeChatId: null,
   unsubMsg: null,
-  unsubOrders: null, // [BARU] Simpan listener orders agar bisa di-update
-  ordersLimit: 20, // [BARU] Batas awal data yang diambil
+  unsubOrders: null,
+  ordersLimit: 20,
   orders: [],
   vouchers: [],
   editingMenuIndex: null,
@@ -64,13 +70,11 @@ window.closeModal = (id) => {
   }
 };
 
-// [BARU] Fungsi Load More
 window.loadMoreOrders = () => {
   const btn = document.getElementById("btnLoadMore");
   if (btn) btn.textContent = "Memuat...";
-
-  state.ordersLimit += 20; // Tambah limit 20 lagi
-  subscribeToOrders(); // Restart listener dengan limit baru
+  state.ordersLimit += 20;
+  subscribeToOrders();
 };
 
 // --- HELPER FUNCTIONS ---
@@ -283,6 +287,7 @@ async function initApp() {
     $("#auth").classList.add("hidden");
     $(".app-layout").classList.remove("hidden");
 
+    // Realtime Listeners
     onSnapshot(doc(db, "vendors", state.vendor.id), (doc) => {
       if (doc.exists()) {
         state.vendor = { id: doc.id, ...doc.data() };
@@ -318,9 +323,10 @@ async function initApp() {
       },
     );
 
-    // [MODIFIKASI] Panggil fungsi listener pesanan yang baru
-    subscribeToOrders();
+    // Init FCM untuk Seller
+    initFCM(state.vendor.id);
 
+    subscribeToOrders();
     listenForChats();
     initBubbleDrag();
     goSeller("Home");
@@ -330,19 +336,36 @@ async function initApp() {
   }
 }
 
-// [BARU] Logic Subscribe Orders dengan Pagination
+// --- [BARU] FCM LOGIC ---
+async function initFCM(vendorId) {
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+      // GANTI 'GANTI_DENGAN_VAPID_KEY_ANDA' dengan Key dari Firebase Console
+      const token = await getToken(messaging, {
+        vapidKey: "GANTI_DENGAN_VAPID_KEY_ANDA",
+      });
+      if (token) {
+        console.log("Seller FCM Token:", token);
+        // await updateDoc(doc(db, "vendors", vendorId), { fcmToken: token });
+      }
+    }
+  } catch (e) {
+    console.error("FCM Error", e);
+  }
+}
+
+// --- ORDERS SUBSCRIPTION (PAGINATION) ---
 function subscribeToOrders() {
   if (state.unsubOrders) {
-    state.unsubOrders(); // Matikan listener lama jika ada
+    state.unsubOrders();
   }
 
-  // Query dengan LIMIT dan ORDER BY
-  // NOTE: Ini mungkin akan meminta pembuatan INDEX di Console Firebase pertama kali
   const qOrd = query(
     collection(db, "orders"),
     where("vendorId", "==", state.vendor.id),
-    orderBy("createdAt", "desc"), // Urutkan dari terbaru
-    limit(state.ordersLimit), // Ambil sejumlah limit
+    orderBy("createdAt", "desc"),
+    limit(state.ordersLimit),
   );
 
   state.unsubOrders = onSnapshot(
@@ -351,11 +374,10 @@ function subscribeToOrders() {
       snap.docChanges().forEach((change) => {
         if (change.type === "added" && !state.firstLoad) {
           const data = change.doc.data();
-          // Cek jika orderan benar-benar baru (kurang dari 1 menit yang lalu)
           const isRecent =
             Date.now() - new Date(data.createdAt).getTime() < 60000;
           if (isRecent) {
-            console.log("🔔 Ada orderan baru, mainkan suara!");
+            console.log("🔔 Ada orderan baru!");
             audioOrderanBaru
               .play()
               .catch((e) => console.log("Audio block:", e));
@@ -373,7 +395,7 @@ function subscribeToOrders() {
       console.error("Firestore Error:", error);
       if (error.message.includes("index")) {
         alert(
-          "⚠️ PERHATIAN ADMIN/DEV:\nQuery membutuhkan Index Firestore.\nBuka Console (F12) untuk melihat link pembuatan index.",
+          "⚠️ PERHATIAN ADMIN/DEV:\nQuery membutuhkan Index Firestore.\nBuka Console (F12) untuk link.",
         );
       }
     },
@@ -718,19 +740,27 @@ function loadChatList() {
   });
 }
 
+// --- [UPDATED] CHAT ROOM (PAGINATION) ---
 window.openChatRoom = (chatId, userName) => {
   state.activeChatId = chatId;
   $("#viewChatRoom").classList.add("active");
   $("#roomTitle").textContent = userName;
+
   if (state.unsubMsg) state.unsubMsg();
+
+  // [BARU] Limit 20 pesan terakhir dan urut descending
   const q = query(
     collection(db, "chats", chatId, "messages"),
-    orderBy("ts", "asc"),
+    orderBy("ts", "desc"),
+    limit(20),
   );
+
   state.unsubMsg = onSnapshot(q, (snap) => {
-    $("#msgBox").innerHTML = snap.docs
-      .map((d) => {
-        const m = d.data();
+    // Reverse array agar pesan tampil dari atas ke bawah
+    const messages = snap.docs.map((d) => d.data()).reverse();
+
+    $("#msgBox").innerHTML = messages
+      .map((m) => {
         const isMe = m.from === state.vendor.id;
         let contentHtml = "";
         if (m.type === "image")
@@ -1180,7 +1210,7 @@ function renderOrdersList() {
     if (o.status.includes("Dibatalkan")) stCls = "status-cancel";
     let btn = "";
 
-    // --- LOGIKA TAMPILAN PRE-ORDER DI SINI ---
+    // --- LOGIKA TAMPILAN PRE-ORDER & DELIVERY DI SINI ---
     let scheduleBadge = "";
     if (o.orderType === "po" && o.schedule) {
       const dateObj = new Date(o.schedule.date);
@@ -1191,6 +1221,19 @@ function renderOrdersList() {
       scheduleBadge = `<div style="background: #eff6ff; color: #1e40af; border: 1px solid #dbeafe; padding: 6px 10px; border-radius: 6px; font-size: 13px; margin-bottom: 10px; font-weight:bold; display:block;">
         📅 Pre-Order: ${dateStr} • Jam ${o.schedule.time}
       </div>`;
+    }
+
+    // [BARU] Delivery Badge
+    let deliveryBadge = "";
+    if (o.deliveryMethod === "delivery") {
+      deliveryBadge = `<div style="background:#fff7ed; color:#c2410c; border:1px solid #ffedd5; padding:6px; border-radius:6px; font-size:12px; margin-bottom:8px; display:block;">
+            🛵 <b>Minta Diantar</b><br>
+            <span style="font-size:11px">${o.deliveryAddress || "-"}</span>
+        </div>`;
+    } else {
+      deliveryBadge = `<div style="background:#f0fdf4; color:#15803d; border:1px solid #dcfce7; padding:6px; border-radius:6px; font-size:12px; margin-bottom:8px; display:block;">
+            🛍️ <b>Ambil Sendiri (Pickup)</b>
+        </div>`;
     }
     // -----------------------------------------
 
@@ -1208,7 +1251,12 @@ function renderOrdersList() {
                   </div>
                  </div>`;
       } else if (o.status === "Diproses") {
-        btn = `<button class="btn primary full" onclick="updStat('${o.id}','Siap Diambil/Diantar')">✅ Selesai Masak</button>`;
+        // [BARU] Logic Tombol sesuai Delivery Method
+        if (o.deliveryMethod === "delivery") {
+          btn = `<button class="btn primary full" onclick="updStat('${o.id}','Siap Diambil/Diantar')">🛵 Mulai Antar</button>`;
+        } else {
+          btn = `<button class="btn primary full" onclick="updStat('${o.id}','Siap Diambil/Diantar')">✅ Siap Diambil</button>`;
+        }
       } else if (o.status === "Siap Diambil/Diantar") {
         btn = `<div style="display:flex; gap:8px;"><input id="pin-${o.id}" placeholder="PIN (4 digit)" style="width:100px; padding:8px; border:1px solid #ccc; border-radius:8px; font-size:14px;" maxlength="4" /><button class="btn full" style="background:#10b981; color:white;" onclick="verifyPin('${o.id}', '${o.securePin}')">Verifikasi</button></div>`;
       }
@@ -1241,7 +1289,9 @@ function renderOrdersList() {
       o.status
     }</span></div>
     <div class="ord-body">
-      ${scheduleBadge} <p style="margin:0 0 10px 0; font-size:14px; line-height:1.5;">${itemsUI}</p>${
+      ${scheduleBadge} 
+      ${deliveryBadge}
+      <p style="margin:0 0 10px 0; font-size:14px; line-height:1.5;">${itemsUI}</p>${
         o.note
           ? `<div style="background:#fff1f2; color:#be123c; padding:8px; border-radius:8px; font-size:12px; margin-bottom:10px;">📝 ${o.note}</div>`
           : ""
@@ -1258,11 +1308,9 @@ function renderOrdersList() {
     activeOrders.map((o) => renderItem(o, true)).join("") ||
     `<div class="empty-state-box">Tidak ada pesanan aktif.</div>`;
 
-  // [MODIFIKASI] Render History dan tombol Load More
+  // Render History dan tombol Load More
   let historyHtml = historyOrders.map((o) => renderItem(o, false)).join("");
 
-  // Tombol load more muncul jika jumlah orderan yang ditarik sama dengan limit
-  // (artinya mungkin masih ada data lagi di server)
   if (state.orders.length >= state.ordersLimit) {
     historyHtml += `
         <div style="text-align:center; margin: 20px 0;">

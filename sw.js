@@ -1,4 +1,47 @@
-const CACHE_NAME = "pikul-app-v3";
+// --- BAGIAN 1: FIREBASE CLOUD MESSAGING (UNTUK NOTIFIKASI) ---
+importScripts(
+  "https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js",
+);
+importScripts(
+  "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js",
+);
+
+// ⚠️ WAJIB: Copy-Paste isi variabel firebaseConfig dari file 'firebase-config.js' Anda ke sini
+// Hapus 'export const', jadikan variabel biasa 'const'
+const firebaseConfig = {
+  apiKey: "AIzaSyAKuZJteaWDWwDFWBqU_plfTbRruIwlf9c",
+  authDomain: "pikul-63c68.firebaseapp.com",
+  databaseURL:
+    "https://pikul-63c68-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "pikul-63c68",
+  storageBucket: "pikul-63c68.firebasestorage.app",
+  messagingSenderId: "1031367560676",
+  appId: "1:1031367560676:web:6e5a081a1467dfeda88bf1",
+};
+
+// Inisialisasi Firebase di Service Worker
+firebase.initializeApp(firebaseConfig);
+
+const messaging = firebase.messaging();
+
+// Handler pesan saat aplikasi di background (Layar mati / Tutup Apps)
+messaging.onBackgroundMessage((payload) => {
+  console.log("[sw.js] Pesan background diterima:", payload);
+
+  const notificationTitle = payload.notification.title;
+  const notificationOptions = {
+    body: payload.notification.body,
+    icon: "./pikul.jpeg", // Icon aplikasi
+    badge: "./pikul.jpeg", // Icon kecil di status bar (Android)
+    vibrate: [200, 100, 200],
+  };
+
+  self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
+// --- BAGIAN 2: CACHING & OFFLINE (LOGIKA LAMA ANDA) ---
+
+const CACHE_NAME = "pikul-app-v4"; // Saya update ke v4 agar cache lama terhapus
 const ASSETS_TO_CACHE = [
   // --- ROOT (CUSTOMER) ---
   "./",
@@ -8,7 +51,7 @@ const ASSETS_TO_CACHE = [
   "./firebase-config.js",
   "./pikul.jpeg",
   "./manifest.json",
-  "./seller/manifest-kasir.json", // Tambahkan baris ini
+  "./seller/manifest-kasir.json",
   "./Kasir.png",
 
   // --- SELLER ---
@@ -18,6 +61,7 @@ const ASSETS_TO_CACHE = [
   "./seller/styles.css",
   "./seller/seller.js",
   "./Mitra-Pikul.png",
+  "./seller/orderan-baru.mp3", // Tambahkan audio agar tercache
 
   // --- ADMIN ---
   "./admin/",
@@ -26,7 +70,7 @@ const ASSETS_TO_CACHE = [
   "./admin/admin.js",
   "./Admin-Pikul.png",
 
-  // --- EXTERNAL LIBS (Opsional: Cache ini agar peta/qr jalan offline jika browser mengizinkan) ---
+  // --- EXTERNAL LIBS ---
   "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap",
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
@@ -40,7 +84,7 @@ self.addEventListener("install", (event) => {
     caches.open(CACHE_NAME).then((cache) => {
       console.log("Membuka cache PIKUL...");
       return cache.addAll(ASSETS_TO_CACHE);
-    })
+    }),
   );
   self.skipWaiting();
 });
@@ -55,20 +99,21 @@ self.addEventListener("activate", (event) => {
             console.log("Menghapus cache lama:", cache);
             return caches.delete(cache);
           }
-        })
+        }),
       );
-    })
+    }),
   );
   self.clients.claim();
 });
 
 // 3. FETCH: Strategi "Stale-While-Revalidate"
-// Ambil dari cache dulu biar cepat, lalu update dari network di background
 self.addEventListener("fetch", (event) => {
-  // Abaikan request ke Firestore/Google Maps (biarkan online)
+  // Abaikan request ke Firestore/Google Maps/Firebase Messaging (biarkan online)
   if (
     event.request.url.includes("firestore") ||
-    event.request.url.includes("googleapis")
+    event.request.url.includes("googleapis") ||
+    event.request.url.includes("fcm") ||
+    event.request.url.includes("google-analytics")
   ) {
     return;
   }
@@ -91,11 +136,11 @@ self.addEventListener("fetch", (event) => {
           return networkResponse;
         })
         .catch(() => {
-          // Jika offline dan tidak ada di cache, bisa return halaman offline custom disini
+          // Jika offline dan tidak ada di cache
         });
 
       // Return cache jika ada, jika tidak tunggu network
       return cachedResponse || fetchPromise;
-    })
+    }),
   );
 });
