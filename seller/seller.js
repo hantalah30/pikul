@@ -14,6 +14,7 @@ import {
   setDoc,
   deleteDoc,
   serverTimestamp,
+  limit, // [BARU] Import limit
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { firebaseConfig } from "../firebase-config.js";
 
@@ -30,12 +31,15 @@ function rupiah(n) {
 
 let state = {
   vendor: null,
-  watchId: null, // ID untuk Live GPS tracking
+  watchId: null,
+  wakeLock: null,
   map: null,
   marker: null,
   locMode: "gps",
   activeChatId: null,
   unsubMsg: null,
+  unsubOrders: null, // [BARU] Simpan listener orders agar bisa di-update
+  ordersLimit: 20, // [BARU] Batas awal data yang diambil
   orders: [],
   vouchers: [],
   editingMenuIndex: null,
@@ -45,7 +49,7 @@ let state = {
   approvedSub: null,
   unreadCount: 0,
   menuSalesCounts: {},
-  firstLoad: true, // Untuk mencegah notifikasi bunyi saat refresh halaman
+  firstLoad: true,
 };
 
 // --- GLOBAL EXPORTS ---
@@ -58,6 +62,15 @@ window.closeModal = (id) => {
   } else {
     $("#" + id).classList.add("hidden");
   }
+};
+
+// [BARU] Fungsi Load More
+window.loadMoreOrders = () => {
+  const btn = document.getElementById("btnLoadMore");
+  if (btn) btn.textContent = "Memuat...";
+
+  state.ordersLimit += 20; // Tambah limit 20 lagi
+  subscribeToOrders(); // Restart listener dengan limit baru
 };
 
 // --- HELPER FUNCTIONS ---
@@ -120,6 +133,40 @@ function formatWA(phone) {
   if (p.startsWith("8")) p = "62" + p;
   return p;
 }
+
+// --- SCREEN WAKE LOCK API ---
+async function requestWakeLock() {
+  try {
+    if ("wakeLock" in navigator) {
+      state.wakeLock = await navigator.wakeLock.request("screen");
+      console.log("💡 Layar dipaksa menyala (Wake Lock Aktif)");
+      state.wakeLock.addEventListener("release", () => {
+        console.log("💡 Wake Lock terlepas");
+      });
+    }
+  } catch (err) {
+    console.error(`Wake Lock Error: ${err.name}, ${err.message}`);
+  }
+}
+
+async function releaseWakeLock() {
+  if (state.wakeLock !== null) {
+    await state.wakeLock.release();
+    state.wakeLock = null;
+    console.log("🌑 Wake Lock dinonaktifkan");
+  }
+}
+
+document.addEventListener("visibilitychange", async () => {
+  if (
+    state.wakeLock !== null &&
+    document.visibilityState === "visible" &&
+    state.vendor &&
+    state.vendor.isLive
+  ) {
+    await requestWakeLock();
+  }
+});
 
 // --- AUTH ---
 window.switchAuthMode = (mode) => {
@@ -236,7 +283,6 @@ async function initApp() {
     $("#auth").classList.add("hidden");
     $(".app-layout").classList.remove("hidden");
 
-    // Realtime Listeners
     onSnapshot(doc(db, "vendors", state.vendor.id), (doc) => {
       if (doc.exists()) {
         state.vendor = { id: doc.id, ...doc.data() };
@@ -272,37 +318,8 @@ async function initApp() {
       },
     );
 
-    const qOrd = query(
-      collection(db, "orders"),
-      where("vendorId", "==", state.vendor.id),
-    );
-
-    // GANTI BAGIAN onSnapshot INI:
-    onSnapshot(qOrd, (snap) => {
-      snap.docChanges().forEach((change) => {
-        // Logika Suara: Cek jika ada pesanan BARU masuk
-        if (change.type === "added" && !state.firstLoad) {
-          const data = change.doc.data();
-          // Cek waktu agar tidak bunyi saat reload, hanya jika pesanan baru < 1 menit
-          const isRecent =
-            Date.now() - new Date(data.createdAt).getTime() < 60000;
-
-          if (isRecent) {
-            console.log("🔔 Ada orderan baru, mainkan suara!");
-            audioOrderanBaru
-              .play()
-              .catch((e) => console.log("Perlu interaksi user agar bunyi:", e));
-            if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
-          }
-        }
-      });
-
-      // Update State Data (Logika Tampilan)
-      state.orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      renderOrdersList();
-      calculateStats();
-      state.firstLoad = false;
-    });
+    // [MODIFIKASI] Panggil fungsi listener pesanan yang baru
+    subscribeToOrders();
 
     listenForChats();
     initBubbleDrag();
@@ -313,18 +330,65 @@ async function initApp() {
   }
 }
 
-// --- NAVIGATION UPDATED (OLD STYLE FOR PROMO) ---
+// [BARU] Logic Subscribe Orders dengan Pagination
+function subscribeToOrders() {
+  if (state.unsubOrders) {
+    state.unsubOrders(); // Matikan listener lama jika ada
+  }
+
+  // Query dengan LIMIT dan ORDER BY
+  // NOTE: Ini mungkin akan meminta pembuatan INDEX di Console Firebase pertama kali
+  const qOrd = query(
+    collection(db, "orders"),
+    where("vendorId", "==", state.vendor.id),
+    orderBy("createdAt", "desc"), // Urutkan dari terbaru
+    limit(state.ordersLimit), // Ambil sejumlah limit
+  );
+
+  state.unsubOrders = onSnapshot(
+    qOrd,
+    (snap) => {
+      snap.docChanges().forEach((change) => {
+        if (change.type === "added" && !state.firstLoad) {
+          const data = change.doc.data();
+          // Cek jika orderan benar-benar baru (kurang dari 1 menit yang lalu)
+          const isRecent =
+            Date.now() - new Date(data.createdAt).getTime() < 60000;
+          if (isRecent) {
+            console.log("🔔 Ada orderan baru, mainkan suara!");
+            audioOrderanBaru
+              .play()
+              .catch((e) => console.log("Audio block:", e));
+            if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
+          }
+        }
+      });
+
+      state.orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      renderOrdersList();
+      calculateStats();
+      state.firstLoad = false;
+    },
+    (error) => {
+      console.error("Firestore Error:", error);
+      if (error.message.includes("index")) {
+        alert(
+          "⚠️ PERHATIAN ADMIN/DEV:\nQuery membutuhkan Index Firestore.\nBuka Console (F12) untuk melihat link pembuatan index.",
+        );
+      }
+    },
+  );
+}
+
+// --- NAVIGATION ---
 window.goSeller = (screen) => {
-  // Reset Nav Styles
   $$(".nav-item").forEach((n) => n.classList.remove("active"));
   $$(".sb-item").forEach((n) => n.classList.remove("active"));
 
-  // Hide All Sections
   $("#sellerHome").classList.add("hidden");
   $("#sellerOrders").classList.add("hidden");
   $("#sellerPromo").classList.add("hidden");
 
-  // Show Selected Section & Active Nav
   if (screen === "Home") {
     $$(".nav-item")[0].classList.add("active");
     $$(".sb-item")[0].classList.add("active");
@@ -341,7 +405,7 @@ window.goSeller = (screen) => {
   }
 };
 
-// --- VOUCHER MANAGEMENT (OLD LOGIC RESTORED) ---
+// --- VOUCHER MANAGEMENT ---
 window.openVoucherModal = () => {
   $("#voucherModal").classList.remove("hidden");
 };
@@ -393,7 +457,7 @@ window.submitVoucher = async () => {
 };
 
 function renderVoucherList() {
-  const list = $("#voucherListContainer"); // Target Container di PAGE, bukan modal
+  const list = $("#voucherListContainer");
   if (!list) return;
   list.innerHTML = "";
 
@@ -527,6 +591,7 @@ function disableShop() {
   $("#statusText").textContent = "Tidak Aktif";
   $("#statusText").className = "status-indicator offline";
   stopGPS();
+  releaseWakeLock();
 }
 
 function enableShop() {
@@ -540,24 +605,17 @@ function enableShop() {
     state.locMode = state.vendor.locationMode || "gps";
     updateModeButtons();
     handleLocationLogic();
+    requestWakeLock();
   } else {
     $("#statusText").textContent = "Toko Tutup (Offline)";
     $("#statusText").className = "status-indicator offline";
     $("#locationControls").classList.add("hidden");
     stopGPS();
+    releaseWakeLock();
   }
 }
 
-function playNotification() {
-  // Menggunakan file audio baru
-  audioOrderanBaru.play().catch((e) => {
-    console.log("Audio autoplay diblokir browser, perlu interaksi user: ", e);
-  });
-
-  if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
-}
-
-// --- CHAT LOGIC (NEW) ---
+// --- CHAT LOGIC ---
 function listenForChats() {
   const q = query(
     collection(db, "chats"),
@@ -736,7 +794,7 @@ $("#replyInput").addEventListener("keypress", (e) => {
   if (e.key === "Enter") sendMessage();
 });
 
-// --- MAP & GPS (NEW) ---
+// --- MAP & GPS ---
 function initMap() {
   if (state.map) return;
   state.map = L.map("sellerMap").setView(
@@ -812,7 +870,7 @@ function stopGPS() {
   }
 }
 
-// --- PAYMENT & QRIS (NEW) ---
+// --- PAYMENT & QRIS ---
 window.updatePaymentMethod = async () => {
   const cash = $("#chkCash").checked;
   const qris = $("#chkQris").checked;
@@ -1108,6 +1166,7 @@ function renderOrdersList() {
     (o) => o.status === "Selesai" || o.status.includes("Dibatalkan"),
   );
   $("#incomingCount").textContent = activeOrders.length;
+
   const renderItem = (o, active) => {
     const itemsUI = (o.items || [])
       .map((i) => `${i.qty}x ${i.name}`)
@@ -1120,6 +1179,21 @@ function renderOrdersList() {
           : "status-done";
     if (o.status.includes("Dibatalkan")) stCls = "status-cancel";
     let btn = "";
+
+    // --- LOGIKA TAMPILAN PRE-ORDER DI SINI ---
+    let scheduleBadge = "";
+    if (o.orderType === "po" && o.schedule) {
+      const dateObj = new Date(o.schedule.date);
+      const dateStr = dateObj.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "short",
+      });
+      scheduleBadge = `<div style="background: #eff6ff; color: #1e40af; border: 1px solid #dbeafe; padding: 6px 10px; border-radius: 6px; font-size: 13px; margin-bottom: 10px; font-weight:bold; display:block;">
+        📅 Pre-Order: ${dateStr} • Jam ${o.schedule.time}
+      </div>`;
+    }
+    // -----------------------------------------
+
     if (active) {
       if (o.status === "Menunggu Konfirmasi Bayar") {
         const proofBtn = o.paymentProof
@@ -1165,25 +1239,43 @@ function renderOrdersList() {
       minute: "2-digit",
     })}</span><div style="margin-top:6px;">${waBtn}</div></div><span class="ord-status ${stCls}">${
       o.status
-    }</span></div><div class="ord-body"><p style="margin:0 0 10px 0; font-size:14px; line-height:1.5;">${itemsUI}</p>${
-      o.note
-        ? `<div style="background:#fff1f2; color:#be123c; padding:8px; border-radius:8px; font-size:12px; margin-bottom:10px;">📝 ${o.note}</div>`
-        : ""
-    }<div class="rowBetween"><span class="muted">Total (${
-      o.paymentMethod === "qris" ? "QRIS" : "Tunai"
-    })</span><div style="text-align:right;">${voucherInfo}<b style="font-size:16px;">${rupiah(
-      o.total,
-    )}</b></div></div><div style="display:flex; margin-top:8px;">${historyProofBtn}${deleteBtn}</div></div>${
-      btn ? `<div class="ord-foot">${btn}</div>` : ""
-    }</div>`;
+    }</span></div>
+    <div class="ord-body">
+      ${scheduleBadge} <p style="margin:0 0 10px 0; font-size:14px; line-height:1.5;">${itemsUI}</p>${
+        o.note
+          ? `<div style="background:#fff1f2; color:#be123c; padding:8px; border-radius:8px; font-size:12px; margin-bottom:10px;">📝 ${o.note}</div>`
+          : ""
+      }<div class="rowBetween"><span class="muted">Total (${
+        o.paymentMethod === "qris" ? "QRIS" : "Tunai"
+      })</span><div style="text-align:right;">${voucherInfo}<b style="font-size:16px;">${rupiah(
+        o.total,
+      )}</b></div></div><div style="display:flex; margin-top:8px;">${historyProofBtn}${deleteBtn}</div></div>${
+        btn ? `<div class="ord-foot">${btn}</div>` : ""
+      }</div>`;
   };
+
   $("#incomingOrdersList").innerHTML =
     activeOrders.map((o) => renderItem(o, true)).join("") ||
     `<div class="empty-state-box">Tidak ada pesanan aktif.</div>`;
-  $("#historyOrdersList").innerHTML = historyOrders
-    .map((o) => renderItem(o, false))
-    .join("");
+
+  // [MODIFIKASI] Render History dan tombol Load More
+  let historyHtml = historyOrders.map((o) => renderItem(o, false)).join("");
+
+  // Tombol load more muncul jika jumlah orderan yang ditarik sama dengan limit
+  // (artinya mungkin masih ada data lagi di server)
+  if (state.orders.length >= state.ordersLimit) {
+    historyHtml += `
+        <div style="text-align:center; margin: 20px 0;">
+            <button id="btnLoadMore" class="btn secondary" onclick="loadMoreOrders()" style="width:100%; padding:12px;">
+                📂 Muat Lebih Banyak (Riwayat)
+            </button>
+        </div>
+      `;
+  }
+
+  $("#historyOrdersList").innerHTML = historyHtml;
 }
+
 window.updStat = async (oid, st) => {
   await updateDoc(doc(db, "orders", oid), { status: st });
 };

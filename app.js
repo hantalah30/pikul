@@ -1182,12 +1182,18 @@ window.checkVoucher = async () => {
 };
 
 window.removeVoucher = () => {
+  // 1. Reset state voucher menjadi null
   state.activeVoucher = null;
-  $("#voucherInput").value = "";
+
+  // 2. Render ulang modal keranjang agar input voucher muncul kembali
   renderCartModal();
+
+  // 3. (Opsional) Beri notifikasi
+  showToast("Voucher dilepas");
 };
 
 function renderCartModal() {
+  window.setOrderTimeType("asap");
   const vendorId = state.cart[0].vendorId;
   const vendor = state.vendors.find((v) => v.id === vendorId);
 
@@ -1331,6 +1337,32 @@ function renderCartModal() {
 
 $("#placeOrderBtn").addEventListener("click", async () => {
   if (!state.user) return requireLogin();
+
+  let scheduleData = null; // Default null (berarti ASAP)
+
+  if (state.orderTimeType === "po") {
+    const d = $("#poDate").value;
+    const t = $("#poTime").value;
+
+    if (!d || !t) {
+      return alert("Mohon lengkapi Tanggal dan Jam untuk Pre-Order!");
+    }
+
+    // Cek apakah tanggal di masa lalu
+    const selectedTime = new Date(d + "T" + t);
+    const now = new Date();
+    if (selectedTime < now) {
+      return alert("Waktu Pre-Order tidak boleh di masa lalu.");
+    }
+
+    scheduleData = {
+      date: d,
+      time: t,
+      full: selectedTime.toISOString(), // Untuk sorting kalau perlu
+    };
+  }
+  // ---------------------------
+
   const btn = $("#placeOrderBtn");
   btn.disabled = true;
   btn.textContent = "Memproses...";
@@ -1414,6 +1446,8 @@ $("#placeOrderBtn").addEventListener("click", async () => {
       securePin: securePin,
       status: payment === "qris" ? "Menunggu Konfirmasi Bayar" : "Diproses",
       createdAt: new Date().toISOString(),
+      orderType: state.orderTimeType, // 'asap' atau 'po'
+      schedule: scheduleData, // null atau object {date, time}
     });
 
     state.cart = [];
@@ -1480,6 +1514,18 @@ function renderOrders() {
       const items = (o.items || [])
         .map((i) => `${i.qty}x ${i.name}`)
         .join(", ");
+      let scheduleLabel = "";
+      if (o.orderType === "po" && o.schedule) {
+        // Format tanggal cantik (Contoh: 20 Jan, 14:00)
+        const dateObj = new Date(o.schedule.date);
+        const dateStr = dateObj.toLocaleDateString("id-ID", {
+          day: "numeric",
+          month: "short",
+        });
+        scheduleLabel = `<div style="background: #eff6ff; color: #1e40af; border: 1px solid #dbeafe; padding: 6px 10px; border-radius: 8px; font-size: 12px; margin-bottom: 8px; display: inline-block;">
+        📅 <b>Pre-Order:</b> ${dateStr} • Jam ${o.schedule.time}
+    </div>`;
+      }
       let statusBadge = "",
         statusIcon = "⏳",
         statusDesc = "Menunggu...",
@@ -1529,7 +1575,7 @@ function renderOrders() {
         minute: "2-digit",
       })}</div></div><span class="badge ${statusBadge}">${
         o.status
-      }</span></div><div class="oc-body"><div style="font-size:13px; margin-bottom:12px">${items}</div>${
+      }</span></div><div class="oc-body">${scheduleLabel} <div style="font-size:13px; margin-bottom:12px">${items}</div>${
         state.activeOrderTab === "active"
           ? `<div class="step-compact"><div class="step-icon">${statusIcon}</div><div><b style="font-size:13px; display:block">${o.status}</b><span class="muted" style="font-size:11px">${statusDesc}</span></div></div>`
           : `<div class="rowBetween"><span class="muted" style="font-size:12px">Total Bayar</span><div style="text-align:right;">${discountInfo}<b style="font-size:16px">${rupiah(
@@ -1939,5 +1985,33 @@ function createDynamicQRIS(rawString, amount) {
   let crc = generateCRC16(newString);
   return newString + crc;
 }
+
+window.setOrderTimeType = (type) => {
+  state.orderTimeType = type;
+
+  // Update UI Tab
+  document
+    .getElementById("btnAsap")
+    .classList.toggle("active", type === "asap");
+  document.getElementById("btnPo").classList.toggle("active", type === "po");
+
+  // Tampilkan/Sembunyikan Input Tanggal
+  const inputContainer = document.getElementById("poInputContainer");
+  if (type === "po") {
+    inputContainer.classList.remove("hidden");
+
+    // Set default tanggal besok & jam 12:00 biar user ga bingung
+    if (!document.getElementById("poDate").value) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      document.getElementById("poDate").value = tomorrow
+        .toISOString()
+        .split("T")[0];
+      document.getElementById("poTime").value = "12:00";
+    }
+  } else {
+    inputContainer.classList.add("hidden");
+  }
+};
 
 initAuth();

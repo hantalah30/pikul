@@ -1811,6 +1811,73 @@
           <div class="rowBetween">
             <span>Total</span><b class="big" id="checkoutTotal">0</b>
           </div>
+
+          <div style="margin: 15px 0">
+            <label
+              class="input-label"
+              style="margin-bottom: 8px; display: block"
+              >Waktu Pesanan</label
+            >
+
+            <div class="segment-control" style="margin-bottom: 10px">
+              <button
+                id="btnAsap"
+                class="segment-btn active"
+                onclick="setOrderTimeType('asap')"
+              >
+                ⚡ Sekarang
+              </button>
+              <button
+                id="btnPo"
+                class="segment-btn"
+                onclick="setOrderTimeType('po')"
+              >
+                📅 Pre-Order
+              </button>
+            </div>
+
+            <div
+              id="poInputContainer"
+              class="hidden"
+              style="
+                background: #f8fafc;
+                padding: 10px;
+                border-radius: 12px;
+                border: 1px solid #e2e8f0;
+              "
+            >
+              <div style="display: flex; gap: 10px">
+                <div style="flex: 1">
+                  <label
+                    style="font-size: 11px; font-weight: 600; color: #64748b"
+                    >Tanggal</label
+                  >
+                  <input
+                    type="date"
+                    id="poDate"
+                    class="input-field"
+                    style="padding: 8px; font-size: 13px"
+                  />
+                </div>
+                <div style="flex: 1">
+                  <label
+                    style="font-size: 11px; font-weight: 600; color: #64748b"
+                    >Jam</label
+                  >
+                  <input
+                    type="time"
+                    id="poTime"
+                    class="input-field"
+                    style="padding: 8px; font-size: 13px"
+                  />
+                </div>
+              </div>
+              <div style="font-size: 10px; color: #f59e0b; margin-top: 5px">
+                ⚠️ Pastikan pedagang buka pada jam tersebut.
+              </div>
+            </div>
+          </div>
+
           <input
             id="orderNote"
             placeholder="Catatan..."
