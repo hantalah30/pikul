@@ -66,16 +66,62 @@ body {
   position: relative;
   overflow: hidden;
 }
-
-/* CONTENT AREA */
+/* Update class .content di styles.css */
 .content {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
-  padding-bottom: calc(var(--nav-height) + 20px); /* Space for Bottom Nav */
+  /* Gunakan padding-top 80px agar konten tidak tertutup header di HP */
+  padding: 80px 20px 100px 20px;
   width: 100%;
-  max-width: 100%; /* Default Full Width */
+  max-width: 100%;
   margin: 0;
+}
+
+/* --- STYLE BARU UNTUK HALAMAN PROFILE --- */
+.profile-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.profile-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.profile-menu-item:hover {
+  background: var(--input-bg);
+}
+
+.p-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 122, 0, 0.1);
+  color: var(--orange);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  margin-right: 12px;
+}
+
+/* --- PERBAIKAN DESKTOP (Agar Padding tidak terlalu besar di PC) --- */
+@media (min-width: 768px) {
+  .content {
+    /* Padding normal untuk Desktop */
+    padding: 30px 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
 }
 
 /* --- COMPONENTS --- */

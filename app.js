@@ -153,8 +153,10 @@ $("#loginForm").addEventListener("submit", async (e) => {
   const email = $("#loginEmail").value.trim(),
     pass = $("#loginPass").value,
     btn = e.target.querySelector("button");
+
   btn.disabled = true;
   btn.textContent = "Memproses...";
+
   try {
     const q = query(collection(db, "users"), where("email", "==", email));
     const s = await getDocs(q);
@@ -171,10 +173,17 @@ $("#loginForm").addEventListener("submit", async (e) => {
       btn.textContent = "Masuk";
       return;
     }
+
+    // --- SUKSES LOGIN ---
     state.user = { id: s.docs[0].id, ...uData };
     localStorage.setItem("pikul_user_id", state.user.id);
+
     showApp();
     bootApp();
+
+    // [TAMBAHKAN INI] Paksa pindah ke Dashboard (Home)
+    window.go("Home");
+    showToast("Selamat datang kembali! 👋");
   } catch (err) {
     alert("Error: " + err.message);
   }
@@ -183,15 +192,19 @@ $("#loginForm").addEventListener("submit", async (e) => {
 });
 $("#registerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
+  // ... (kode validasi input tetap sama) ...
   const name = $("#regName").value.trim(),
     email = $("#regEmail").value.trim(),
     phone = $("#regPhone").value.trim(),
     pass = $("#regPass").value,
     btn = e.target.querySelector("button");
+
   if (pass.length < 6) return alert("Password min 6 karakter");
   if (phone.length < 9) return alert("Nomor WA tidak valid");
+
   btn.disabled = true;
   btn.textContent = "Mendaftar...";
+
   try {
     const q = query(collection(db, "users"), where("email", "==", email));
     const s = await getDocs(q);
@@ -201,6 +214,7 @@ $("#registerForm").addEventListener("submit", async (e) => {
       btn.textContent = "Daftar";
       return;
     }
+
     const newUser = {
       name,
       email,
@@ -209,11 +223,19 @@ $("#registerForm").addEventListener("submit", async (e) => {
       wallet: 0,
       createdAt: Date.now(),
     };
+
     const ref = await addDoc(collection(db, "users"), newUser);
+
+    // --- SUKSES REGISTER ---
     state.user = { id: ref.id, ...newUser };
     localStorage.setItem("pikul_user_id", ref.id);
+
     showApp();
     bootApp();
+
+    // [TAMBAHKAN INI] Paksa pindah ke Dashboard (Home)
+    window.go("Home");
+    showToast("Akun berhasil dibuat! 🎉");
   } catch (err) {
     alert("Gagal daftar: " + err.message);
   }
@@ -1535,53 +1557,185 @@ function getChatId() {
   return `${state.user.id}_${state.chatWithVendorId}`;
 }
 window.go = (n) => {
+  // Cek login untuk halaman tertentu (kecuali Profile, biar Tamu bisa buka Profile untuk Login)
   if ((n === "Orders" || n === "Messages") && !state.user) {
     requireLogin();
     return;
   }
+
+  // Sembunyikan semua layar, tampilkan yang dipilih
   Object.values(screens).forEach((e) => e.classList.add("hidden"));
   screens[n].classList.remove("hidden");
+
+  // Atur Header (sembunyikan di halaman chat mobile)
   if (n === "Messages" && window.innerWidth < 768)
     $("#mainHeader").classList.add("hidden");
   else $("#mainHeader").classList.remove("hidden");
+
+  // Update Navigasi Aktif
   $$(".nav").forEach((b) => b.classList.toggle("active", b.dataset.go === n));
+
+  // --- LOGIKA KHUSUS PER HALAMAN ---
+
   if (n === "Map") {
     initMap();
     setTimeout(() => state.map.invalidateSize(), 300);
   }
-  if (n === "Messages") renderInbox();
+
+  if (n === "Messages") {
+    renderInbox();
+  }
+
+  // [PENTING] Tambahkan ini agar halaman Profile dimuat!
+  if (n === "Profile") {
+    renderProfile();
+  }
 };
 $$(".nav").forEach((b) =>
   b.addEventListener("click", () => window.go(b.dataset.go)),
 );
+/* --- GANTI FUNCTION renderProfile() LAMA DENGAN INI --- */
 function renderProfile() {
   const container = $("#profileContent");
-  const logoutBtn = $("#mobileProfileLogout");
-  const headerLogout = $("#logoutBtn");
+  const logoutBtn = $("#mobileProfileLogout"); // Tombol keluar lama (jika ada di HTML)
+  const headerLogout = $("#logoutBtn"); // Tombol keluar di header atas
+
+  // Bersihkan tombol logout lama di bawah agar tidak duplikat
+  if (logoutBtn) logoutBtn.style.display = "none";
+
   if (state.user) {
-    container.innerHTML = `<div class="card"><div class="rowBetween"><div style="display: flex; gap: 12px; align-items: center"><div style="width: 50px; height: 50px; background: #eee; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px;">👤</div><div><b id="pName" style="display: block">${
-      state.user.name
-    }</b><span id="pEmail" class="muted" style="font-size: 12px">${
-      state.user.email
-    }</span></div></div></div><hr style="border: none; border-top: 1px solid var(--border); margin: 16px 0;" /><div class="rowBetween" style="margin-bottom: 10px"><span class="muted">Saldo</span><b class="big" style="color: var(--primary)" id="wallet">${rupiah(
-      state.user.wallet,
-    )}</b></div><button class="btn primary" onclick="openTopupModal()" style="width: 100%">+ Isi Saldo</button></div>`;
-    if (logoutBtn) {
-      logoutBtn.style.display = "block";
-      logoutBtn.onclick = () => {
-        if (confirm("Keluar?")) {
-          localStorage.removeItem("pikul_user_id");
-          location.reload();
-        }
-      };
-    }
+    // --- KONDISI SUDAH LOGIN ---
+    // Tampilkan tombol logout di header
     if (headerLogout) headerLogout.style.display = "flex";
+    headerLogout.onclick = () => doLogout();
+
+    container.innerHTML = `
+      <div class="card" style="background: linear-gradient(135deg, #ff7a00, #ff5e00); color: white; border:none;">
+        <div class="rowBetween">
+          <div style="display: flex; gap: 16px; align-items: center">
+            <div style="width: 60px; height: 60px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; border: 2px solid rgba(255,255,255,0.3);">
+              👤
+            </div>
+            <div>
+              <b id="pName" style="display: block; font-size: 18px; margin-bottom: 4px;">${state.user.name}</b>
+              <span id="pEmail" style="font-size: 13px; opacity: 0.9;">${state.user.email}</span>
+              <div style="font-size: 12px; margin-top: 4px; opacity: 0.8;">${state.user.phone || "No HP belum diatur"}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="rowBetween" style="margin-bottom: 10px">
+            <span class="muted">Saldo PIKULPay</span>
+            <b class="big" style="color: var(--primary)" id="wallet">${rupiah(state.user.wallet)}</b>
+        </div>
+        <button class="btn primary" onclick="openTopupModal()" style="width: 100%; display:flex; justify-content:center; align-items:center; gap:8px;">
+            <span>➕</span> Isi Saldo
+        </button>
+      </div>
+
+      <h3 style="margin: 20px 0 10px; font-size: 16px;">Pengaturan</h3>
+      <div class="profile-menu-list">
+        <div class="profile-menu-item" onclick="alert('Fitur Edit Profil akan segera hadir!')">
+            <div style="display:flex; align-items:center;">
+                <div class="p-icon">✏️</div>
+                <b>Edit Profil</b>
+            </div>
+            <span class="muted">›</span>
+        </div>
+        
+        <div class="profile-menu-item" onclick="alert('Hubungi CS di WA: 085775603396')">
+            <div style="display:flex; align-items:center;">
+                <div class="p-icon">🎧</div>
+                <b>Bantuan & CS</b>
+            </div>
+            <span class="muted">›</span>
+        </div>
+
+        <div class="profile-menu-item" onclick="alert('Versi Aplikasi: v1.0.0 Beta')">
+            <div style="display:flex; align-items:center;">
+                <div class="p-icon">ℹ️</div>
+                <b>Tentang Aplikasi</b>
+            </div>
+            <span class="muted">v1.0</span>
+        </div>
+
+        <div class="profile-menu-item" onclick="doLogout()" style="border-color: #fee2e2; background: #fef2f2;">
+            <div style="display:flex; align-items:center;">
+                <div class="p-icon" style="background: #fee2e2; color: #ef4444;">🚪</div>
+                <b style="color: #ef4444;">Keluar Akun</b>
+            </div>
+        </div>
+      </div>
+    `;
   } else {
-    container.innerHTML = `<div class="card"><div style="text-align:center; padding:20px;"><div style="font-size:40px; margin-bottom:10px;">👋</div><b>Halo, Tamu!</b><p class="muted" style="margin:5px 0 20px;">Masuk untuk melihat saldo dan profil.</p><button class="btn primary full" onclick="requireLogin()">Masuk / Daftar</button></div></div>`;
-    if (logoutBtn) logoutBtn.style.display = "none";
+    // --- KONDISI BELUM LOGIN (TAMU) ---
+    // Sembunyikan tombol logout di header
     if (headerLogout) headerLogout.style.display = "none";
+
+    container.innerHTML = `
+      <div class="card" style="text-align: center; padding: 40px 20px; border: 1px dashed var(--border);">
+        <div style="font-size: 60px; margin-bottom: 16px; animation: bounce 2s infinite;">👋</div>
+        <h2 style="margin: 0 0 8px 0;">Halo, Tamu!</h2>
+        <p class="muted" style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.5;">
+            Kamu sedang dalam mode tamu.<br>
+            Silakan masuk untuk melihat saldo, riwayat pesanan, dan menyimpan alamat.
+        </p>
+        
+        <button class="btn primary full" onclick="requireLogin()" style="padding: 16px; font-size: 16px; box-shadow: 0 4px 15px rgba(255,122,0,0.3);">
+            🔐 Masuk / Daftar Akun
+        </button>
+        
+        <div style="margin-top: 20px; font-size: 12px; color: #94a3b8;">
+            Belum punya akun? Klik tombol di atas untuk mendaftar.
+        </div>
+      </div>
+
+      <div class="profile-menu-list">
+        <div class="profile-menu-item" onclick="alert('Silakan login terlebih dahulu.')">
+            <div style="display:flex; align-items:center;">
+                <div class="p-icon" style="background: #f1f5f9; color: #64748b;">⚙️</div>
+                <b style="color: #64748b;">Pengaturan Aplikasi</b>
+            </div>
+            <span class="muted">🔒</span>
+        </div>
+        <div class="profile-menu-item" onclick="alert('Hubungi CS di WA: 08123456789')">
+            <div style="display:flex; align-items:center;">
+                <div class="p-icon">🎧</div>
+                <b>Pusat Bantuan</b>
+            </div>
+            <span class="muted">›</span>
+        </div>
+      </div>
+    `;
   }
 }
+
+window.doLogout = () => {
+  if (confirm("Apakah Anda yakin ingin keluar dari akun?")) {
+    // 1. Hapus data login
+    localStorage.removeItem("pikul_user_id");
+    state.user = null;
+    state.cart = [];
+    state.orders = [];
+
+    // 2. Reset tampilan
+    renderProfile(); // Render ulang profil jadi mode Tamu
+    renderOrders(); // Kosongkan list order
+
+    // 3. Reset nama di Header
+    const userNameEl = $("#userName");
+    if (userNameEl) userNameEl.textContent = "Tamu";
+
+    // 4. Pindah ke Home & Tampilkan pesan
+    window.go("Home");
+    showToast("Berhasil Keluar Akun");
+
+    // Opsional: Reload halaman agar benar-benar bersih (hilangkan comment jika perlu)
+    // location.reload();
+  }
+};
 function showToast(m, type = "info") {
   let c = $(".toast-container");
   if (!c) {
