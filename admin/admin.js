@@ -11,10 +11,18 @@ import {
   deleteDoc,
   getDoc,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+// [KEAMANAN] Import Firebase Auth
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { firebaseConfig } from "../firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app); // [KEAMANAN] Inisialisasi Auth
 
 const $ = (q) => document.querySelector(q);
 const $$ = (q) => document.querySelectorAll(q);
@@ -27,14 +35,15 @@ let state = {
   vendors: [],
   banners: [],
   subscriptions: [],
-  topups: [], // New state for User Topups
+  topups: [],
   vendorStats: {},
   selectedOrderId: null,
   selectedVendorId: null,
   selectedSubId: null,
+  isBooted: false, // Mencegah double listener
 };
 
-// --- GLOBAL: IMAGE MODAL LOGIC (FIX FOR BLANK PAGE) ---
+// --- GLOBAL: IMAGE MODAL LOGIC ---
 window.closeImageModal = () => {
   $("#imageModal").classList.add("hidden");
   $("#imagePreviewFull").src = "";
@@ -46,7 +55,6 @@ window.viewProofImage = (imgSrc) => {
   $("#imageModal").classList.remove("hidden");
 };
 
-// Helper function to find proof URL by ID (safest way)
 window.viewTopupProof = (id) => {
   const item = state.topups.find((t) => t.id === id);
   if (item && item.proof) window.viewProofImage(item.proof);
@@ -57,27 +65,65 @@ window.viewSubscriptionProof = (id) => {
   if (item && item.proof) window.viewProofImage(item.proof);
 };
 
-// --- AUTH ---
-$("#adminLoginForm").addEventListener("submit", (e) => {
-  e.preventDefault();
-  if (
-    $("#adminUser").value === "admin" &&
-    $("#adminPass").value === "admin123"
-  ) {
+// --- [KEAMANAN] AUTH LOGIC BARU ---
+
+// 1. Cek Status Login (Session Persistence)
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    // Jika User Login Valid
+    console.log("Admin Logged In:", user.email);
     $("#adminAuth").classList.add("hidden");
     $("#adminApp").classList.remove("hidden");
-    boot();
+
+    // Jalankan aplikasi hanya jika belum jalan
+    if (!state.isBooted) {
+      boot();
+      state.isBooted = true;
+    }
   } else {
-    alert("Salah.");
+    // Jika Tidak Login / Logout
+    $("#adminAuth").classList.remove("hidden");
+    $("#adminApp").classList.add("hidden");
+    state.isBooted = false;
   }
 });
-$("#adminLogoutBtn").addEventListener("click", () => location.reload());
+
+// 2. Fungsi Login
+$("#adminLoginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const email = $("#adminUser").value.trim(); // Pastikan input HTML type="email" atau user isi email
+  const pass = $("#adminPass").value;
+  const btn = e.target.querySelector("button");
+
+  btn.textContent = "Memverifikasi...";
+  btn.disabled = true;
+
+  try {
+    // Login ke Firebase
+    await signInWithEmailAndPassword(auth, email, pass);
+    // Jika sukses, onAuthStateChanged akan otomatis jalan
+  } catch (err) {
+    alert("Login Gagal: Password salah atau user tidak ditemukan.");
+    console.error(err);
+    btn.textContent = "Masuk";
+    btn.disabled = false;
+  }
+});
+
+// 3. Fungsi Logout
+$("#adminLogoutBtn").addEventListener("click", async () => {
+  if (confirm("Keluar dari Panel Admin?")) {
+    await signOut(auth);
+    location.reload(); // Refresh agar bersih
+  }
+});
 
 // --- TABS (DESKTOP) ---
 $$(".sbItem").forEach((b) =>
   b.addEventListener("click", () => {
     switchTab(b.dataset.tab);
-  })
+  }),
 );
 
 // --- TABS (MOBILE) ---
@@ -87,19 +133,14 @@ window.switchTabMobile = (tabName, el) => {
 
 // --- UNIVERSAL TAB SWITCHER ---
 function switchTab(tabName) {
-  // Hide all tabs
   $$(".tab").forEach((t) => t.classList.add("hidden"));
-  // Show selected tab
   $("#tab" + tabName).classList.remove("hidden");
 
-  // Update Desktop Sidebar Active State
   $$(".sbItem").forEach((x) => x.classList.remove("active"));
   const desktopBtn = document.querySelector(`.sbItem[data-tab="${tabName}"]`);
   if (desktopBtn) desktopBtn.classList.add("active");
 
-  // Update Mobile Nav Active State
   $$(".nav-item").forEach((x) => x.classList.remove("active"));
-  // Find mobile btn by onclick content (simple match)
   const mobileBtns = document.querySelectorAll(".nav-item");
   mobileBtns.forEach((btn) => {
     if (btn.getAttribute("onclick").includes(tabName)) {
@@ -113,8 +154,8 @@ function switchTab(tabName) {
       tabName === "Topups"
         ? "Topup User"
         : tabName === "Revenue"
-        ? "Validasi Mitra"
-        : tabName;
+          ? "Validasi Mitra"
+          : tabName;
 }
 
 window.goToRevenue = () => {
@@ -123,6 +164,7 @@ window.goToRevenue = () => {
 
 // --- BOOT ---
 function boot() {
+  // Hanya jalan kalau sudah login
   onSnapshot(
     query(collection(db, "orders"), orderBy("createdAt", "desc")),
     (snap) => {
@@ -131,7 +173,7 @@ function boot() {
       renderDashboard();
       renderOrdersTable();
       renderVendors();
-    }
+    },
   );
   onSnapshot(collection(db, "vendors"), (snap) => {
     state.vendors = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -139,22 +181,20 @@ function boot() {
     renderVendorDropdown();
     renderDashboard();
   });
-  // Listener for Seller Subscriptions
   onSnapshot(
     query(collection(db, "subscriptions"), orderBy("timestamp", "desc")),
     (snap) => {
       state.subscriptions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       renderDashboard();
       renderRevenueTable();
-    }
+    },
   );
-  // NEW: Listener for User Topups
   onSnapshot(
     query(collection(db, "topups"), orderBy("timestamp", "desc")),
     (snap) => {
       state.topups = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       renderTopupsTable();
-    }
+    },
   );
   onSnapshot(collection(db, "banners"), (snap) => {
     state.banners = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -185,7 +225,7 @@ function renderDashboard() {
     .filter(
       (s) =>
         s.status === "redeemed" ||
-        (s.status === "approved" && s.method === "qris")
+        (s.status === "approved" && s.method === "qris"),
     )
     .reduce((a, b) => a + (b.amount || 0), 0);
   $("#kpiAdminRevenue").textContent = rupiah(adminRev);
@@ -200,10 +240,10 @@ function renderDashboard() {
         <div>
             <div style="font-weight:600; font-size:13px;">${s.vendorName}</div>
             <div class="muted" style="font-size:11px;">${new Date(
-              s.timestamp
+              s.timestamp,
             ).toLocaleDateString()} • ${
-          s.method === "qris" ? "QRIS" : "Tunai"
-        }</div>
+              s.method === "qris" ? "QRIS" : "Tunai"
+            }</div>
         </div>
         <div class="trx-amount" style="background:${
           s.status === "pending" ? "#fef3c7" : "#dcfce7"
@@ -211,7 +251,7 @@ function renderDashboard() {
           s.status === "pending" ? "⏳ Wait" : "+" + rupiah(s.amount)
         }</div>
     </div>
-  `
+  `,
       )
       .join("") ||
     '<div class="muted" style="text-align:center; padding:10px;">Belum ada pemasukan.</div>';
@@ -223,18 +263,18 @@ function renderDashboard() {
     <div class="item"><div><div style="font-weight:700">${
       o.vendorName
     }</div><div class="muted" style="font-size:12px">${new Date(
-        o.createdAt
-      ).toLocaleTimeString()} • ${
-        o.userName
-      }</div></div><div style="text-align:right"><div style="font-weight:700; color:var(--orange)">${rupiah(
-        o.total
-      )}</div><small class="pill">${o.status}</small></div></div>
-  `
+      o.createdAt,
+    ).toLocaleTimeString()} • ${
+      o.userName
+    }</div></div><div style="text-align:right"><div style="font-weight:700; color:var(--orange)">${rupiah(
+      o.total,
+    )}</div><small class="pill">${o.status}</small></div></div>
+  `,
     )
     .join("");
 }
 
-// --- NEW: TOPUP USER LOGIC ---
+// --- TOPUP USER LOGIC ---
 function renderTopupsTable() {
   const container = $("#topupsTable");
   if (state.topups.length === 0) {
@@ -248,7 +288,6 @@ function renderTopupsTable() {
           <tbody>
               ${state.topups
                 .map((t) => {
-                  // FIX: Use button to open modal instead of href blank
                   let proofHtml = t.proof
                     ? `<button onclick="viewTopupProof('${t.id}')" style="color:blue; text-decoration:underline; border:none; background:none; cursor:pointer; font-size:12px;">Lihat Bukti</button>`
                     : "-";
@@ -273,7 +312,7 @@ function renderTopupsTable() {
                       <td>${new Date(t.timestamp).toLocaleString()}</td>
                       <td><b>${t.userName}</b></td>
                       <td style="color:#166534; font-weight:bold;">${rupiah(
-                        t.amount
+                        t.amount,
                       )}</td>
                       <td>${proofHtml}</td>
                       <td>${statusBadge}</td>
@@ -309,8 +348,8 @@ window.verifyTopupUser = (tid) => {
                 <button class="btn primary full" onclick="approveTopupUser('${
                   t.id
                 }', '${t.userId}', ${
-    t.amount
-  })">✅ Setujui (Auto Add Saldo)</button>
+                  t.amount
+                })">✅ Setujui (Auto Add Saldo)</button>
             </div>
         </div>
     `;
@@ -320,14 +359,13 @@ window.approveTopupUser = async (tid, uid, amount) => {
   if (
     !confirm(
       `Yakin setujui topup ${rupiah(
-        amount
-      )}? Saldo user akan bertambah otomatis.`
+        amount,
+      )}? Saldo user akan bertambah otomatis.`,
     )
   )
     return;
 
   try {
-    // 1. Get Current User Data
     const userRef = doc(db, "users", uid);
     const userSnap = await getDoc(userRef);
 
@@ -335,10 +373,7 @@ window.approveTopupUser = async (tid, uid, amount) => {
       const currentWallet = userSnap.data().wallet || 0;
       const newWallet = currentWallet + parseInt(amount);
 
-      // 2. Update User Wallet
       await updateDoc(userRef, { wallet: newWallet });
-
-      // 3. Update Topup Status
       await updateDoc(doc(db, "topups", tid), { status: "approved" });
 
       $("#verificationModal").classList.add("hidden");
@@ -357,7 +392,7 @@ window.rejectTopupUser = async (tid) => {
   $("#verificationModal").classList.add("hidden");
 };
 
-// --- REVENUE TABLE (SELLER SUBSCRIPTIONS) ---
+// --- REVENUE TABLE ---
 function renderRevenueTable() {
   const container = $("#revenueTable");
   if (state.subscriptions.length === 0) {
@@ -371,7 +406,6 @@ function renderRevenueTable() {
         <tbody>
             ${state.subscriptions
               .map((s) => {
-                // FIX: Use button for modal
                 let proofHtml =
                   s.method === "qris" && s.proof
                     ? `<button onclick="viewSubscriptionProof('${s.id}')" style="color:blue; text-decoration:underline; border:none; background:none; cursor:pointer; font-size:12px;">Lihat Bukti</button>`
@@ -424,7 +458,7 @@ function renderRevenueTable() {
     </table>`;
 }
 
-// --- VERIFICATION LOGIC (SELLER SUBSCRIPTION) ---
+// --- VERIFICATION LOGIC ---
 window.openVerification = (subId, type) => {
   const sub = state.subscriptions.find((s) => s.id === subId);
   if (!sub) return;
@@ -497,7 +531,7 @@ window.rejectSub = async (subId) => {
   $("#verificationModal").classList.add("hidden");
 };
 
-// --- EDIT & DELETE SUBSCRIPTION LOGIC ---
+// --- EDIT & DELETE SUBSCRIPTION ---
 window.deleteSub = async (id) => {
   if (confirm("Yakin hapus data transaksi ini selamanya?")) {
     await deleteDoc(doc(db, "subscriptions", id));
@@ -511,7 +545,7 @@ window.openEditSub = (id) => {
 
   $("#esName").value = sub.vendorName;
   $("#esMethod").value = (sub.method || "cash").toUpperCase();
-  $("#esStatus").value = sub.status; // Set current status
+  $("#esStatus").value = sub.status;
   $("#editSubModal").classList.remove("hidden");
 };
 
@@ -528,26 +562,25 @@ $("#editSubForm").addEventListener("submit", async (e) => {
   $("#editSubModal").classList.add("hidden");
 });
 
-// ... (ORDERS, VENDORS, BANNERS SAME AS BEFORE) ...
+// --- ORDERS CRUD ---
 function renderOrdersTable() {
-  $(
-    "#ordersTable"
-  ).innerHTML = `<table><thead><tr><th>Waktu</th><th>User</th><th>Vendor</th><th>Total</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${state.orders
-    .map(
-      (o) =>
-        `<tr><td>${new Date(o.createdAt).toLocaleString()}</td><td>${
-          o.userName
-        }</td><td>${o.vendorName}</td><td><b>${rupiah(
-          o.total
-        )}</b></td><td><span class="pill">${
-          o.status
-        }</span></td><td><button class="btn small ghost" onclick="openOrd('${
-          o.id
-        }')">Edit</button> <button class="btn small" onclick="deleteOrd('${
-          o.id
-        }')" style="color:red; border-color:#fee">🗑</button></td></tr>`
-    )
-    .join("")}</tbody></table>`;
+  $("#ordersTable").innerHTML =
+    `<table><thead><tr><th>Waktu</th><th>User</th><th>Vendor</th><th>Total</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${state.orders
+      .map(
+        (o) =>
+          `<tr><td>${new Date(o.createdAt).toLocaleString()}</td><td>${
+            o.userName
+          }</td><td>${o.vendorName}</td><td><b>${rupiah(
+            o.total,
+          )}</b></td><td><span class="pill">${
+            o.status
+          }</span></td><td><button class="btn small ghost" onclick="openOrd('${
+            o.id
+          }')">Edit</button> <button class="btn small" onclick="deleteOrd('${
+            o.id
+          }')" style="color:red; border-color:#fee">🗑</button></td></tr>`,
+      )
+      .join("")}</tbody></table>`;
 }
 window.openOrd = (id) => {
   state.selectedOrderId = id;
@@ -560,12 +593,12 @@ window.openOrd = (id) => {
           `<div class="rowBetween" style="margin-bottom:6px"><span>${
             i.name
           } <small>x${i.qty}</small></span><span>${rupiah(
-            i.price * i.qty
-          )}</span></div>`
+            i.price * i.qty,
+          )}</span></div>`,
       )
       .join("") +
     `<hr style="margin:10px 0; border:none; border-top:1px dashed #ccc"><div class="rowBetween"><b>Total</b><b>${rupiah(
-      o.total
+      o.total,
     )}</b></div>`;
   $("#orderModal").classList.remove("hidden");
 };
@@ -578,6 +611,8 @@ $("#saveStatusBtn").addEventListener("click", async () => {
 window.deleteOrd = async (id) => {
   if (confirm("Hapus?")) await deleteDoc(doc(db, "orders", id));
 };
+
+// --- VENDOR CRUD ---
 function renderVendors() {
   $("#vendorAdminList").innerHTML = state.vendors
     .map((v) => {
@@ -588,20 +623,20 @@ function renderVendors() {
                 <div><div style="font-weight:700; font-size:16px;">${
                   v.name
                 }</div><div class="muted" style="font-size:12px">${v.type.toUpperCase()} • Rating ${
-        v.rating || 0
-      }</div></div>
+                  v.rating || 0
+                }</div></div>
                 <div style="display:flex; gap:6px;"><button class="btn small ghost" onclick="openEditVendor('${
                   v.id
                 }')">Edit</button><button class="btn small" style="color:red; border:1px solid #fee" onclick="deleteVendor('${
-        v.id
-      }')">Hapus</button></div>
+                  v.id
+                }')">Hapus</button></div>
             </div>
             <div style="display:flex; gap:10px; background:#f8fafc; padding:8px; border-radius:8px;">
                 <div style="flex:1; text-align:center; border-right:1px solid #e2e8f0;"><div style="font-size:10px; color:#64748b; font-weight:600;">ORDER</div><div style="font-weight:800; font-size:16px;">${
                   stats.totalOrders
                 }</div></div>
                 <div style="flex:1; text-align:center;"><div style="font-size:10px; color:#64748b; font-weight:600;">OMZET</div><div style="font-weight:800; font-size:16px; color:#10b981;">${rupiah(
-                  stats.revenue
+                  stats.revenue,
                 )}</div></div>
             </div>
         </div>`;
@@ -642,6 +677,8 @@ $("#editVendorForm").addEventListener("submit", async (e) => {
 window.deleteVendor = async (id) => {
   if (confirm("Yakin hapus vendor?")) await deleteDoc(doc(db, "vendors", id));
 };
+
+// --- BANNERS ---
 function renderVendorDropdown() {
   $("#bnVendor").innerHTML =
     `<option value="">-- Info Umum (Tanpa Link) --</option>` +
@@ -663,7 +700,7 @@ function renderBanners() {
           b.d
         }</p></div><button onclick="deleteBanner('${
           b.id
-        }')" style="position:absolute; top:10px; right:10px; background:white; color:red; border:none; width:28px; height:28px; border-radius:50%; cursor:pointer; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.2);">✕</button></div>`
+        }')" style="position:absolute; top:10px; right:10px; background:white; color:red; border:none; width:28px; height:28px; border-radius:50%; cursor:pointer; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.2);">✕</button></div>`,
     )
     .join("");
 }
@@ -736,6 +773,6 @@ window.deleteBanner = async (id) => {
 };
 $$("[data-close]").forEach((b) =>
   b.addEventListener("click", () =>
-    $("#" + b.dataset.close).classList.add("hidden")
-  )
+    $("#" + b.dataset.close).classList.add("hidden"),
+  ),
 );
